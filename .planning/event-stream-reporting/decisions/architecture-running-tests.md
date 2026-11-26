@@ -2,6 +2,20 @@
 
 Decisions behind `../ARCHITECTURE.md` on how the test command runs each module's tests under Mill, which processes it starts them through, and how it knows the test classes each took, newest first.
 
+## Inside the nested evaluation, each selected JVM test module's tests run in an anonymous task the test command builds for the module, downstream of only that module's inputs.
+
+**Alternatives** Running each module's tests in the command's body once the nested evaluation has evaluated every module's inputs holds every module's tests until the slowest module compiles, against `../SPECIFICATION.md` R-056b.
+
+**Reasoning** On Mill 1.3.1, in four cold runs, each module's anonymous task started 0.01 s to 0.18 s after the module's own compile, and the anonymous task of a module that compiled 15 s after another module's compile had failed still ran. No worker's output reached the console on any worker path: queue workers forked through `fork.async`, a queue worker on the anonymous task's own thread, and batch workers.
+
+**Costs** An anonymous task has no `dest` and runs under Mill's filesystem checker, so the module run must turn the checker off to write the module folder. A module whose inputs fail never runs its anonymous task, so the test command learns of that module only from the nested evaluation's results.
+
+**Settled by** [Many modules in one test command - The fail-fast-off nested evaluation on Mill 1.3.1](https://github.com/jamesgorman2/scalatest/issues/242).
+
+**See** `../research/mill-nested-module-run.md` § 3, § 4, § 5.
+
+---
+
 ## The test manifest is compiled from Mill's test queue and claim files on the JVM, and no manifest file is written.
 
 **Alternatives**
@@ -125,16 +139,19 @@ Decisions behind `../ARCHITECTURE.md` on how the test command runs each module's
 - Requiring `--keep-going` on the command line adds a flag to every run, and without it scheduling decides which modules report (`../SPECIFICATION.md` R-056a).
 - Setting `--keep-going` in the build's `mill-opts` turns fail-fast off for every Mill command in the project.
 
-**Reasoning** The nested evaluation is one `execute` call on a copy of `mill.exec.Execution`, made by reflection with `failFast` off, which meets `../SPECIFICATION.md` R-056a without `--keep-going`. On Mill 1.1.10 and on Mill 1.3.1, it ran every module's tests after another module's compile had failed, each module's tests starting on that module's own compile, with the results and start times of `--keep-going`. R-044, R-089 and R-092 already rest on Mill internals that a Mill change can break at run time (`capture-and-console.md` "`../SPECIFICATION.md` R-040, R-097a and R-044 hold on every runtime…" and "Progress output is a summary of the number of suites and tests expected to run…"; `test-command.md` "A test module needs no change to its definition…"), and the JVM routes that met R-044 were observed only on the copy. Meeting R-056a through the copy adds one more such dependency, not a new kind of risk.
+**Reasoning** The nested evaluation is one `execute` call on a copy of `mill.exec.Execution`, made by reflection with `failFast` off, which meets `../SPECIFICATION.md` R-056a without `--keep-going`. On Mill 1.1.10 and on Mill 1.3.1, the nested evaluation ran every module's tests after another module's compile had failed, each module's tests starting on that module's own compile, with the results and start times of `--keep-going`. R-044, R-089 and R-092 already rest on Mill internals that a Mill change can break at run time (`capture-and-console.md` "`../SPECIFICATION.md` R-040, R-097a and R-044 hold on every runtime…" and "Progress output is a summary of the number of suites and tests expected to run…"; `test-command.md` "A test module needs no change to its definition…"), and the JVM routes that met R-044 were observed only on the copy. Meeting R-056a through the copy adds one more such dependency, not a new kind of risk.
 
-**Costs** The route reaches a `private val` of Mill's evaluator by reflection and copies `mill.exec.Execution`, both outside Mill's compatibility policy, so a Mill release that changes either breaks it at run time, not compile time. The copy may briefly draw its own failure count on Mill's prompt before the test command ends.
+**Costs** The route reaches a `private val` of Mill's evaluator by reflection and copies `mill.exec.Execution`, both outside Mill's compatibility policy, so a Mill release that changes either breaks the route at run time, and the copy may briefly draw its own failure count on Mill's prompt. On Mill 1.3.1 the nested evaluation gives up the command's exclusive lease, so another launcher sharing the daemon can rewrite a task the nested evaluation depends on, and Mill then retries the whole nested evaluation, which would run each module's tests again.
 
-**Settled by** [Does the test command hold R-056 through Mill internals, or does R-056 accept a later start for modules fail-fast skipped?](https://github.com/jamesgorman2/scalatest/issues/44).
+**Settled by**
+
+- [Does the test command hold R-056 through Mill internals, or does R-056 accept a later start for modules fail-fast skipped?](https://github.com/jamesgorman2/scalatest/issues/44).
+- [Many modules in one test command - The fail-fast-off nested evaluation on Mill 1.3.1](https://github.com/jamesgorman2/scalatest/issues/242).
 
 **See**
 
 - `../research/mill-nested-keep-going.md` § 3, § 4.1, § 4.4, § 5.
-- `../research/mill-nested-module-run.md` § 2, § 3, § 4.
+- `../research/mill-nested-module-run.md` § 2, § 3.1, § 6.
 - `../research/mill-runner-progress-without-trait.md` § 1, § 9.
 - `../research/nested-prompt-console.md` § 4.
 

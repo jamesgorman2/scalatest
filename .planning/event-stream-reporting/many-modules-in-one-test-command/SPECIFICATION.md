@@ -13,7 +13,7 @@ The test command takes exactly one module selector, which must name one JVM test
 ## Spec documents
 
 - [../SPECIFICATION.md](../SPECIFICATION.md) — the epic's specification, which this feature is written against.
-- [TECHNICAL-DESIGN.md](TECHNICAL-DESIGN.md) — how each selected module's tests run inside the test command's nested evaluation.
+- [TECHNICAL-DESIGN.md](TECHNICAL-DESIGN.md) — how the test command checks every selected module before any test starts, and runs each module's tests inside its nested evaluation.
 - [../../../mill-plugin/consolidated.schema.json](../../../mill-plugin/consolidated.schema.json) — the JSON schema of the JSON output, including the root's `moduleSelectors` and `contents` (`$defs/root`, `$defs/moduleSelector` and `$defs/module`).
 - [../ROADMAP.md](../ROADMAP.md) — the epic's later features, which own what this feature leaves out.
 
@@ -21,12 +21,13 @@ Bare `AC-nnn` IDs are this document's. The epic's requirements are cited as `../
 
 ## Scope
 
-- Several module selectors on one test command, each resolved to the test modules it names, and each test module the module selectors name selected once.
+- Several module selectors on one test command, each resolved to the test modules it names, and each test module the module selectors resolve to selected once.
 - The module nodes of the consolidated output and the JSON root's `moduleSelectors` when several test modules are selected.
 - Running every selected JVM test module's tests in one test command: each module's tests start once that module compiles, and run whatever happens to the other selected modules, whether or not Mill's `--keep-going` is given.
 - A selected test module whose tests cannot start, as where it fails to compile, its dependencies fail to resolve, or another task its tests depend on fails.
 - The class globs and framework arguments applying alike to every selected test module.
-- Failing the test command before any test starts where a module selector resolves to no test module, or names a test module that does not test with the release of this fork the Mill plugin belongs to, or a Scala.js or Native test module.
+- Failing the test command before any test starts where the test command is given no module selector, or a module selector resolves to no test module.
+- Failing the test command before any test starts where a module selector resolves to a test module that does not test with the release of this fork the Mill plugin belongs to, to a Scala.js or Native test module, or to a test module whose `testArgsDefault` holds an argument ScalaTest does not recognise.
 - The test command not running where a task Mill must complete before it, such as another goal on the same `mill` command line, fails first.
 
 ### Out of scope
@@ -45,11 +46,8 @@ An item that names a section of `../ROADMAP.md` is left to the feature that sect
 
 ```gherkin
 Feature: Several module selectors
-  The test command takes one or more module selectors and selects each test module that at least one of them resolves to.
-  A test module that more than one module selector resolves to is selected once.
-  The consolidated output holds one module node for each selected test module.
+  The test command takes one or more module selectors.
   Each module node's name is the module's name as Mill writes it in a task name, such as `core.test`.
-  The JSON output's root records, in `moduleSelectors`, each module selector the test command was given, with the test modules it resolved to.
   Module names are ordered by comparing them with Java's `String.compareTo`.
 
   Background:
@@ -70,6 +68,14 @@ Feature: Several module selectors
       Then the JSON output's root holds exactly the module nodes `alpha.test` and `beta.test`, in that order
       And the JSON output's root `moduleSelectors` holds exactly two entries, whose `selector` values are `alpha.test` and `beta.test`, in that order
       And the test command succeeds
+
+  Rule: The test command fails before any test starts where it is given no module selector
+    Scenario: AC-018 Only an output argument
+      When `mill -j 2 scalatest/test -fJ <report>` is invoked
+      Then Mill reports that the test command failed, with a message saying that the test command was given no module selector
+      And no file exists in `<markers>`
+      And nothing exists at `<report>`
+      And Mill's console shows no consolidated output
 
   Rule: Each test module that at least one module selector resolves to runs its tests once and has one module node
     Scenario Outline: AC-001 Module selectors <selectors>
@@ -118,17 +124,15 @@ Feature: Several module selectors
     A module's module folder is the module's name, as Mill writes it in a task name, in the folder `org.scalatest.mill.TestCommandModule/modules` of Mill's output folder.
 
     Scenario: AC-004 The working directory of each module's tests
-      Given the tests `Alpha1.fast` and `Beta1.fast` each send an `info` message holding the system property `user.dir`
+      Given `Alpha1`'s test `fast` and `Beta1`'s test `fast` each send an `info` message holding the system property `user.dir`
       When the test command is invoked with the module selectors `alpha.test beta.test`
-      Then the `info` message of `Alpha1.fast` is the path of the folder `sandbox` in `out/org.scalatest.mill.TestCommandModule/modules/alpha.test` in the build's workspace
-      And the `info` message of `Beta1.fast` is the path of the folder `sandbox` in `out/org.scalatest.mill.TestCommandModule/modules/beta.test` in the build's workspace
+      Then in the JSON output, the `output` of `Alpha1`'s test `fast` holds an `info` message whose `message` is the path of the folder `sandbox` in `out/org.scalatest.mill.TestCommandModule/modules/alpha.test` in the build's workspace
+      And in the JSON output, the `output` of `Beta1`'s test `fast` holds an `info` message whose `message` is the path of the folder `sandbox` in `out/org.scalatest.mill.TestCommandModule/modules/beta.test` in the build's workspace
 ```
 
 ```gherkin
 Feature: Every selected module runs, whatever happens to the others
-  The test command runs the tests of every selected test module, whether another selected test module's tests cannot start, another selected test module has a test that fails, or another selected test module fails the test command in any other way.
-  The test command does so whether or not Mill's `--keep-going` is given.
-  A selected test module's tests start once that module, and each module it depends on, has compiled.
+  The test command runs the tests of every selected test module, whether or not Mill's `--keep-going` is given, and whether another selected test module's tests cannot start, another selected test module has a test that fails, or another selected test module fails the test command in any other way.
 
   Background:
     Given a Mill 1.3.1 build that adds the Mill plugin, at the release of this fork under test, as the entry `com.edc::scalatest-mill` of its `build.mill` header's `mvnDeps`
@@ -154,7 +158,7 @@ Feature: Every selected module runs, whatever happens to the others
 
   Rule: A module whose tests cannot start has its module node and fails the test command, and does not stop another module's tests
     A module's tests cannot start where the module fails to compile, a dependency of the module fails to resolve, or any other task the module's tests depend on fails.
-    The test command starts no test of that module.
+    The test command starts no test of a module whose tests cannot start.
     A failing task of a selected test module does not stop the test command from running.
 
     Scenario Outline: AC-006 broken.test does not compile, flags <flags>
@@ -193,7 +197,9 @@ Feature: Every selected module runs, whatever happens to the others
 ```gherkin
 Feature: Class globs and framework arguments across modules
   The test command's class globs and framework arguments apply alike to every selected test module.
-  In each selected test module, only the test classes whose fully qualified name matches at least one class glob run, and every run receives the framework arguments.
+  Where the test command is given class globs, only the test classes of each selected test module whose fully qualified name matches at least one class glob run.
+  Where the test command is given no class glob, every test class of each selected test module runs.
+  Every run receives the test command's framework arguments.
 
   Background:
     Given a Mill 1.3.1 build that adds the Mill plugin, at the release of this fork under test, as the entry `com.edc::scalatest-mill` of its `build.mill` header's `mvnDeps`
@@ -226,21 +232,21 @@ Feature: Class globs and framework arguments across modules
 
 ```gherkin
 Feature: Modules the test command cannot run
-  Where a module selector resolves to a test module that does not test with the release of this fork the Mill plugin belongs to, the test command fails before any test of any selected test module starts.
-  Such a test module tests with MUnit, uTest, upstream ScalaTest 3.2.20 or another release of this fork.
-  Where a module selector resolves to a Scala.js or Native test module, the test command fails before any test of any selected test module starts.
-  Where a module selector resolves to no test module, the test command fails before any test of any selected test module starts.
-  In each of these cases, once the test command has ended, no file exists at the path `-fJ` names.
+  The test command cannot run a test module that does not test with the release of this fork the Mill plugin belongs to, a Scala.js test module, or a Native test module.
+  A test module tests with the release of this fork the Mill plugin belongs to where the dependencies Mill resolves for that test module hold `com.edc::scalatest-core` at that release, whether the test module names that dependency itself or gets it through another module or library it depends on.
+  Where the test command fails before any test of any selected test module starts, nothing exists at the path that `-fJ` names once the test command has ended.
 
   Background:
     Given a Mill 1.3.1 build that adds the Mill plugin, at the release of this fork under test, as the entry `com.edc::scalatest-mill` of its `build.mill` header's `mvnDeps`
     And the build's JVM test module `alpha.test` tests with `com.edc::scalatest` at that release and holds the suite `Alpha1`, an `AnyFunSuite` whose test `fast` succeeds
     And the build also has these test modules, each with one test that succeeds:
-      | module          | runtime  | tests with                                                  |
-      | `munit.test`    | JVM      | MUnit                                                       |
-      | `upstream.test` | JVM      | `org.scalatest::scalatest` 3.2.20                           |
-      | `js.test`       | Scala.js | `com.edc::scalatest` at the release under test, in `NodeJs` |
-      | `native.test`   | Native   | `com.edc::scalatest` at the release under test              |
+      | module          | runtime  | tests with                                                                                                  |
+      | `munit.test`    | JVM      | MUnit                                                                                                       |
+      | `utest.test`    | JVM      | uTest                                                                                                       |
+      | `upstream.test` | JVM      | `org.scalatest::scalatest` 3.2.20                                                                           |
+      | `other.test`    | JVM      | `com.edc::scalatest` at a release other than the release under test, which a repository the build uses holds |
+      | `js.test`       | Scala.js | `com.edc::scalatest` at the release under test, in `NodeJs`                                                 |
+      | `native.test`   | Native   | `com.edc::scalatest` at the release under test                                                              |
     And `<markers>` is an absolute path at which an empty folder exists, and each test, when it runs, creates a file in `<markers>`
     And `<report>` is an absolute path at which a file exists that an earlier test command wrote
     And the test command is invoked as `mill -j 2 scalatest/test <selectors> -fJ <report>`, each argument reaching `mill` exactly as written, with no shell expansion
@@ -251,20 +257,42 @@ Feature: Modules the test command cannot run
       Then Mill reports that the test command failed, with a message naming `<module>`
       And no file exists in `<markers>`
       And nothing exists at `<report>`
+      And Mill's console shows no consolidated output
 
       Examples:
         | module          |
         | `munit.test`    |
+        | `utest.test`    |
         | `upstream.test` |
+        | `other.test`    |
         | `js.test`       |
         | `native.test`   |
 
   Rule: The failure names every test module the test command cannot run
     Scenario: AC-011 A module selector that resolves to every test module
       When the test command is invoked with the module selector `__.test`
-      Then Mill reports that the test command failed, with a message naming each of `munit.test`, `upstream.test`, `js.test` and `native.test`
+      Then Mill reports that the test command failed, with a message naming each of `munit.test`, `utest.test`, `upstream.test`, `other.test`, `js.test` and `native.test`
       And no file exists in `<markers>`
       And nothing exists at `<report>`
+      And Mill's console shows no consolidated output
+
+  Rule: A test module that gets the release of this fork the Mill plugin belongs to only through a module it depends on is a test module the test command runs
+    Scenario: AC-020 A test module that tests with the release under test through a module it depends on
+      Given the build also has the JVM module `shared`, which is not a test module and whose `mvnDeps` holds `com.edc::scalatest` at the release under test
+      And the build also has the JVM test module `indirect.test`, whose `moduleDeps` holds `shared`, whose own `mvnDeps` holds nothing of this fork, and which holds one test that succeeds
+      When the test command is invoked with the module selectors `alpha.test indirect.test`
+      Then exactly two files exist in `<markers>`
+      And the file at `<report>` holds JSON output whose root holds exactly the module nodes `alpha.test` and `indirect.test`, in that order
+      And the test command succeeds
+
+  Rule: A selected test module whose `testArgsDefault` holds an argument ScalaTest does not recognise fails the test command, naming that argument, before any module's tests start
+    Scenario: AC-019 A test module whose testArgsDefault holds an unrecognised argument
+      Given the build also has the JVM test module `args.test`, which tests with `com.edc::scalatest` at the release under test, holds one test that succeeds, and whose `testArgsDefault` is `--not-a-scalatest-argument`
+      When the test command is invoked with the module selectors `alpha.test args.test`
+      Then Mill reports that the test command failed, with a message naming `--not-a-scalatest-argument`
+      And no file exists in `<markers>`
+      And nothing exists at `<report>`
+      And Mill's console shows no consolidated output
 
   Rule: A module selector that resolves to no test module fails the test command, naming that module selector, before any module's tests start
     Scenario: AC-016 Module selectors alpha.test and util
@@ -273,13 +301,13 @@ Feature: Modules the test command cannot run
       Then Mill reports that the test command failed, with a message naming the module selector `util`
       And no file exists in `<markers>`
       And nothing exists at `<report>`
+      And Mill's console shows no consolidated output
 ```
 
 ```gherkin
 Feature: Another goal fails first
-  Where a task that Mill must complete before it starts the test command fails, the test command starts no test and writes no consolidated output.
-  The test command then creates, changes and deletes nothing at the path `-fJ` names.
-  Such a task is a goal before the test command on the same `mill` command line where Mill's `--keep-going` is not given.
+  Where a task that Mill must complete before it starts the test command fails, the test command starts no test, writes no consolidated output, and creates, changes and deletes nothing at the path that `-fJ` names.
+  A goal before the test command on the same `mill` command line is a task that Mill must complete before it starts the test command only where Mill's `--keep-going` is not given.
   No task of a selected test module, such as its compile or its dependency resolution, is a task that Mill must complete before it starts the test command.
 
   Background:
@@ -288,13 +316,22 @@ Feature: Another goal fails first
     And the build's module `broken` does not compile
     And `<markers>` is an absolute path at which an empty folder exists
     And `<report>` is an absolute path at which a file exists that an earlier test command wrote
+    And each argument of a `mill` command line reaches `mill` exactly as written, with no shell expansion
 
-  Rule: The test command does not run after an earlier goal fails
+  Rule: Where Mill's `--keep-going` is not given, the test command does not run after an earlier goal on the same `mill` command line fails
     Scenario: AC-012 broken.compile before the test command
-      When `mill -j 2 broken.compile + scalatest/test alpha.test -fJ <report>` is invoked, each argument reaching `mill` exactly as written, with no shell expansion
+      When `mill -j 2 broken.compile + scalatest/test alpha.test -fJ <report>` is invoked
       Then Mill reports that `broken.compile` failed
       And no file exists in `<markers>`
       And the file at `<report>` has the content and modification time it had before `mill` was invoked
+      And Mill's console shows no consolidated output
+
+  Rule: Where Mill's `--keep-going` is given, the test command runs after an earlier goal on the same `mill` command line fails
+    Scenario: AC-021 broken.compile before the test command, with --keep-going
+      When `mill -j 2 --keep-going broken.compile + scalatest/test alpha.test -fJ <report>` is invoked
+      Then Mill reports that `broken.compile` failed
+      And a file exists in `<markers>`
+      And the file at `<report>` holds JSON output whose root holds exactly the module node `alpha.test`
 ```
 
 Each epic requirement this feature enables, with the criteria that test it:
@@ -302,18 +339,17 @@ Each epic requirement this feature enables, with the criteria that test it:
 | Epic requirement             | Criteria                               |
 |------------------------------|----------------------------------------|
 | `../SPECIFICATION.md` R-028  | AC-002, AC-013, AC-014, AC-017         |
-| `../SPECIFICATION.md` R-046c | AC-006, AC-015                         |
 | `../SPECIFICATION.md` R-053a | AC-008, AC-009                         |
 | `../SPECIFICATION.md` R-053b | AC-008                                 |
-| `../SPECIFICATION.md` R-055  | AC-001, AC-003, AC-008, AC-017         |
+| `../SPECIFICATION.md` R-055  | AC-001, AC-003, AC-008, AC-017, AC-018 |
 | `../SPECIFICATION.md` R-056a | AC-005, AC-006, AC-009, AC-015         |
 | `../SPECIFICATION.md` R-056b | AC-007                                 |
-| `../SPECIFICATION.md` R-059  | AC-010, AC-011                         |
-| `../SPECIFICATION.md` R-061  | AC-006, AC-012, AC-015                 |
-| `../SPECIFICATION.md` R-062  | AC-012                                 |
-| `../SPECIFICATION.md` R-077  | AC-010, AC-011, AC-016                 |
+| `../SPECIFICATION.md` R-059  | AC-010, AC-011, AC-020                 |
+| `../SPECIFICATION.md` R-061  | AC-006, AC-015                         |
+| `../SPECIFICATION.md` R-062  | AC-012, AC-021                         |
+| `../SPECIFICATION.md` R-077  | AC-010, AC-011, AC-016, AC-019         |
 | `../SPECIFICATION.md` R-096a | AC-001, AC-002, AC-003, AC-006, AC-013 |
-| `../SPECIFICATION.md` R-098e | AC-006, AC-015                         |
 | `../SPECIFICATION.md` R-105  | AC-001, AC-003, AC-006                 |
 | `../SPECIFICATION.md` R-110  | AC-004                                 |
 | `../SPECIFICATION.md` R-137  | AC-005, AC-006, AC-009, AC-015         |
+| `../SPECIFICATION.md` R-142  | AC-019                                 |
