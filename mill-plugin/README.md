@@ -97,7 +97,7 @@ For example, `mill scalatest/test core.test util.test`.
   - `-n`, `-l`, `-m`, `-w`, `-F`, `-T`, `-t`, `-z`, `-S` or `-W`, followed by the values ScalaTest's runner takes with it;
   - one of the values that follow such a flag, such as `samples.Fast` after `-n`.
 
-  The module runs as one of Mill's own test tasks runs it, except for the arguments each run receives (below):
+  Each selected module runs as one of Mill's own test tasks runs it, except for the arguments each run receives (below):
 
   - with class globs, as `mill <module>.testOnly <class globs> -- <framework arguments>`;
   - with none, as `mill <module>.testForked <framework arguments>`.
@@ -132,6 +132,7 @@ It also fails when:
 
 - a test fails or is cancelled, a suite aborts, or a run aborts or is stopped;
 - a test worker dies;
+- a task a selected module's tests depend on fails, such as the module's compile. That module's tests do not start, and Mill reports the task's error;
 - class globs are given and none of them matches a test class of a selected module. No test of that module runs. The consolidated output is written, and its root holds the failure Mill's `testOnly` gives: `Test selector does not match any test: <class globs>` ([JSON.md](JSON.md) § Root);
 - class globs are given, and once every test worker of a module has ended, no run of that module has reported a test as succeeded, failed, ignored, pending or cancelled, or a suite as aborted. This happens, for example, where `-- samples.Alpha1 -- -z nothing-matches` leaves no test of `samples.Alpha1` to run. The consolidated output is written, and its root holds the same failure unless laying out a fork group's files or starting or running a test worker failed. The failure is also left out where a test worker's JVM ended without writing its result and the test command already fails. Neither of these counts as such a report:
   - a test shown as ignored only because its suite's structure marks it ignored;

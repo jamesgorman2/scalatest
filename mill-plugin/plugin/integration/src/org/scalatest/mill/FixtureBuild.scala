@@ -32,6 +32,8 @@ final class FixtureBuild(tester: IntegrationTester) {
 
   def replaceInSample(fileName: String, from: String, to: String): Unit = replaceIn(samples / fileName, fileName)(from, to)
 
+  def replaceInSource(source: os.Path, from: String, to: String): Unit = replaceIn(source, source.last)(from, to)
+
   private def replaceIn(file: os.Path, description: String)(from: String, to: String): Unit = {
     val text = os.read(file)
     withClue(s"$description holds no $from:\n$text\n") {

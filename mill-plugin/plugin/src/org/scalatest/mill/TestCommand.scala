@@ -6,6 +6,7 @@ import mill.api.BuildCtx
 import mill.api.BuildInfo
 import mill.api.Evaluator
 import mill.api.Logger
+import mill.api.Result
 import mill.api.Task
 import mill.api.TaskCtx
 import org.scalatest.consolidation.BuildTool
@@ -26,12 +27,14 @@ private[mill] object TestCommand {
     val commandArguments = orFail(TestCommandArguments.parse(arguments))
     val jsonOutputFile = commandArguments.jsonOutputPath.map(path => new JsonOutputFile(os.Path(path, BuildCtx.workspaceRoot).toNIO))
     jsonOutputFile.foreach(file => orFail(BuildCtx.withFilesystemCheckerDisabled(file.delete())))
-    val selection = orFail(SelectedTestModule.resolve(evaluator, commandArguments.moduleSelectors))
+    val selection = orFail(ModuleSelection.from(evaluator, commandArguments.moduleSelectors))
     // Fail-fast off lets every module's tests run, whatever happens to the others' tasks.
     val failFastOffEvaluator = FailFastOffEvaluator.from(evaluator)
-    val checkedModules = successfulValues(failFastOffEvaluator, ctx.log)(selection.modules.map(module => module -> moduleCheckTask(module)))
-    val runArguments = checkedModules.map { case (module, moduleArguments) =>
-      module -> RunArguments.from(orFail(ModuleScalaTestArguments.kept(moduleArguments)), commandArguments.frameworkArguments)
+    val checkTasks = selection.modules.map(module => module -> moduleCheckTask(module))
+    val checkEvaluation = failFastOffEvaluator.execute(checkTasks.map(_._2), logger = ctx.log)
+    val checkedModuleTestArgs = successfulValues(checkEvaluation, checkTasks)
+    val runArguments = checkedModuleTestArgs.map { case (module, testArgs) =>
+      module -> RunArguments.from(orFail(ModuleScalaTestArguments.kept(testArgs)), commandArguments.frameworkArguments)
     }
     val moduleFolders = BuildCtx.withFilesystemCheckerDisabled(selection.modules.map(module => module -> clearedModuleFolder(ctx, module.name)).toMap)
     val output = ctx.log.streams.out
@@ -53,11 +56,15 @@ private[mill] object TestCommand {
     val moduleRunTasks = runArguments.map { case (module, moduleRunArguments) =>
       moduleRunTask(module, moduleRunArguments, commandArguments.classGlobs, moduleFolders(module), consolidation, ctx.log, now, workerCharset)
     }
-    failFastOffEvaluator.execute(moduleRunTasks, logger = ctx.log)
+    val runEvaluation = failFastOffEvaluator.execute(moduleRunTasks, logger = ctx.log)
     val endedState = consolidation.end(Some(now()))
     orFail(jsonOutputWritten)
-    if (endedState.failed) {
-      ctx.fail(s"The tests of ${EnglishList.of(selection.modules.map(_.name.value))} failed")
+    val failures = Seq(checkEvaluation.values, runEvaluation.values).collect { case failure: Result.Failure => failure } ++
+      Option.when(endedState.failed)(Result.Failure(s"The tests of ${EnglishList.of(selection.modules.map(_.name.value))} failed"))
+    if (failures.nonEmpty) {
+      // `ctx.fail` takes only a message; the joined failure keeps each failed task's name and Mill's own error.
+      val failure = Result.Failure.join(failures)
+      throw new Result.Exception(failure.error, Some(failure))
     }
   }
 
@@ -104,12 +111,13 @@ private[mill] object TestCommand {
     }
   }
 
-  private def successfulValues[K, V](evaluator: Evaluator, logger: Logger)(tasks: Seq[(K, Task[V])]): Seq[(K, V)] = {
-    val results = evaluator.execute(tasks.map(_._2), logger = logger).executionResults.transitiveResults
+  private def successfulValues[K, V](evaluation: Evaluator.Result[V], tasks: Seq[(K, Task[V])]): Seq[(K, V)] =
     tasks.flatMap { case (key, task) =>
-      results.get(task).flatMap(_.asSuccess).map(success => key -> success.value.value.asInstanceOf[V])
+      for {
+        result <- evaluation.executionResults.transitiveResults.get(task)
+        success <- result.asSuccess
+      } yield key -> success.value.value.asInstanceOf[V]
     }
-  }
 
   private def clearedModuleFolder(ctx: TaskCtx, module: ModuleName): os.Path = {
     val moduleFolder = os.Path(ModuleFolder.inside((ctx.dest / os.up / "modules").toNIO, module))

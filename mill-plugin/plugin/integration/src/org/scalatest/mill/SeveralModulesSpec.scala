@@ -21,14 +21,8 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
     Seq("B1", "b10", "b2").foreach(module => build.appendToBuild(s"object $module extends SampleModule"))
   }
 
-  private def replaceInSuite(build: FixtureBuild, module: String, suite: String)(from: String, to: String): Unit = {
-    val source = build.workspace / module / "test" / "src" / "samples" / s"$suite.scala"
-    val text = os.read(source)
-    withClue(s"$suite.scala holds no $from:\n$text\n") {
-      text should include(from)
-    }
-    os.write.over(source, text.replace(from, to))
-  }
+  private def replaceInSuite(build: FixtureBuild, module: String, suite: String)(from: String, to: String): Unit =
+    build.replaceInSource(build.workspace / module / "test" / "src" / "samples" / s"$suite.scala", from, to)
 
   private def runTestCommand(build: FixtureBuild, millFlags: String*)(arguments: String*): TestCommandResult =
     build.runTestCommandWithMillArguments(FixtureBuild.jobsArguments(2) ++ millFlags)(arguments*)
@@ -94,6 +88,7 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
 
           And("Mill's console shows no consolidated output")
           result.treeLines shouldBe empty
+          result.consoleLines.map(TestCommandResult.withoutMillPrefix).filter(_.startsWith("Suites: ")) shouldBe empty
         }
       }
     }
@@ -215,6 +210,23 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
           And("the test command fails")
           shouldFail(result)
         }
+      }
+    }
+
+    Scenario("A test module that does not compile fails the test command and does not stop alpha.test's tests") {
+      withSeveralModules { build =>
+        Given("Beta1's sources do not compile")
+        replaceInSuite(build, "beta", "Beta1")("""test("slow") {}""", """test("slow") { notDefinedAnywhere }""")
+        val (result, _) = runWritingJsonOutput(build)("alpha.test", "beta.test")
+
+        Then("the files Alpha1.fast, Alpha1.slow, Alpha2.fast and Alpha2.slow exist in <markers>")
+        withClue(result.debugString) {
+          Seq("Alpha1.fast", "Alpha1.slow", "Alpha2.fast", "Alpha2.slow").filterNot(marker => os.exists(build.markersFolder / marker)) shouldBe empty
+        }
+
+        And("Mill reports that the test command failed, naming the failed task beta.test.compile")
+        shouldFail(result)
+        shouldWriteToTheConsole(result, "beta.test.compile")
       }
     }
   }

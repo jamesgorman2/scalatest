@@ -96,7 +96,7 @@ object TestCommandResult {
     // characters keep their colours.
     marked.replaceAll("""\{reset\}(?=\{(?!reset\}))""", "")
 
-  private def withoutMillPrefix(line: String): String = millPrefix.replaceFirstIn(line, "")
+  def withoutMillPrefix(line: String): String = millPrefix.replaceFirstIn(line, "")
 
   private def isModuleLine(unprefixed: String): Boolean = unprefixed.startsWith("[")
 

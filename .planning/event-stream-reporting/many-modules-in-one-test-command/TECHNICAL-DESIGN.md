@@ -4,7 +4,7 @@ Bare `AC-nnn` IDs are `SPECIFICATION.md`'s. *The fail-fast-off evaluator* is the
 
 ## Summary
 
-This design checks every selected JVM test module before any test starts, then runs each module's tests in its own anonymous task inside the test command's nested evaluation with fail-fast off (`../decisions/architecture-running-tests.md` "Inside the nested evaluation, each selected JVM test module's tests run in an anonymous task…"). No module's tests may wait on another selected module's compile, so nothing evaluated before the nested evaluation may wait on a compile. Experiments on Mill 1.3.1 confirm the nested evaluation's per-module tasks (`../research/mill-nested-module-run.md` § 3, § 4, § 5). The capture of what test discovery writes follows from Mill 1.3.1's source (`../research/mill-test-discovery-output.md`). Neither the capture nor the check tasks have been run.
+This design checks every selected JVM test module before any test starts, then runs each module's tests in its own anonymous task inside the test command's nested evaluation with fail-fast off (`../decisions/architecture-running-tests.md` "Inside the nested evaluation, each selected JVM test module's tests run in an anonymous task…"). No module's tests may wait on another selected module's compile, so nothing evaluated before the nested evaluation may wait on a compile. Experiments on Mill 1.3.1 confirm the nested evaluation's per-module tasks (`../research/mill-nested-module-run.md` § 3, § 4, § 5). The capture of what test discovery writes follows from Mill 1.3.1's source (`../research/mill-test-discovery-output.md`). Neither the capture nor the check task's Coursier resolution has been built.
 
 ## Components
 
@@ -47,7 +47,8 @@ This design checks every selected JVM test module before any test starts, then r
 
 ### The module run as a task body
 
-- The module run takes its anonymous task's `Task.ctx()` as its command context, in place of the command's. `ModuleFolderTaskCtx` still wraps that context.
+- The module run takes its anonymous task's `Task.ctx()` as its task context, in place of the command's. `ModuleFolderTaskCtx` wraps that context and gives test discovery the module folder as its `dest`, as an anonymous task's context has none.
+- Each worker's `TaskCtx` (`WorkerTaskCtx`) logs through the exclusive command's logger, not the anonymous task's. Mill's test queue names each test class a worker claims through that logger's ticker. Only the exclusive command's logger has no line on Mill's prompt, so the class names stay off the console (`.docs/learnings/mill-build-tooling.md`, 2026-11-26).
 - The anonymous task's body calls the module run inside `BuildCtx.withFilesystemCheckerDisabled`. The block is inside the anonymous task's body, not around `execute`:
   - Mill runs a task that is not a command under a filesystem checker. The checker refuses writes outside the task's own `dest`. An anonymous task has no `dest`, and the module folder lies beside the command's `Task.dest`.
   - `fork.async` carries into each forked body the checker setting in force where `fork.async` is called, so the workers forked inside the block also run with the checker off.

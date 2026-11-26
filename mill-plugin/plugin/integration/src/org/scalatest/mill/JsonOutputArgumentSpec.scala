@@ -158,14 +158,14 @@ final class JsonOutputArgumentSpec extends AnyFeatureSpec with GivenWhenThen wit
   Feature("Deleting and writing the -fJ file") {
 
     val selectorsFailingAfterTheDelete = Seq(
-      "nothing.test" -> "nothing.test names no module",
-      "core" -> "core names a module that is not a test module"
+      "nothing.test" -> "CalculatorSuite, in a build with no module named nothing.test",
+      "core" -> "CalculatorSuite, in core.test, whose parent module core is not a test module"
     )
 
-    for ((selector, whySelectorFails) <- selectorsFailingAfterTheDelete) {
+    for ((selector, buildDescription) <- selectorsFailingAfterTheDelete) {
       Scenario(s"$selector, failing before any test starts, leaves no file at the path") {
         withJsonOutputFixture("CalculatorSuite") { build =>
-          Given(s"CalculatorSuite, in a build with no other module, so that $whySelectorFails")
+          Given(buildDescription)
           And("the file at <report> holds the text left over")
           os.write(build.jsonOutputFile, leftOver)
           When(s"the test command is invoked as mill scalatest/test $selector -fJ <report>")
