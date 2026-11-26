@@ -11,7 +11,7 @@ private[mill] enum TestCommandFailure extends Exception with NoStackTrace {
   case NoModuleSelector
   case NoTestModule(selector: ModuleSelectorArgument)
   case UnresolvedModuleSelector(selector: ModuleSelectorArgument, error: String)
-  case UnrunnableModules(reasons: Seq[UnrunnableModule])
+  case CannotRunModules(reasons: Seq[CannotRunReason])
   case JsonOutputPathIsFolder(path: Path)
   case JsonOutputNotDeleted(path: Path, cause: Throwable)
   case JsonOutputNotWritten(path: Path, cause: Throwable, partlyWrittenFileDeleteFailure: Option[Throwable])
@@ -37,7 +37,7 @@ private[mill] enum TestCommandFailure extends Exception with NoStackTrace {
         s"Module selector ${selector.text} resolves to no test module"
       case UnresolvedModuleSelector(selector, error) =>
         s"Module selector ${selector.text} resolves to no module: $error"
-      case UnrunnableModules(reasons) =>
+      case CannotRunModules(reasons) =>
         ("The test command cannot run these selected test modules:" +: reasons.map(reason => s"  ${reason.line}")).mkString("\n")
       case JsonOutputPathIsFolder(path) =>
         s"The test command cannot delete $path, the file $jsonOutputArgument names: it is a folder"

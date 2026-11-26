@@ -32,12 +32,12 @@ private[mill] final class TestCommand private (
     val (checkFailures, moduleChecks) = checkTasks.partitionMap { case (module, task) =>
       checkResults.valueOrFailure(task).left.map(failure => module -> failure).map(check => module -> check)
     }
-    val (jvmModulesUnrunnable, runArguments) = moduleChecks.partitionMap { case (module, check) =>
+    val (jvmModuleReasons, runArguments) = moduleChecks.partitionMap { case (module, check) =>
       check.runArguments(module.name, commandArguments.frameworkArguments).map(module -> _)
     }
-    val unrunnableModules = otherModules.map(module => UnrunnableModule.NotJvm(module.name)) ++ jvmModulesUnrunnable.flatten
-    if (unrunnableModules.nonEmpty)
-      Left(TestCommandFailure.UnrunnableModules(unrunnableModules.sortBy(_.module.value)))
+    val cannotRunReasons = otherModules.map(module => CannotRunReason.NotJvm(module.name)) ++ jvmModuleReasons.flatten
+    if (cannotRunReasons.nonEmpty)
+      Left(TestCommandFailure.CannotRunModules(cannotRunReasons.sortBy(_.module.value)))
     else
       consolidateSelectedModules(runArguments, checkFailures)
   }

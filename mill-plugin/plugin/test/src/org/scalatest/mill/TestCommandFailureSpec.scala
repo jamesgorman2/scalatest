@@ -63,11 +63,11 @@ final class TestCommandFailureSpec extends AnyWordSpec with should.Matchers {
     "the test command cannot run selected test modules" should {
       "name each module, on its own line, with why the test command cannot run it" in {
         TestCommandFailure
-          .UnrunnableModules(
+          .CannotRunModules(
             Seq(
-              UnrunnableModule.NotJvm(ModuleName("js.test")),
-              UnrunnableModule.WithoutThisRelease(ModuleName("munit.test")),
-              UnrunnableModule.UnrecognisedArguments(ModuleName("args.test"), Seq("-x", "--not-a-scalatest-argument"))
+              CannotRunReason.NotJvm(ModuleName("js.test")),
+              CannotRunReason.WithoutThisRelease(ModuleName("munit.test")),
+              CannotRunReason.UnrecognisedArguments(ModuleName("args.test"), Seq("-x", "--not-a-scalatest-argument"))
             )
           )
           .message shouldBe

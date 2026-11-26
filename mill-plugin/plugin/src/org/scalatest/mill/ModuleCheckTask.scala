@@ -22,6 +22,6 @@ private[mill] object ModuleCheckTask {
 
   private def resolvedDependencies(resolution: Resolution): Set[ResolvedDependency] =
     resolution.retainedVersions.map { case (library, version) =>
-      ResolvedDependency(library.organization.value, library.name.value, version.repr)
+      ResolvedDependency(Organization(library.organization.value), ArtifactName(library.name.value), LibraryVersion(version.repr))
     }.toSet
 }
