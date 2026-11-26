@@ -2,9 +2,23 @@
 
 ## Summary
 
-This design checks every selected JVM test module before any test starts, then runs each module's tests in its own anonymous task inside the test command's nested evaluation with fail-fast off (`../decisions/architecture-running-tests.md` "Inside the nested evaluation, each selected JVM test module's tests run in an anonymous task…"). Each module's tests must start once that module compiles, so nothing evaluated before the nested evaluation may wait on a compile. The tasks of the nested evaluation ran on Mill 1.3.1 (`../research/mill-nested-module-run.md` § 3, § 4, § 5). The check before the nested evaluation has not been run.
+This design checks every selected JVM test module before any test starts, then runs each module's tests in its own anonymous task inside the test command's nested evaluation with fail-fast off (`../decisions/architecture-running-tests.md` "Inside the nested evaluation, each selected JVM test module's tests run in an anonymous task…"). No module's tests may wait on another selected module's compile, so nothing evaluated before the nested evaluation may wait on a compile. The nested evaluation's per-module tasks are confirmed on Mill 1.3.1 (`../research/mill-nested-module-run.md` § 3, § 4, § 5); the check tasks, and capturing what test discovery writes, are not yet confirmed.
 
 Bare `AC-nnn` IDs are `SPECIFICATION.md`'s. *The fail-fast-off evaluator* is the evaluator the test command builds over a copy of Mill's `Execution` with fail-fast off (`../decisions/architecture-running-tests.md` "The test command runs every selected module's tests in one nested evaluation…").
+
+## Components
+
+### The consolidation library's additions
+
+`org.scalatest.consolidation.Consolidation` has `addRootFailure` and `addRootOutput`, and nothing that attaches to a module. It gains a method for each of these operations of `../ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library:
+
+- **Attach output or a failure to a module**, which also serves **Add a module whose tests did not start**. The library keeps each module's failures and output beside its runs, as it keeps the root's. It also needs:
+  - a module given a failure or output but no run, which the library orders by name with the other modules however late it is added (AC-006, AC-015, AC-024);
+  - a module's `outcome` and `failures` in the JSON writer (AC-006, AC-009, AC-015, AC-022, AC-024);
+  - a module's `output` in the JSON writer (AC-025);
+  - in the human-readable writer, a module's output lines and its `*** MODULE ABORTED ***` block, built as `HumanReadableOutput`'s `rootFailureLines` builds the root's (AC-023, AC-026);
+  - a failed consolidation state once a failure is attached (`../SPECIFICATION.md` R-137).
+- **Read whether a module has failed**, which the module run's no-match check reads in place of the consolidation state (`../SPECIFICATION.md` R-053a, R-098e).
 
 ## Critical code paths
 
@@ -21,7 +35,7 @@ Bare `AC-nnn` IDs are `SPECIFICATION.md`'s. *The fail-fast-off evaluator* is the
   - a JVM test module that does not test with the release of this fork;
   - a JVM test module whose `testArgsDefault` holds an argument that `ModuleScalaTestArguments.kept` rejects.
 - That failure names each such module and each rejected argument (AC-010, AC-011, AC-019). The test command fails before **Start**, so it writes no consolidated output.
-- A module whose check task does not succeed, as where its dependencies fail to resolve, is a module whose tests did not start (AC-015). The fail-fast-off evaluator still runs every other module's check task. The test command builds no task in the nested evaluation for a module whose check task did not succeed, and adds that module to the consolidation after **Start** (§ A module whose tests cannot start).
+- A module whose check task does not succeed, as where its dependencies fail to resolve, is a module whose tests did not start (AC-015; § A module whose tests cannot start). The fail-fast-off evaluator still runs every other module's check task.
 - The test command builds each module's `RunArguments` in its own body, from the arguments `ModuleScalaTestArguments.kept` keeps from the module's `testArgsDefault` and from the framework arguments.
 
 ### One task per module
@@ -37,10 +51,18 @@ Bare `AC-nnn` IDs are `SPECIFICATION.md`'s. *The fail-fast-off evaluator* is the
   - Mill runs a task that is not a command under a filesystem checker. The checker refuses writes outside the task's own `dest`. An anonymous task has no `dest`, and the module folder lies beside the command's `Task.dest`.
   - `fork.async` carries into each forked body the checker setting in force where `fork.async` is called, so the workers forked inside the block also run with the checker off.
 
+### A module's failures and output
+
+- The test command adds no module name to a failure it attaches to that module. Mill's own text, such as task names and `testOnly`'s message, stays as Mill writes it.
+- The module run attaches each failure it raises to its module with **Attach output or a failure to a module**, not to the root (AC-009, AC-022, AC-024). These are the failures of `JvmTestModuleRun.launcherOrReportFailure`, `JvmTestModuleRun.layOutForkGroups`, `JvmTestModuleRun.reportNoTestResultForClassGlobs` and `WorkerRun.end`.
+- The module run captures each line test discovery writes to stdout and stderr while `ZincOp.GetTestTasks` runs, and attaches it to the module with **Attach output or a failure to a module** (AC-025, AC-026).
+
 ### A module whose tests cannot start
 
 - Where a task upstream of a module's anonymous task fails, Mill marks the anonymous task `Skipped` and never runs its body. The module run therefore never adds such a module to the consolidation.
 - After the second `execute` returns and before **End**, the test command reads each module's anonymous task's result from the evaluation's results:
   - For a module whose anonymous task is `Skipped`, the test command calls **Add a module whose tests did not start** (`../ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library) with one failure (AC-006, AC-015). That failure's message holds one line for each failed task upstream of the anonymous task, in order of task name, naming the task and its error. The evaluation's results hold each failed upstream task's failure under that task's name.
-  - For a module whose anonymous task ends in `Failure` or `Exception`, as where `ZincOp.GetTestTasks` throws, the test command attaches a failure naming the error to that module (**Attach a failure to a module**). The consolidation state is then failed, so the test command fails.
-- For a module whose check task did not succeed, the test command calls **Add a module whose tests did not start** after **Start**, with one failure. That failure's message is built as for a `Skipped` anonymous task, from each failed task among the check task and the tasks upstream of the check task. The check task itself fails where the module's resolution fails, since the check task resolves the module's dependencies in its own body.
+  - For a module whose anonymous task ends in `Failure` or `Exception`, as where `ZincOp.GetTestTasks` throws, the test command attaches a failure naming the error to that module with **Attach output or a failure to a module** (`../SPECIFICATION.md` R-072b, R-137).
+- For a module whose check task did not succeed, the test command calls **Add a module whose tests did not start** after **Start**, with one failure. That failure's message is built as for a `Skipped` anonymous task, from each failed task among the check task and the tasks upstream of the check task (AC-015).
+  - The check task itself fails where the module's resolution fails, since the check task resolves the module's dependencies in its own body.
+  - The check task has no task name, so the line for its own failure names no task: it is the resolution's error, as Coursier reports it.
