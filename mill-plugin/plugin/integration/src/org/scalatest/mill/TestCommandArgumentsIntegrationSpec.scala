@@ -86,8 +86,8 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
 
   private def moduleNode(json: JsonNode): JsonNode = json.node(NodeKind.Module, "core.test")
 
-  private def noTestMatchedMessageNaming(classGlob: String): String =
-    s"Test selector does not match any test: $classGlob\nRun discoveredTestClasses to see available tests"
+  private def noTestMatchedFailuresOfModule(json: JsonNode): Seq[String] =
+    moduleNode(json).failureMessages.filter(_.startsWith("Test selector does not match any test"))
 
   private def suitesRun(json: JsonNode): Seq[String] =
     moduleNode(json).nodes
@@ -224,9 +224,14 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
         withMarkingSuites { build =>
           val (result, json) = runWithClassGlobsReadingJsonOutput(build, classGlob)
 
-          Then(s"the JSON output's root holds exactly one failure, the one Mill's testOnly fails with, naming $classGlob")
+          Then(s"the module node core.test holds exactly one failure, the one Mill's testOnly fails with, naming $classGlob")
           withClue(result.debugString) {
-            json.failureMessages shouldBe Seq(noTestMatchedMessageNaming(classGlob))
+            moduleNode(json).failureMessages shouldBe Seq(noTestMatchedMessageNaming(classGlob))
+          }
+
+          And("the JSON output's root holds no failure")
+          withClue(result.debugString) {
+            json.failureMessages shouldBe empty
           }
 
           And("no file exists in the markers folder, and no test worker started")
@@ -247,9 +252,14 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
       withMarkingSuites { build =>
         val (result, json) = runReadingJsonOutput(build, "--", "samples.Alpha1", "--", "-z", "nothing-matches")
 
-        Then("the JSON output's root holds exactly one failure, the one Mill's testOnly fails with, naming samples.Alpha1")
+        Then("the module node core.test holds exactly one failure, the one Mill's testOnly fails with, naming samples.Alpha1")
         withClue(result.debugString) {
-          json.failureMessages shouldBe Seq(noTestMatchedMessageNaming("samples.Alpha1"))
+          moduleNode(json).failureMessages shouldBe Seq(noTestMatchedMessageNaming("samples.Alpha1"))
+        }
+
+        And("the JSON output's root holds no failure")
+        withClue(result.debugString) {
+          json.failureMessages shouldBe empty
         }
 
         And("no file exists in the markers folder")
@@ -275,8 +285,8 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
           broken1.outcome shouldBe Some("aborted")
           broken1.holds("message") shouldBe true
 
-          And("the JSON output's root holds no failure whose message begins Test selector does not match any test")
-          json.failureMessages.filter(_.startsWith("Test selector does not match any test")) shouldBe empty
+          And("the module node core.test holds no failure whose message begins Test selector does not match any test")
+          noTestMatchedFailuresOfModule(json) shouldBe empty
         }
 
         And("the test command fails")
@@ -291,9 +301,9 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
         build.addSuites("Halting1")
         val (result, json) = runWithClassGlobsReadingJsonOutput(build, "samples.Halting1")
 
-        Then("the JSON output's root holds no failure whose message begins Test selector does not match any test")
+        Then("the module node core.test holds no failure whose message begins Test selector does not match any test")
         withClue(result.debugString) {
-          json.failureMessages.filter(_.startsWith("Test selector does not match any test")) shouldBe empty
+          noTestMatchedFailuresOfModule(json) shouldBe empty
         }
 
         And("the test command fails")

@@ -1,6 +1,6 @@
 ---
 kind: mill-build-tooling
-description: How Mill 1.x, its bootstrap scripts, testkit, BSP server and plugin API misbehave, and how to read a meta-build's classpath. Read before running Mill from GitBash on Windows, writing a Mill plugin or its integration tests, driving Mill's BSP server, or inspecting a meta-build's classpath.
+description: How Mill 1.x, its bootstrap scripts, testkit, BSP server and plugin API misbehave or constrain a build, and how to read a meta-build's classpath. Read before running Mill from GitBash on Windows, writing a Mill plugin or its integration tests, driving Mill's BSP server, or inspecting a meta-build's classpath.
 ---
 
 <learning>
@@ -237,4 +237,12 @@ In Mill 1.3.1 with the ticker on (`--ticker true`) and output that is not a term
 - `TestModuleUtil.runTestFuture`, where it runs a worker on the calling thread, calls `ticker` with each test class the worker claims, on the logger of the `TaskCtx` it was built with.
 
 To keep test class names off the console, a plugin that runs Mill's test workers inside an anonymous task of its exclusive command must build `TestModuleUtil` with a `TaskCtx` whose logger is the exclusive command's, not the anonymous task's.
+</learning>
+
+<learning>
+date: 2026-11-27
+---
+A Mill module trait that declares `object test extends ScalaTests, ...` gives every module that extends it the same test module, and no module can change it: Scala cannot override an `object`, so a module cannot set its own test module's tasks, such as `testForkGrouping`. Copying the whole module out to change one task duplicates the trait.
+
+Where modules share test settings but one may need its own, declare the settings as an inner trait of the module trait (`trait SharedTests extends ScalaTests, TestModule.ScalaTest { ... }`) and have each module declare `object test extends SharedTests`. One module's test module then takes its own tasks in `object test extends SharedTests { def testForkGrouping = ... }`. This holds for a test fixture build that a scenario edits as much as for a real one.
 </learning>

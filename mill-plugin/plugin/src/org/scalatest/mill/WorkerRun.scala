@@ -2,13 +2,20 @@ package org.scalatest.mill
 
 import java.util.concurrent.ExecutionException
 import org.scalatest.consolidation.Consolidation
+import org.scalatest.consolidation.ModuleName
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
 
-private[mill] final class WorkerRun(consolidation: Consolidation, workerName: String, reader: EventLogReader, capture: WorkerOutputCapture) {
+private[mill] final class WorkerRun(
+    consolidation: Consolidation,
+    module: ModuleName,
+    workerName: String,
+    reader: EventLogReader,
+    capture: WorkerOutputCapture
+) {
 
   private var started: Try[Future[WorkerProcess]] = Failure(new IllegalStateException(s"$workerName was never started"))
   private var readerState: WorkerRun.ReaderState = WorkerRun.ReaderState.NotStarted
@@ -32,11 +39,11 @@ private[mill] final class WorkerRun(consolidation: Consolidation, workerName: St
     tellReaderOfEnd(ended)
     val startedUncaptured = ended.toOption.exists(_.started) && startReadingLate()
     val reading = if (closeReader()) Try(reader.awaitStreamEnd()) else Success(())
-    ended.failed.foreach(throwable => consolidation.addRootFailure(s"Starting $workerName failed: ${WorkerRun.unboxed(throwable)}"))
+    ended.failed.foreach(throwable => consolidation.addModuleFailure(module, s"Starting $workerName failed: ${WorkerRun.unboxed(throwable)}"))
     if (startedUncaptured) {
-      consolidation.addRootFailure(s"Capturing the output of $workerName failed: the worker ran outside the test command's capture, so its output went to Mill's console")
+      consolidation.addModuleFailure(module, s"Capturing the output of $workerName failed: the worker ran outside the test command's capture, so its output went to Mill's console")
     }
-    reading.failed.foreach(throwable => consolidation.addRootFailure(s"Reading the event log of $workerName failed: $throwable"))
+    reading.failed.foreach(throwable => consolidation.addModuleFailure(module, s"Reading the event log of $workerName failed: $throwable"))
     WorkerRun.Ending.of(ended)
   }
 

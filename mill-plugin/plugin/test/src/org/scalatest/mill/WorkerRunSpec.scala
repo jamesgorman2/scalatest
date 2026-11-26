@@ -33,7 +33,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
 
   private final class WorkerRunFixture(
       val eventLogFile: EventLogFile,
-      workerName: String = "worker 0 of fork group 1 of core.test",
+      workerName: String = "worker 0 of fork group 1",
       consolidationUnderTest: ConsolidationUnderTest = new ConsolidationUnderTest
   ) {
     val consolidation: Consolidation = consolidationUnderTest.consolidation
@@ -41,7 +41,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
     val counting: CountingConsolidation = new CountingConsolidation(consolidation, module)
     @volatile var processExited: Boolean = true
     private val reader = new EventLogReader(eventLogFile, addCapturedRun, () => counting.addProcessEndedBeforeAnyRun(), _ => processExited, pollInterval = 1.millis)
-    val workerRun: WorkerRun = new WorkerRun(consolidation, workerName, reader, capture)
+    val workerRun: WorkerRun = new WorkerRun(consolidation, module, workerName, reader, capture)
 
     def runAndEndConsolidation(startWorker: => Future[WorkerProcess]): Unit = {
       run(startWorker)
@@ -78,7 +78,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
     }
 
     def awaitWorkerEnd(): Unit =
-      // `WorkerRun.end` turns a throw from its wait into a root failure, so the test thread waits first, failing the
+      // `WorkerRun.end` turns a throw from its wait into a module failure, so the test thread waits first, failing the
       // test if the worker never ends.
       workerEnd.foreach(Await.ready(_, workerEndTimeout))
 
@@ -124,16 +124,15 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
 
   "Running a worker" when {
     "its event log file never becomes readable" should {
-      "attach what reading threw to the root, end the run's event stream and fail the consolidation" in {
+      "attach what reading threw to the module, naming the worker, end the run's event stream and fail the consolidation" in {
         withEventLogFile { file =>
           appendCompletedRun(file)
           val fixture = new WorkerRunFixture(neverOpening(file))
           fixture.runAndEndConsolidation(processEndedWithResult)
           fixture.outputWithoutSummaryLine shouldBe Seq(
-            "Consolidated tests:",
-            "  [core.test]",
-            "  *** CONSOLIDATED TESTS ABORTED ***",
-            s"    Reading the event log of worker 0 of fork group 1 of core.test failed: java.io.FileNotFoundException: $file (The process cannot access the file because it is being used by another process)"
+            "[core.test]",
+            "  *** MODULE ABORTED ***",
+            s"    Reading the event log of worker 0 of fork group 1 failed: java.io.FileNotFoundException: $file (The process cannot access the file because it is being used by another process)"
           )
           fixture.consolidation.state shouldBe ConsolidationState.EndedFailed
         }
@@ -141,16 +140,15 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
     }
 
     "a line of its event log cannot be decoded" should {
-      "add a root failure naming the line and why, end the run's event stream and fail the consolidation" in {
+      "attach to the module a failure naming the worker, the line and why, end the run's event stream and fail the consolidation" in {
         withWorkerRun { (file, fixture) =>
           append(file, s"$runStarted\nnot an event\n$runEndedCompleted\n")
           fixture.processExited = false
           fixture.runAndEndConsolidation(processEndedWithResult)
           fixture.outputWithoutSummaryLine shouldBe Seq(
-            "Consolidated tests:",
-            "  [core.test]",
-            "  *** CONSOLIDATED TESTS ABORTED ***",
-            "    Reading the event log of worker 0 of fork group 1 of core.test failed: org.scalatest.events.MalformedTestEventLogException: no value starts at offset 0, in not an event"
+            "[core.test]",
+            "  *** MODULE ABORTED ***",
+            "    Reading the event log of worker 0 of fork group 1 failed: org.scalatest.events.MalformedTestEventLogException: no value starts at offset 0, in not an event"
           )
           fixture.consolidation.state shouldBe ConsolidationState.EndedFailed
         }
@@ -168,12 +166,11 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
           writeStdout(fixture.capture, " rest\n")
           fixture.consolidation.end()
           fixture.outputWithoutSummaryLine shouldBe Seq(
-            "Consolidated tests:",
-            "  [core.test]",
-            "    Run 1:",
-            "      [stdout] partial rest",
-            "  *** CONSOLIDATED TESTS ABORTED ***",
-            "    Starting worker 0 of fork group 1 of core.test failed: java.lang.IllegalStateException: claim log unreadable"
+            "[core.test]",
+            "  Run 1:",
+            "    [stdout] partial rest",
+            "  *** MODULE ABORTED ***",
+            "    Starting worker 0 of fork group 1 failed: java.lang.IllegalStateException: claim log unreadable"
           )
         }
       }
@@ -190,12 +187,11 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
           writeStdout(fixture.capture, " rest\n")
           fixture.consolidation.end()
           fixture.outputWithoutSummaryLine shouldBe Seq(
-            "Consolidated tests:",
-            "  [core.test]",
-            "    Run 1:",
-            "      [stdout] partial rest",
-            "  *** CONSOLIDATED TESTS ABORTED ***",
-            "    Starting worker 0 of fork group 1 of core.test failed: java.lang.InterruptedException: sleep interrupted"
+            "[core.test]",
+            "  Run 1:",
+            "    [stdout] partial rest",
+            "  *** MODULE ABORTED ***",
+            "    Starting worker 0 of fork group 1 failed: java.lang.InterruptedException: sleep interrupted"
           )
         }
       }
@@ -219,13 +215,13 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
     }
 
     "starting the worker throws before its event log exists" should {
-      "attach what starting threw to the root and fail the consolidation" in {
+      "attach what starting threw to the module, naming the worker, and fail the consolidation" in {
         withWorkerRun { (_, fixture) =>
           fixture.runAndEndConsolidation(throw new IllegalStateException("testargs already exists"))
           fixture.outputWithoutSummaryLine shouldBe Seq(
-            "Consolidated tests:",
-            "  *** CONSOLIDATED TESTS ABORTED ***",
-            "    Starting worker 0 of fork group 1 of core.test failed: java.lang.IllegalStateException: testargs already exists"
+            "[core.test]",
+            "  *** MODULE ABORTED ***",
+            "    Starting worker 0 of fork group 1 failed: java.lang.IllegalStateException: testargs already exists"
           )
           fixture.consolidation.state shouldBe ConsolidationState.EndedFailed
         }
@@ -233,13 +229,13 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
     }
 
     "the worker started on a future fails after it started" should {
-      "attach what it failed with to the root, naming the worker, and fail the consolidation" in {
+      "attach what it failed with to the module, naming the worker, and fail the consolidation" in {
         withWorkerRun { (_, fixture) =>
           fixture.runAndEndConsolidation(Future.failed(new IllegalStateException("claim folder missing")))
           fixture.outputWithoutSummaryLine shouldBe Seq(
-            "Consolidated tests:",
-            "  *** CONSOLIDATED TESTS ABORTED ***",
-            "    Starting worker 0 of fork group 1 of core.test failed: java.lang.IllegalStateException: claim folder missing"
+            "[core.test]",
+            "  *** MODULE ABORTED ***",
+            "    Starting worker 0 of fork group 1 failed: java.lang.IllegalStateException: claim folder missing"
           )
           fixture.consolidation.state shouldBe ConsolidationState.EndedFailed
         }
@@ -289,7 +285,7 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
     }
 
     "the worker started a process without starting its event log reader, as where it ran on the calling thread uncaptured" should {
-      "read the worker's run once it has ended, and attach a failure naming the worker to the root" in {
+      "read the worker's run once it has ended, and attach a failure naming the worker to the module" in {
         withWorkerRun { (file, fixture) =>
           appendCompletedRun(file)
           fixture.startWithoutMillStartingIt(processEndedWithResult)
@@ -297,22 +293,21 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
           fixture.consolidation.end()
           fixture.counting.runsAdded shouldBe 1
           fixture.outputWithoutSummaryLine shouldBe Seq(
-            "Consolidated tests:",
-            "  [core.test]",
-            "  *** CONSOLIDATED TESTS ABORTED ***",
-            "    Capturing the output of worker 0 of fork group 1 of core.test failed: the worker ran outside the test command's capture, so its output went to Mill's console"
+            "[core.test]",
+            "  *** MODULE ABORTED ***",
+            "    Capturing the output of worker 0 of fork group 1 failed: the worker ran outside the test command's capture, so its output went to Mill's console"
           )
         }
       }
     }
 
     "starting the first of two workers throws before its event log exists" should {
-      "attach what starting threw to the root, naming the first worker, and still give the second worker's run to the consolidation" in {
+      "attach what starting threw to the module, naming the first worker, and still give the second worker's run to the consolidation" in {
         withTwoEventLogFiles { (firstFile, secondFile) =>
           appendCompletedRun(secondFile)
           val consolidationUnderTest = new ConsolidationUnderTest
-          val first = new WorkerRunFixture(EventLogFile.at(firstFile), "worker 0 of fork group 0 of core.test", consolidationUnderTest)
-          val second = new WorkerRunFixture(EventLogFile.at(secondFile), "worker 0 of fork group 1 of core.test", consolidationUnderTest)
+          val first = new WorkerRunFixture(EventLogFile.at(firstFile), "worker 0 of fork group 0", consolidationUnderTest)
+          val second = new WorkerRunFixture(EventLogFile.at(secondFile), "worker 0 of fork group 1", consolidationUnderTest)
           first.run(throw new IllegalStateException("testargs already exists"))
           second.run {
             writeStdout(second.capture, "second\n")
@@ -320,12 +315,11 @@ final class WorkerRunSpec extends AnyWordSpec with should.Matchers with Eventual
           }
           consolidationUnderTest.consolidation.end()
           consolidationUnderTest.outputWithoutSummaryLine shouldBe Seq(
-            "Consolidated tests:",
-            "  [core.test]",
-            "    Run 1:",
-            "      [stdout] second",
-            "  *** CONSOLIDATED TESTS ABORTED ***",
-            "    Starting worker 0 of fork group 0 of core.test failed: java.lang.IllegalStateException: testargs already exists"
+            "[core.test]",
+            "  Run 1:",
+            "    [stdout] second",
+            "  *** MODULE ABORTED ***",
+            "    Starting worker 0 of fork group 0 failed: java.lang.IllegalStateException: testargs already exists"
           )
         }
       }

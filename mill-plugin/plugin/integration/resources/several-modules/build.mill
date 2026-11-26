@@ -8,7 +8,7 @@ import mill.scalalib.*
 trait SampleModule extends ScalaModule {
   def scalaVersion = "3.3.8"
 
-  object test extends ScalaTests, TestModule.ScalaTest {
+  trait SampleTests extends ScalaTests, TestModule.ScalaTest {
     def mvnDeps = Seq(mvn"com.edc::scalatest::3.2.20")
     def testParallelism = false
     def testSandboxWorkingDir = true
@@ -17,6 +17,10 @@ trait SampleModule extends ScalaModule {
   }
 }
 
-object alpha extends SampleModule
+object alpha extends SampleModule {
+  object test extends SampleTests
+}
 
-object beta extends SampleModule
+object beta extends SampleModule {
+  object test extends SampleTests
+}

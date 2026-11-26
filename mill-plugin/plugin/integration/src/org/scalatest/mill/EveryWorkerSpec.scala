@@ -527,11 +527,16 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
         When("the test command runs the module")
         val (result, json) = build.resultAndJsonOutputOfTestCommand()
 
-        Then("the JSON output's only failure names the module and the worker that could not start")
-        val failures = json.failureMessages
+        Then("the module node core.test holds exactly one failure, naming the worker that could not start but not the module")
+        val failures = json.node(NodeKind.Module, "core.test").failureMessages
         withClue(result.debugString) {
           failures should have size 1
-          failures.head should startWith("Starting worker 0 of fork group 1 of core.test failed: ")
+          failures.head should startWith("Starting worker 0 of fork group 1 failed: ")
+        }
+
+        And("the JSON output's root holds no failure")
+        withClue(result.debugString) {
+          json.failureMessages shouldBe empty
         }
 
         And("the module's runs are the first fork group's, holding B1 and B2, then the third's, holding A2")
@@ -552,10 +557,17 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
         When("the test command runs the module")
         val (result, json) = build.resultAndJsonOutputOfTestCommand()
 
-        Then("the JSON output's only failure says the two fork groups share a processFolder")
-        json.failureMessages shouldBe Seq(
-          "Laying out the workers of core.test failed: fork groups 0 and 1 share the processFolder samples.A1"
-        )
+        Then("the module node core.test holds exactly one failure, saying the two fork groups share a processFolder")
+        withClue(result.debugString) {
+          json.node(NodeKind.Module, "core.test").failureMessages shouldBe Seq(
+            "Laying out the workers failed: fork groups 0 and 1 share the processFolder samples.A1"
+          )
+        }
+
+        And("the JSON output's root holds no failure")
+        withClue(result.debugString) {
+          json.failureMessages shouldBe empty
+        }
 
         And("the module has no run, and no startedAt, endedAt or duration")
         runs(json) shouldBe empty

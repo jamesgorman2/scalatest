@@ -38,4 +38,7 @@ trait FixtureBuilds { this: should.Matchers =>
     withClue(result.debugString) {
       result.consoleText should include(text)
     }
+
+  protected def noTestMatchedMessageNaming(classGlobs: String): String =
+    s"Test selector does not match any test: $classGlobs\nRun discoveredTestClasses to see available tests"
 }

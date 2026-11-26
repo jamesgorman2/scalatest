@@ -16,10 +16,25 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
       test(build)
     }
 
+  private def withClassGlobsAcrossModules[A](test: FixtureBuild => A): A =
+    withFixtureBuild(FixtureName.classGlobsAcrossModules) { build =>
+      Given("the JVM test modules alpha.test, holding Alpha1 and Alpha2, and beta.test, holding Beta1")
+      And("each suite's tests fast, tagged samples.Fast, and slow succeed, and each test, when it runs, creates the file <suite>.<test> in <markers>")
+      And("each of those modules holds the object samples.Fast, which is a Tag and not a test class")
+      os.makeDir.all(build.markersFolder)
+      test(build)
+    }
+
   private def addModulesThatSortByCharacterCode(build: FixtureBuild): Unit = {
     Given("the build also has the JVM test modules B1.test, b10.test and b2.test, each holding one suite whose one test succeeds")
-    Seq("B1", "b10", "b2").foreach(module => build.appendToBuild(s"object $module extends SampleModule"))
+    Seq("B1", "b10", "b2").foreach(module => build.appendToBuild(s"object $module extends SampleModule {\n  object test extends SampleTests\n}"))
   }
+
+  private def setForkGroupingOfBetaTest(build: FixtureBuild, forkGrouping: String): Unit =
+    build.replaceInBuild(
+      "object beta extends SampleModule {\n  object test extends SampleTests\n}",
+      s"object beta extends SampleModule {\n  object test extends SampleTests {\n    def testForkGrouping = Task { $forkGrouping }\n  }\n}"
+    )
 
   private def replaceInSuite(build: FixtureBuild, module: String, suite: String)(from: String, to: String): Unit =
     build.replaceInSource(build.workspace / module / "test" / "src" / "samples" / s"$suite.scala", from, to)
@@ -31,6 +46,22 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
     When(s"the test command is invoked as mill -j 2 ${millFlags.map(_ + " ").mkString}scalatest/test ${selectors.mkString(" ")} -fJ <report>")
     build.resultAndJsonOutput(runTestCommand(build, millFlags*)((selectors :+ "-fJ" :+ build.jsonOutputFile.toString)*))
   }
+
+  private def runOnBothModulesWritingJsonOutput(build: FixtureBuild, arguments: String*): (TestCommandResult, JsonNode) = {
+    When(s"the test command is invoked as mill -j 2 scalatest/test alpha.test beta.test -fJ <report> ${arguments.mkString(" ")}")
+    build.resultAndJsonOutput(runTestCommand(build)((Seq("alpha.test", "beta.test", "-fJ", build.jsonOutputFile.toString) ++ arguments)*))
+  }
+
+  private def moduleNode(json: JsonNode, module: String): JsonNode = json.node(NodeKind.Module, module)
+
+  private def runNodesOf(json: JsonNode, module: String): Seq[JsonNode] = moduleNode(json, module).nodes.filter(_.kind == NodeKind.Run)
+
+  private def shouldHaveNoOutcomeAndNoFailures(node: JsonNode): Unit = {
+    node.holds("outcome") shouldBe false
+    node.holds("failures") shouldBe false
+  }
+
+  private def markerFiles(build: FixtureBuild): Seq[String] = os.list(build.markersFolder).map(_.last).sorted
 
   private def moduleSelectorsOf(json: JsonNode): Seq[(String, Seq[String])] =
     json("moduleSelectors").arr.toSeq.map(entry => entry("selector").str -> entry("modules").arr.toSeq.map(_.str))
@@ -227,6 +258,114 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
         And("Mill reports that the test command failed, naming the failed task beta.test.compile")
         shouldFail(result)
         shouldWriteToTheConsole(result, "org.scalatest.mill.TestCommandModule/test beta.test.compile")
+      }
+    }
+
+    Scenario("Two of beta.test's fork groups each holding only samples.Beta1 abort beta.test, and do not stop alpha.test's tests") {
+      withSeveralModules { build =>
+        Given("beta.test's testForkGrouping gives two fork groups, each holding only samples.Beta1")
+        setForkGroupingOfBetaTest(build, """Seq(Seq("samples.Beta1"), Seq("samples.Beta1"))""")
+        val (result, json) = runWritingJsonOutput(build)("alpha.test", "beta.test")
+
+        withClue(result.debugString) {
+          Then("the files Alpha1.fast and Alpha1.slow exist in <markers>, and neither Beta1.fast nor Beta1.slow does")
+          Seq("Alpha1.fast", "Alpha1.slow").filterNot(marker => os.exists(build.markersFolder / marker)) shouldBe empty
+          Seq("Beta1.fast", "Beta1.slow").filter(marker => os.exists(build.markersFolder / marker)) shouldBe empty
+
+          And("the module node beta.test holds no run node, its outcome is aborted, and its failures holds exactly one entry")
+          val beta = moduleNode(json, "beta.test")
+          runNodesOf(json, "beta.test") shouldBe empty
+          beta.outcome shouldBe Some("aborted")
+          beta.failureMessages should have size 1
+
+          And("that entry's message contains samples.Beta1 and does not contain beta.test")
+          beta.failureMessages.head should include("samples.Beta1")
+          beta.failureMessages.head should not include "beta.test"
+
+          And("the module node alpha.test has no outcome and no failures")
+          shouldHaveNoOutcomeAndNoFailures(moduleNode(json, "alpha.test"))
+
+          And("the JSON output's root has no outcome and no failures")
+          shouldHaveNoOutcomeAndNoFailures(json)
+        }
+
+        And("the test command fails")
+        shouldFail(result)
+      }
+    }
+  }
+
+  Feature("Class globs and framework arguments across modules") {
+
+    val argumentsAndMarkers = Seq(
+      Seq("--", "samples.Alpha1", "samples.Beta1") -> Seq("Alpha1.fast", "Alpha1.slow", "Beta1.fast", "Beta1.slow"),
+      Seq("--", "--", "-n", "samples.Fast") -> Seq("Alpha1.fast", "Alpha2.fast", "Beta1.fast"),
+      Seq("--", "*1", "--", "-z", "slow") -> Seq("Alpha1.slow", "Beta1.slow")
+    )
+
+    for ((arguments, markers) <- argumentsAndMarkers) {
+      Scenario(s"Arguments ${arguments.mkString(" ")} reach every selected module") {
+        withClassGlobsAcrossModules { build =>
+          val (result, _) = runOnBothModulesWritingJsonOutput(build, arguments*)
+
+          Then(s"the files in <markers> are exactly ${EnglishList.of(markers)}")
+          withClue(result.debugString) {
+            markerFiles(build) shouldBe markers
+          }
+
+          And("the test command succeeds")
+          shouldSucceed(result)
+        }
+      }
+    }
+
+    Scenario("Class globs that match only alpha.test's classes abort beta.test with the failure Mill's testOnly fails with") {
+      withClassGlobsAcrossModules { build =>
+        val (result, json) = runOnBothModulesWritingJsonOutput(build, "--", "samples.Alpha*")
+
+        withClue(result.debugString) {
+          Then("the files in <markers> are exactly Alpha1.fast, Alpha1.slow, Alpha2.fast and Alpha2.slow")
+          markerFiles(build) shouldBe Seq("Alpha1.fast", "Alpha1.slow", "Alpha2.fast", "Alpha2.slow")
+
+          And("the module node beta.test holds no run node, its outcome is aborted, and its failures holds exactly the failure Mill's testOnly fails with, naming samples.Alpha*")
+          val beta = moduleNode(json, "beta.test")
+          runNodesOf(json, "beta.test") shouldBe empty
+          beta.outcome shouldBe Some("aborted")
+          beta.failureMessages shouldBe Seq(noTestMatchedMessageNaming("samples.Alpha*"))
+
+          And("the module node alpha.test has no outcome and no failures")
+          shouldHaveNoOutcomeAndNoFailures(moduleNode(json, "alpha.test"))
+
+          And("the JSON output's root has no outcome and no failures")
+          shouldHaveNoOutcomeAndNoFailures(json)
+        }
+
+        And("the test command fails")
+        shouldFail(result)
+      }
+    }
+
+    Scenario("Framework arguments that exclude every test the class globs keep abort each module, which keeps its runs") {
+      withClassGlobsAcrossModules { build =>
+        val (result, json) = runOnBothModulesWritingJsonOutput(build, "--", "*1", "--", "-z", "nothing-matches")
+
+        withClue(result.debugString) {
+          Then("no file exists in <markers>")
+          markerFiles(build) shouldBe empty
+
+          for (module <- Seq("alpha.test", "beta.test")) {
+            And(s"the module node $module holds one or more run nodes, its outcome is aborted, and its failures holds exactly the failure Mill's testOnly fails with, naming *1")
+            runNodesOf(json, module) should not be empty
+            moduleNode(json, module).outcome shouldBe Some("aborted")
+            moduleNode(json, module).failureMessages shouldBe Seq(noTestMatchedMessageNaming("*1"))
+          }
+
+          And("the JSON output's root has no outcome and no failures")
+          shouldHaveNoOutcomeAndNoFailures(json)
+        }
+
+        And("the test command fails")
+        shouldFail(result)
       }
     }
   }

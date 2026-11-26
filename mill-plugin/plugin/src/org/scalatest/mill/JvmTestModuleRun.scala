@@ -124,7 +124,7 @@ private[mill] final class JvmTestModuleRun(
       processHasExited,
       eventLogPollInterval
     )
-    val workerRun = new WorkerRun(consolidation, plannedWorker.describedIn(module), reader, capture)
+    val workerRun = new WorkerRun(consolidation, module, plannedWorker.description, reader, capture)
     workerRun.start { workerStarting =>
       val workerCtx = new WorkerTaskCtx(ctx, workerLog, capture, workerStarting)
       runWorker(workerCtx, inputs.testModuleUtil(runArguments.commandLine ++ RunnerArgument.forEventLogFile(eventLogFile.toNIO), workerCtx))
@@ -257,7 +257,7 @@ private[mill] object JvmTestModuleRun {
   ): Option[Launcher] =
     outcomeOfLayingOut.fold(
       failure => {
-        consolidation.addRootFailure(failure.rootMessage(module))
+        consolidation.addModuleFailure(module, failure.moduleFailureMessage)
         consolidation.timeModule(module, None, None)
         None
       },
@@ -275,14 +275,14 @@ private[mill] object JvmTestModuleRun {
     // the workers ended. The consolidation, not the result Mill gives for each worker, tells whether a test result
     // reached it. Mill skips this check where a fork group failed to lay out, a worker failed to start or run, or a
     // worker's JVM ended without writing its result. Unlike Mill, the test command skips it for such a JVM only where
-    // the test command already fails. A JVM that dies after its run ended leaves no aborted run or class, so the test
-    // command could otherwise pass where Mill's fails.
+    // the module has already failed. A JVM that dies after its run ended leaves no aborted run or class, so the module
+    // could otherwise pass where Mill's fails.
     val missingTestResultExplained =
       !everyForkGroupLaidOut ||
         workerEndings.contains(WorkerRun.Ending.Failed) ||
-        (workerEndings.contains(WorkerRun.Ending.EndedWithoutResult) && consolidation.state.failed)
+        (workerEndings.contains(WorkerRun.Ending.EndedWithoutResult) && consolidation.hasFailed(module))
     if (classGlobs.nonEmpty && !missingTestResultExplained && !consolidation.hasTestResult(module)) {
-      consolidation.addRootFailure(ClassGlob.noTestMatchedMessage(classGlobs))
+      consolidation.addModuleFailure(module, ClassGlob.noTestMatchedMessage(classGlobs))
     }
   }
 
@@ -291,7 +291,7 @@ private[mill] object JvmTestModuleRun {
   ): Seq[(PlannedForkGroup, LaidOut)] = {
     val attempts = forkGroups.map(forkGroup => forkGroup -> Try(layOut(forkGroup)))
     attempts.foreach {
-      case (forkGroup, Failure(throwable)) => consolidation.addRootFailure(s"Laying out ${forkGroup.describedIn(module)} failed: $throwable")
+      case (forkGroup, Failure(throwable)) => consolidation.addModuleFailure(module, s"Laying out ${forkGroup.description} failed: $throwable")
       case (_, Success(_)) => ()
     }
     attempts.collect { case (forkGroup, Success(laidOut)) => forkGroup -> laidOut }
