@@ -200,7 +200,10 @@ The Mill plugin is the library's only caller (`decisions/event-log-contract.md` 
   - `isShortOfValues`: whether the flag holds fewer values than the runner needs with it, from `ArgumentSplitter.isShortOfValues`.
 
   The test command calls `split`:
-  - on its framework arguments, as it reads its own arguments and before it resolves the module. It accepts them only where `split` returns no `Unrecognised`, and each `Flagged` is not short of values and has one of these forms: `-D` with a config map entry joined to it, such as `-Dcolour=blue`; `-P` with a thread count of 1 or more joined to it, such as `-P4`; or one of `-n`, `-l`, `-m`, `-w`, `-F`, `-T`, `-t`, `-z`, `-S` and `-W`, with nothing joined to it, followed by the separate values ScalaTest's runner takes after that flag;
+  - on its framework arguments, as it reads its own arguments and before it resolves the module. It accepts them only where `split` returns no `Unrecognised`, and where each `Flagged` is not short of values and has one of these forms:
+    - `-D` with a config map entry joined to it, such as `-Dcolour=blue`;
+    - `-P` with a thread count of 1 or more joined to it, such as `-P4`;
+    - one of `-n`, `-l`, `-m`, `-w`, `-F`, `-T`, `-t`, `-z`, `-S` and `-W`, with nothing joined to it, followed by the values ScalaTest's runner takes after that flag;
   - on each argument before its first `--`, to find one of the ScalaTest flags `-D`, `-n`, `-l`, `-P`, `-m`, `-w`, `-F`, `-T`, `-t`, `-z`, `-S` and `-W`, alone or with its value joined to it;
   - on the module's `testArgsDefault` arguments, once it has resolved the module and before it runs the module's test discovery or starts its tests. It fails where any is `Unrecognised`, and keeps each `Flagged` whose flag `SPECIFICATION.md` R-142 lists (§ Data flow).
 - **Build the runner argument** (§ APIs § The emitter and the Mill plugin): given what the argument carries, returns the argument, from core's runner argument definition (§ Modules § ScalaTest core), which the plugin, outside core's package, cannot read. The argument carries the event log file's absolute path or, under `JsDom`, the framing prefix and this test command's nonce. The test command calls it for each run it starts.
