@@ -282,8 +282,10 @@ Feature: Class globs and framework arguments across modules
       And the test command fails
 
   Rule: What Mill's test discovery writes for a selected module is that module's output, shown after the module's runs and before the module's failures
-    Scenario Outline: AC-025 beta.test's discovery output in the JSON output, javaHome <java home>
-      Given `beta.test` also holds the class `samples.Noisy`, a public Java class whose only public constructor takes no argument, which extends `org.scalatest.funsuite.AnyFunSuite`, holds no test, and whose static initializer writes the line `loading samples.Noisy` to stdout
+    Scenario Outline: AC-025 beta.test's discovery output in the JSON output, with javaHome <java home>
+      Given `beta.test` also holds the class `samples.Noisy`, a public Java class that extends `org.scalatest.funsuite.AnyFunSuite` and holds no test
+      And `samples.Noisy`'s only public constructor takes no argument
+      And `samples.Noisy`'s static initializer writes the line `loading samples.Noisy` to stdout
       And `beta.test`'s `javaHome` is <java home>
       When the test command is invoked with `-- samples.* -- -z nothing-matches`
       Then in the JSON output, the module node `beta.test` has an `output` that holds exactly one item, a `stdio` item whose `stream` is `stdout` and whose `text` is `loading samples.Noisy` followed by a line terminator
@@ -296,7 +298,9 @@ Feature: Class globs and framework arguments across modules
         | set to the path of a JDK of Java 17 or later |
 
     Scenario: AC-026 beta.test's runs, output and failure in the human-readable output
-      Given `beta.test` also holds the class `samples.Noisy`, a public Java class whose only public constructor takes no argument, which extends `org.scalatest.funsuite.AnyFunSuite`, holds no test, and whose static initializer writes the line `loading samples.Noisy` to stdout
+      Given `beta.test` also holds the class `samples.Noisy`, a public Java class that extends `org.scalatest.funsuite.AnyFunSuite` and holds no test
+      And `samples.Noisy`'s only public constructor takes no argument
+      And `samples.Noisy`'s static initializer writes the line `loading samples.Noisy` to stdout
       And `<human>` is an absolute path at which nothing exists
       When the test command is invoked with `-fH <human> -- samples.* -- -z nothing-matches`
       Then in the file at `<human>`, the lines that follow `[beta.test]` and are indented more than it end with these lines, in this order:
