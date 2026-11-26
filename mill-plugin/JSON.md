@@ -13,7 +13,7 @@ The consolidation as a whole, holding its modules.
 - `buildTool` — [Build tool](#build-tool) object: the build tool that started the runs. Absent where the consolidation library's caller gives no build tool.
 - `moduleSelectors` — array of [Module selector](#module-selector) objects, one for each module selector the test command was given. Empty where none was given.
 - `outcome` — string, always `aborted`. Present exactly when `failures` is. No outcome is rolled up from the modules.
-- `failures` — array of one or more [Failure](#failure) objects: the failures that the consolidation library's caller attaches to the root, which belong to no module. The test command attaches each of its failures to a module ([Module](#module)), so it attaches none to the root. Present exactly when `outcome` is; absent where no failure is attached.
+- `failures` — array of one or more [Failure](#failure) objects: the failures that the consolidation library's caller attaches to the root, which belong to no module. The test command attaches none. Present exactly when `outcome` is; absent where no failure is attached.
 - `startedAt` — integer, epoch milliseconds: the root's start time, which the consolidation library's caller gives. Absent where the caller gives none.
 - `endedAt` — integer, epoch milliseconds: the root's end time, which the consolidation library's caller gives. Absent where the caller gives none.
 - `duration` — integer, milliseconds: `endedAt` less `startedAt`. Present exactly when both `startedAt` and `endedAt` are.
