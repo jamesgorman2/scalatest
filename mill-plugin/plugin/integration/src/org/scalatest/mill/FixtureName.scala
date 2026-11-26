@@ -15,6 +15,7 @@ object FixtureName {
   val libraryWithoutMill: FixtureName = "library-without-mill"
   val millOwnTasks: FixtureName = "mill-own-tasks"
   val moduleSelectors: FixtureName = "module-selectors"
+  val modulesTheTestCommandCannotRun: FixtureName = "modules-the-test-command-cannot-run"
   val munit: FixtureName = "munit"
   val result: FixtureName = "result"
   val severalModules: FixtureName = "several-modules"

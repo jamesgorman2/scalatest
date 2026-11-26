@@ -2,6 +2,7 @@ package org.scalatest.mill
 
 import java.io.IOException
 import java.nio.file.Paths
+import org.scalatest.consolidation.Consolidation
 import org.scalatest.consolidation.ModuleName
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -52,13 +53,6 @@ final class TestCommandFailureSpec extends AnyWordSpec with should.Matchers {
       }
     }
 
-    "a module selector resolves to Scala.js or Native test modules" should {
-      "name the selector and each such module" in {
-        TestCommandFailure.NotJvmTestModules(ModuleSelectorArgument("__.test"), Seq(ModuleName("coreJS.test"), ModuleName("coreNative.test"))).message shouldBe
-          "Module selector __.test resolves to Scala.js or Native test modules, which the test command cannot run: coreJS.test and coreNative.test"
-      }
-    }
-
     "a module selector resolves to no module" should {
       "name the selector and Mill's error" in {
         TestCommandFailure.UnresolvedModuleSelector(ModuleSelectorArgument("missing"), "Cannot resolve missing").message shouldBe
@@ -66,10 +60,24 @@ final class TestCommandFailureSpec extends AnyWordSpec with should.Matchers {
       }
     }
 
-    "the module's ScalaTest arguments hold an unrecognised argument" should {
-      "name the argument" in {
-        TestCommandFailure.UnrecognisedModuleArgument("-x").message shouldBe
-          "The module's ScalaTest arguments hold -x, which ScalaTest does not recognise"
+    "the test command cannot run selected test modules" should {
+      "name each module, on its own line, with why the test command cannot run it" in {
+        TestCommandFailure
+          .UnrunnableModules(
+            Seq(
+              UnrunnableModule.NotJvm(ModuleName("js.test")),
+              UnrunnableModule.WithoutThisRelease(ModuleName("munit.test")),
+              UnrunnableModule.UnrecognisedArguments(ModuleName("args.test"), Seq("-x", "--not-a-scalatest-argument"))
+            )
+          )
+          .message shouldBe
+          Seq(
+            "The test command cannot run these selected test modules:",
+            "  js.test is a Scala.js or Native test module",
+            s"  munit.test does not depend on com.edc:scalatest-core_3 at ${Consolidation.scalaTestVersion}, " +
+              "the release of this fork that the Mill plugin belongs to",
+            "  args.test's testArgsDefault holds -x and --not-a-scalatest-argument, which ScalaTest does not recognise"
+          ).mkString("\n")
       }
     }
 

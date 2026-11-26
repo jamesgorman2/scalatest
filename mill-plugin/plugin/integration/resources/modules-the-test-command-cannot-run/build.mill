@@ -1,0 +1,75 @@
+//| mvnDeps: ["com.edc::scalatest-mill::3.2.20"]
+package build
+
+import mill.*
+import mill.api.BuildCtx
+import mill.scalajslib.*
+import mill.scalajslib.api.JsEnvConfig
+import mill.scalalib.*
+import mill.scalanativelib.*
+
+object Markers {
+  def folder: os.Path = BuildCtx.workspaceRoot / "markers"
+}
+
+trait SampleModule extends ScalaModule {
+  def scalaVersion = "3.3.8"
+
+  trait SampleTests extends ScalaTests {
+    def forkArgs = Task { Seq(s"-Dmarkers=${Markers.folder}") }
+  }
+}
+
+object alpha extends SampleModule {
+  object test extends SampleTests, TestModule.ScalaTest {
+    def mvnDeps = Seq(mvn"com.edc::scalatest::3.2.20")
+  }
+}
+
+object munit extends SampleModule {
+  object test extends SampleTests, TestModule.Munit {
+    def mvnDeps = Seq(mvn"org.scalameta::munit::1.2.4")
+  }
+}
+
+object utest extends SampleModule {
+  object test extends SampleTests, TestModule.Utest {
+    def mvnDeps = Seq(mvn"com.lihaoyi::utest::0.9.1")
+  }
+}
+
+object upstream extends SampleModule {
+  object test extends SampleTests, TestModule.ScalaTest {
+    def mvnDeps = Seq(mvn"org.scalatest::scalatest::3.2.20")
+  }
+}
+
+object other extends SampleModule {
+  // The repository holds only the POMs of a release of this fork that was never built. A test module resolves with
+  // its outer module's repositories.
+  def repositories = Task { Seq((BuildCtx.workspaceRoot / "repository").toNIO.toUri.toASCIIString) }
+
+  object test extends SampleTests, TestModule.ScalaTest {
+    def mvnDeps = Seq(mvn"com.edc::scalatest::3.2.19")
+  }
+}
+
+object js extends ScalaJSModule {
+  def scalaVersion = "3.3.8"
+  def scalaJSVersion = "1.20.2"
+
+  object test extends ScalaJSTests, TestModule.ScalaTest {
+    def mvnDeps = Seq(mvn"com.edc::scalatest::3.2.20")
+    def jsEnvConfig = Task { JsEnvConfig.NodeJs(env = Map("MARKERS" -> Markers.folder.toString)) }
+  }
+}
+
+object native extends ScalaNativeModule {
+  def scalaVersion = "3.3.8"
+  def scalaNativeVersion = "0.5.12"
+
+  object test extends ScalaNativeTests, TestModule.ScalaTest {
+    def mvnDeps = Seq(mvn"com.edc::scalatest::3.2.20")
+    def forkEnv = Task { super.forkEnv() ++ Map("MARKERS" -> Markers.folder.toString) }
+  }
+}

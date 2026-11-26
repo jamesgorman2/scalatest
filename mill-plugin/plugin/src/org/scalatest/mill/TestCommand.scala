@@ -12,7 +12,6 @@ import org.scalatest.consolidation.BuildTool
 import org.scalatest.consolidation.Consolidation
 import org.scalatest.consolidation.ConsolidationState
 import org.scalatest.consolidation.ModuleName
-import org.scalatest.consolidation.ScalaTestArgument
 import scala.concurrent.duration.DurationInt
 
 private[mill] final class TestCommand private (
@@ -26,14 +25,21 @@ private[mill] final class TestCommand private (
 ) {
 
   def checkAndRunTests(): Either[TestCommandFailure, ConsolidationState] = {
-    val checkTasks = selection.modules.map(module => module -> ModuleCheck.task(module))
+    val (jvmModules, otherModules) = selection.modules.partition(_.isJvm)
+    val checkTasks = jvmModules.map(module => module -> ModuleCheckTask.of(module))
     val checkResults = EvaluatedTasks.of(failFastOffEvaluator.execute(checkTasks.map(_._2), logger = ctx.log))
+    // A module whose check task failed is not rejected here: its tests did not start.
     val (checkFailures, moduleChecks) = checkTasks.partitionMap { case (module, task) =>
       checkResults.valueOrFailure(task).left.map(failure => module -> failure).map(check => module -> check)
     }
-    TestCommand
-      .runArgumentsFrom(moduleChecks, commandArguments.frameworkArguments)
-      .flatMap(runArguments => consolidateSelectedModules(runArguments, checkFailures))
+    val (jvmModulesUnrunnable, runArguments) = moduleChecks.partitionMap { case (module, check) =>
+      check.runArguments(module.name, commandArguments.frameworkArguments).map(module -> _)
+    }
+    val unrunnableModules = otherModules.map(module => UnrunnableModule.NotJvm(module.name)) ++ jvmModulesUnrunnable.flatten
+    if (unrunnableModules.nonEmpty)
+      Left(TestCommandFailure.UnrunnableModules(unrunnableModules.sortBy(_.module.value)))
+    else
+      consolidateSelectedModules(runArguments, checkFailures)
   }
 
   private def consolidateSelectedModules(
@@ -140,14 +146,6 @@ private[mill] object TestCommand {
       case Right(_) => Result.Success(())
     }
   }
-
-  private def runArgumentsFrom(
-      moduleChecks: Seq[(SelectedTestModule, ModuleCheck)],
-      frameworkArguments: Seq[ScalaTestArgument.Flagged]
-  ): Either[TestCommandFailure, Seq[(SelectedTestModule, RunArguments)]] =
-    FirstFailure.orValues(moduleChecks.map { case (module, check) =>
-      check.runArguments(frameworkArguments).map(runArguments => module -> runArguments)
-    })
 
   private def addModuleFailures(consolidation: Consolidation, failures: Seq[(SelectedTestModule, String)]): Unit =
     failures.foreach { case (module, failure) => consolidation.addModuleFailure(module.name, failure) }

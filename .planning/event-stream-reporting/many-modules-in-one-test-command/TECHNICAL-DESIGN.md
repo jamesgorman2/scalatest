@@ -31,7 +31,8 @@ This design checks every selected JVM test module before any test starts, then r
   - the Coursier resolution of the module's runtime dependencies, which covers the dependencies of every module the module depends on:
     - The check task calls the module's `millResolver`'s `resolution` on the module's `coursierDependencyTask`, which names the runtime configuration itself. `resolution` fetches metadata only.
     - `resolvedRunMvnDeps` uses the same resolver and root dependency but calls `classpath`, whose parameters set the runtime configuration as the default configuration and add the Gradle runtime variant attributes. `resolution` takes the module's `resolutionParams` unchanged, so the check's resolution has neither.
-- The test command holds each module's check result, its resolution included, once that `execute` returns.
+- The test command holds each module's check result once that `execute` returns. The result holds the module's `testArgsDefault`, and the library and version of each dependency the resolution keeps.
+- The test command builds no check task for a Scala.js or Native test module.
 - A check task evaluates no compile. A module's tests therefore wait on every selected module's dependency resolution and `testArgsDefault`, but on no other module's compile (AC-007).
 - A JVM test module tests with the release of this fork where its resolution holds `com.edc:scalatest-core_3` at the version the consolidation library was built at (AC-010, AC-011, AC-020).
 - Once that `execute` returns, and before **Start**, the test command fails where any selected module is:

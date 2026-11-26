@@ -53,11 +53,13 @@ Read the process's own output, `evalResult.result.out.text()` and `evalResult.re
 </learning>
 
 <learning>
-date: 2026-11-14
+date: 2026-11-27
 ---
 A Mill module's `compileMvnDeps` reach neither its runtime classpath nor its `ScalaTests` test module's classpath. A Mill plugin that depends on Mill through `compileMvnDeps` therefore has no Mill or os-lib classes in its unit tests: a test naming `os.*` fails with `Not found: os`.
 
-Keep classes under unit test free of Mill and os-lib types, and do the Mill wiring, such as setting `os.Inherit.out`, in the class that calls Mill. Test that wiring under testkit.
+Where a case class's companion object holds a method that builds a `Task.Anon`, a unit test calling the case class's `apply` compiles but fails at run time with `java.lang.NoClassDefFoundError: mill/api/Task`, and the suite aborts.
+
+Keep classes under unit test free of Mill and os-lib types. Do the Mill wiring, such as setting `os.Inherit.out`, in the class that calls Mill, and build a task in an object that no unit test loads, not in the companion of a class under unit test. Test that wiring under testkit.
 </learning>
 
 <learning>
@@ -267,4 +269,20 @@ date: 2026-11-27
 In Mill 1.3.1, `CoursierModule.Resolver.resolution` calls `.get` on the `Result` that `Lib.resolveDependenciesMetadataSafe` returns. A failed resolution therefore throws a `RuntimeException` from inside the task's body, and the evaluation records the task as `ExecResult.Exception`, not `ExecResult.Failure`. The exception's message is Coursier's error, which begins and ends with a line break.
 
 Code that reads a task's failure from `executionResults.transitiveResults` must handle both `ExecResult.Failure` (read `msg`) and `ExecResult.Exception` (read the throwable's message). Trim the message before writing it on one line or after a task name.
+</learning>
+
+<learning>
+date: 2026-11-27
+---
+In Mill 1.3.1, a test module (`ScalaTests`, `JavaTests`) overrides `repositoriesTask` to return its outer module's `repositoriesTask` (`mill.javalib.JavaModule`, the `JavaTests` trait). A `repositories` override inside `object test` is therefore ignored: the test module's resolution never tries that repository, and Coursier's error lists only the outer module's repositories.
+
+Declare extra repositories, such as a fixture's local `file://` Maven repository, on the outer module. The test module then resolves with them.
+</learning>
+
+<learning>
+date: 2026-11-27
+---
+To read which version of a library a Mill module's dependencies resolve to without downloading jars, take the `coursier.core.Resolution` that `millResolver().resolution` returns for the module's `coursierDependencyTask()` and read `retainedVersions`, a `Map[coursier.core.Module, coursier.version.Version]` (Coursier 2.1.26). Compare `module.organization.value`, `module.name.value` (the artifact name with its Scala suffix, such as `_3`) and `version.repr`.
+
+The root dependency is the module's own Coursier project, so the result also holds the libraries the module gets through its `moduleDeps`, served from Mill's internal repositories. A library a module reaches only through another module is therefore found without walking `moduleDeps` yourself.
 </learning>

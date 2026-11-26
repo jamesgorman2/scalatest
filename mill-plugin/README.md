@@ -59,7 +59,7 @@ The build runs Mill 1.3.1. Add the plugin to the header of its `build.mill`:
 
 If the header already has `mvnDeps`, add `"com.edc::scalatest-mill::3.2.20"` to it.
 
-A test module run by the test command must depend on this fork's `scalatest` at the plugin's release and be built with Scala 3.3 or later:
+A test module run by the test command must depend on this fork's `scalatest` at the plugin's release, itself or through a module or library it depends on, and be built with Scala 3.3 or later:
 
 ```scala
 //| mvnDeps: ["com.edc::scalatest-mill::3.2.20"]
@@ -128,8 +128,11 @@ The test command fails before any test starts, and writes no consolidated output
 - a folder is at the `-fJ` path, or the file there cannot be deleted;
 - it is given no module selector;
 - a module selector resolves to no module, or to no test module;
-- a module selector resolves to a Scala.js or Native test module;
+- a selected test module is a Scala.js or Native test module;
+- a selected test module does not test with this fork at the plugin's release: the dependencies Mill resolves for it hold no `com.edc:scalatest-core_3` at that release, as for a module testing with MUnit, uTest, upstream `org.scalatest:scalatest` or another release of this fork;
 - a selected module's own ScalaTest arguments hold a flag ScalaTest's runner does not recognise.
+
+The failure names each selected test module the test command cannot run, and each such flag. A selected module whose dependencies fail to resolve is not among them: its tests do not start (below).
 
 It also fails when:
 
@@ -145,7 +148,6 @@ It also fails when:
 - a test worker's test event log cannot be read, or holds a line that cannot be decoded;
 - two of a module's fork groups would share a `processFolder`, as where each runs only the same test class or, on a case-insensitive filesystem, only classes whose names differ only in case. No test of that module runs;
 - two or more of a module's fork groups hold a test class to run, and the test command cannot tell whether the filesystem is case-insensitive. No test of that module runs;
-- a selected module does not test with this fork, such as one testing with MUnit, uTest or upstream `org.scalatest:scalatest`;
 - the JSON output cannot be written to the `-fJ` path. The human-readable output is still written.
 
 Under the test command, ScalaTest prints no end-of-run summary of its own. Instead, the human-readable output ends with one summary line that counts the suites and tests of every run. Mill's own test tasks still print ScalaTest's summary.
@@ -156,7 +158,7 @@ The test command writes a module's files in its module folder, `org.scalatest.mi
 
 - Each file and folder that Mill's `testOnly` or `testForked` would write in its task folder, such as each worker's working directory `sandbox`, is at the same relative path in the module folder. The exception is Mill's JUnit XML report: the test command writes none, whatever the module's `testReportXml`.
 - Once it has resolved its module selectors and read each selected module's own ScalaTest arguments, the test command deletes everything an earlier test command left in each selected module's folder. It does so before any test starts, and also where none starts, as where no class glob matches.
-- A test command that fails on its arguments, such as on a framework argument it does not accept or on a flag in a module's own ScalaTest arguments that ScalaTest's runner does not recognise, leaves every module folder as it was.
+- A test command that fails on its arguments, such as on a framework argument it does not accept, or on a selected module it cannot run, such as one whose own ScalaTest arguments hold a flag ScalaTest's runner does not recognise, leaves every module folder as it was.
 - It leaves Mill's own `testForked` and `testOnly` task folders as they were.
 
 ## Runs in the human-readable output

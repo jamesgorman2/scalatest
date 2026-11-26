@@ -151,21 +151,25 @@ final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with
     }
   }
 
-  Feature("A module that does not test with this fork fails the test command") {
+  Feature("A module that does not test with this fork fails the test command before any test starts") {
 
     Seq(
       "MUnit" -> FixtureName.munit,
       "uTest" -> FixtureName.utest,
       "org.scalatest:scalatest 3.2.20" -> FixtureName.upstreamScalaTest
     ).foreach { case (framework, fixture) =>
-      Scenario(s"A module testing with $framework fails the test command") {
-        Given(s"core.test tests with $framework, and its one suite, FrameworkSuite, has one test, \"runs\", which succeeds")
-        When("the test command runs core.test")
-        val result = withFixtureBuild(fixture) { build =>
-          build.runTestCommand("core.test")
+      Scenario(s"A module testing with $framework fails the test command before any test starts") {
+        withFixtureBuild(fixture) { build =>
+          Given(s"core.test tests with $framework, and its one suite, FrameworkSuite, has one test, \"runs\", which succeeds")
+          When("the test command runs core.test")
+          val result = build.runTestCommand("core.test")
+
+          Then("the test command fails before any test starts")
+          shouldFailBeforeAnyTestStarts(build, result)
+
+          And("the console says that core.test does not depend on this fork's core")
+          shouldWriteToTheConsole(result, "core.test does not depend on com.edc:scalatest-core_3")
         }
-        Then("the test command fails")
-        shouldFailTheModulesTests(result)
       }
     }
   }

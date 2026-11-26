@@ -5,8 +5,6 @@ import mill.api.Result
 import mill.api.SelectMode
 import mill.javalib.JavaModule
 import mill.javalib.TestModule
-import mill.scalajslib.ScalaJSModule
-import mill.scalanativelib.ScalaNativeModule
 import org.scalatest.consolidation.ModuleSelector
 
 private[mill] final case class ModuleSelection(resolvedSelectors: Seq[ResolvedModuleSelector]) {
@@ -36,19 +34,12 @@ private[mill] object ResolvedModuleSelector {
   def from(evaluator: Evaluator, selector: ModuleSelectorArgument): Either[TestCommandFailure, ResolvedModuleSelector] =
     evaluator.resolveModulesOrTasks(Seq(selector.text), SelectMode.Multi) match {
       case Result.Success(resolved) =>
-        val testModules = resolved.collect { case Left(module: (TestModule & JavaModule)) => module }
-        val (jvmModules, otherModules) = testModules.partition(isJvm)
-        if (testModules.isEmpty) {
+        val testModules = resolved.collect { case Left(module: (TestModule & JavaModule)) => SelectedTestModule(module) }
+        if (testModules.isEmpty)
           Left(TestCommandFailure.NoTestModule(selector))
-        } else if (otherModules.nonEmpty) {
-          Left(TestCommandFailure.NotJvmTestModules(selector, otherModules.map(SelectedTestModule(_).name)))
-        } else {
-          Right(ResolvedModuleSelector(selector, jvmModules.map(SelectedTestModule(_))))
-        }
+        else
+          Right(ResolvedModuleSelector(selector, testModules))
       case failure: Result.Failure =>
         Left(TestCommandFailure.UnresolvedModuleSelector(selector, failure.error))
     }
-
-  private def isJvm(module: TestModule & JavaModule): Boolean =
-    !module.isInstanceOf[ScalaJSModule] && !module.isInstanceOf[ScalaNativeModule]
 }

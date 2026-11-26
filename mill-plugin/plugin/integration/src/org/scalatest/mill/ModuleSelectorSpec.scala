@@ -17,7 +17,7 @@ final class ModuleSelectorSpec extends AnyFeatureSpec with GivenWhenThen with sh
       (
         "one resolving to a Scala.js test module",
         Seq("coreJS.test"),
-        "Module selector coreJS.test resolves to Scala.js or Native test modules, which the test command cannot run: coreJS.test"
+        "coreJS.test is a Scala.js or Native test module"
       ),
       (
         "one resolving to no module",

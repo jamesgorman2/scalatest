@@ -1,7 +1,6 @@
 package org.scalatest.mill
 
 import java.nio.file.Path
-import org.scalatest.consolidation.ModuleName
 import scala.util.control.NoStackTrace
 
 private[mill] enum TestCommandFailure extends Exception with NoStackTrace {
@@ -11,9 +10,8 @@ private[mill] enum TestCommandFailure extends Exception with NoStackTrace {
   case FrameworkArgumentNotPassedOn(argument: String)
   case NoModuleSelector
   case NoTestModule(selector: ModuleSelectorArgument)
-  case NotJvmTestModules(selector: ModuleSelectorArgument, modules: Seq[ModuleName])
   case UnresolvedModuleSelector(selector: ModuleSelectorArgument, error: String)
-  case UnrecognisedModuleArgument(argument: String)
+  case UnrunnableModules(reasons: Seq[UnrunnableModule])
   case JsonOutputPathIsFolder(path: Path)
   case JsonOutputNotDeleted(path: Path, cause: Throwable)
   case JsonOutputNotWritten(path: Path, cause: Throwable, partlyWrittenFileDeleteFailure: Option[Throwable])
@@ -37,13 +35,10 @@ private[mill] enum TestCommandFailure extends Exception with NoStackTrace {
         "The test command takes one or more module selectors, but was given none"
       case NoTestModule(selector) =>
         s"Module selector ${selector.text} resolves to no test module"
-      case NotJvmTestModules(selector, modules) =>
-        s"Module selector ${selector.text} resolves to Scala.js or Native test modules, which the test command cannot run: " +
-          EnglishList.of(modules.map(_.value))
       case UnresolvedModuleSelector(selector, error) =>
         s"Module selector ${selector.text} resolves to no module: $error"
-      case UnrecognisedModuleArgument(argument) =>
-        s"The module's ScalaTest arguments hold $argument, which ScalaTest does not recognise"
+      case UnrunnableModules(reasons) =>
+        ("The test command cannot run these selected test modules:" +: reasons.map(reason => s"  ${reason.line}")).mkString("\n")
       case JsonOutputPathIsFolder(path) =>
         s"The test command cannot delete $path, the file $jsonOutputArgument names: it is a folder"
       case JsonOutputNotDeleted(path, cause) =>

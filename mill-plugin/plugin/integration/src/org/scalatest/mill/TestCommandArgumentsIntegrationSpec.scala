@@ -781,7 +781,7 @@ final class TestCommandArgumentsIntegrationSpec extends AnyFeatureSpec with Give
 
         Then("the test command fails before any test starts, naming -x")
         shouldFailBeforeAnyTestStarts(build, result)
-        shouldWriteToTheConsole(result, "hold -x,")
+        shouldWriteToTheConsole(result, "core.test's testArgsDefault holds -x, which ScalaTest does not recognise")
 
         And("the console holds no line of human-readable output")
         result.treeLines shouldBe empty
