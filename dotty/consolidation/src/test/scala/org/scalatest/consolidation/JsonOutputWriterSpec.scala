@@ -262,7 +262,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with should.Matchers with C
     }
 
     "given a failure but no run, and another module given no failure" should {
-      "give the other module no outcome and no failures" in {
+      "give the other module no outcome, failures or output" in {
         val json = jsonOutputAfter { consolidation =>
           consolidation.addRunOf(completedRun)
           consolidation.addModuleFailure(ModuleName("broken.test"), "broken.test.compile failed")

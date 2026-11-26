@@ -137,7 +137,7 @@ final class ConsolidationSpec extends AnyWordSpec with should.Matchers with Cons
       }
     }
 
-    "given a failure attached to a module after it has ended" should {
+    "ended, then given a failure attached to a module" should {
       "be refused" in {
         val consolidation = startedWithColour()
         consolidation.end()
@@ -145,7 +145,7 @@ final class ConsolidationSpec extends AnyWordSpec with should.Matchers with Cons
       }
     }
 
-    "given output attached to a module after it has ended" should {
+    "ended, then given output attached to a module" should {
       "be refused" in {
         val consolidation = startedWithColour()
         consolidation.end()
