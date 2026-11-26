@@ -2,7 +2,7 @@ package org.scalatest.mill
 
 import java.nio.charset.StandardCharsets
 
-private[mill] object WorkerOutput {
+private[mill] object OutputCaptureWriter {
 
   def writeStdout(capture: OutputCapture, text: String): Unit = write(capture.stdout, text)
 

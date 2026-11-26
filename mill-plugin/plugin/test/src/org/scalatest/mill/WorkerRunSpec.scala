@@ -13,7 +13,7 @@ import org.scalatest.consolidation.ModuleName
 import org.scalatest.consolidation.RunFeed
 import org.scalatest.matchers.should
 import org.scalatest.mill.EventLogs.*
-import org.scalatest.mill.WorkerOutput.writeStdout
+import org.scalatest.mill.OutputCaptureWriter.writeStdout
 import org.scalatest.time.Seconds
 import org.scalatest.time.Span
 import org.scalatest.wordspec.AnyWordSpec

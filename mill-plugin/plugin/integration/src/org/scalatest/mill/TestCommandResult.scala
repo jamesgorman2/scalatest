@@ -68,8 +68,8 @@ final case class TestCommandResult(eval: IntegrationTester.EvalResult) {
     if (start < 0) {
       Nil
     } else {
-      val indentation = output(start).takeWhile(_ == ' ').length
-      val underCount = output.drop(start + 1).takeWhile(line => line.takeWhile(_ == ' ').length > indentation).size
+      val indentation = TestCommandResult.indentationOf(output(start))
+      val underCount = output.drop(start + 1).takeWhile(line => TestCommandResult.indentationOf(line) > indentation).size
       lines.slice(start, start + 1 + underCount).map(_.drop(indentation))
     }
   }
@@ -102,6 +102,8 @@ object TestCommandResult {
     // Mill drops each reset directly followed by a colour when it re-renders a line to add its prefix; the line's
     // characters keep their colours.
     marked.replaceAll("""\{reset\}(?=\{(?!reset\}))""", "")
+
+  def indentationOf(line: String): Int = line.takeWhile(_ == ' ').length
 
   private def withoutMillPrefix(line: String): String = millPrefix.replaceFirstIn(line, "")
 

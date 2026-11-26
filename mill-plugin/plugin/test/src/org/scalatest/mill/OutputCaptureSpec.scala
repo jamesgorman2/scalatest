@@ -4,8 +4,8 @@ import java.nio.charset.Charset
 import java.nio.charset.StandardCharsets
 import org.scalatest.consolidation.CapturedLine
 import org.scalatest.matchers.should
-import org.scalatest.mill.WorkerOutput.writeStderr
-import org.scalatest.mill.WorkerOutput.writeStdout
+import org.scalatest.mill.OutputCaptureWriter.writeStderr
+import org.scalatest.mill.OutputCaptureWriter.writeStdout
 import org.scalatest.wordspec.AnyWordSpec
 import scala.collection.mutable
 

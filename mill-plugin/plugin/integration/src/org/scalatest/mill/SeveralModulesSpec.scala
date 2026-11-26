@@ -99,7 +99,7 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
   private def runTestCommand(build: FixtureBuild, millFlags: String*)(arguments: String*): TestCommandResult =
     build.runTestCommandWithMillArguments(FixtureBuild.jobsArguments(2) ++ millFlags)(arguments*)
 
-  private def runWritingJsonOutput(build: FixtureBuild, millFlags: String*)(selectors: String*): (TestCommandResult, JsonNode) = {
+  private def runParsingJsonOutput(build: FixtureBuild, millFlags: String*)(selectors: String*): (TestCommandResult, JsonNode) = {
     When(s"the test command is invoked as mill -j 2 ${millFlags.map(_ + " ").mkString}scalatest/test ${selectors.mkString(" ")} -fJ <report>")
     build.resultAndJsonOutput(runTestCommand(build, millFlags*)((selectors :+ "-fJ" :+ build.jsonOutputFile.toString)*))
   }
@@ -146,8 +146,6 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
     And("the test command fails")
     shouldFail(result)
   }
-
-  private def indentationOf(line: String): Int = line.takeWhile(_ == ' ').length
 
   private def runNodesOf(json: JsonNode, module: String): Seq[JsonNode] = moduleNode(json, module).nodes.filter(_.kind == NodeKind.Run)
 
@@ -222,7 +220,7 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
     for (selectors <- selectorsSelectingBothModules) {
       Scenario(s"Module selectors ${selectors.mkString(" ")} run each test module's tests once, under one module node each") {
         withSeveralModules { build =>
-          val (result, json) = runWritingJsonOutput(build)(selectors*)
+          val (result, json) = runParsingJsonOutput(build)(selectors*)
 
           withClue(result.debugString) {
             Then("the JSON output's root holds exactly the module nodes alpha.test and beta.test, in that order")
@@ -241,7 +239,7 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
     Scenario("A module selector that resolves to test modules and other modules selects only its test modules") {
       withSeveralModules { build =>
         Given("the build's modules alpha and beta, which hold alpha.test and beta.test, are JVM modules that are not test modules")
-        val (result, json) = runWritingJsonOutput(build)("__")
+        val (result, json) = runParsingJsonOutput(build)("__")
 
         withClue(result.debugString) {
           Then("the JSON output's root holds exactly the module nodes alpha.test and beta.test, in that order")
@@ -258,7 +256,7 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
 
     Scenario("Two module selectors that share a test module each record it") {
       withSeveralModules { build =>
-        val (result, json) = runWritingJsonOutput(build)("alpha.test", "__.test")
+        val (result, json) = runParsingJsonOutput(build)("alpha.test", "__.test")
 
         Then("the root's moduleSelectors holds alpha.test, resolved to alpha.test, then __.test, resolved to alpha.test and beta.test")
         withClue(result.debugString) {
@@ -270,7 +268,7 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
     Scenario("A module selector's test modules are ordered by name") {
       withSeveralModules { build =>
         addModulesThatSortByCharacterCode(build)
-        val (result, json) = runWritingJsonOutput(build)("__.test")
+        val (result, json) = runParsingJsonOutput(build)("__.test")
 
         Then("the root's moduleSelectors holds exactly __.test, resolved to B1.test, alpha.test, b10.test, b2.test and beta.test, in that order")
         withClue(result.debugString) {
@@ -282,7 +280,7 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
     Scenario("Module nodes are ordered by name, whatever the order of the module selectors") {
       withSeveralModules { build =>
         addModulesThatSortByCharacterCode(build)
-        val (result, json) = runWritingJsonOutput(build)("b2.test", "beta.test", "b10.test", "alpha.test", "B1.test")
+        val (result, json) = runParsingJsonOutput(build)("b2.test", "beta.test", "b10.test", "alpha.test", "B1.test")
 
         Then("the JSON output's root holds exactly the module nodes B1.test, alpha.test, b10.test, b2.test and beta.test, in that order")
         withClue(result.debugString) {
@@ -297,7 +295,7 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
         val sendingWorkingDirectory = """test("fast") { info(System.getProperty("user.dir")) }"""
         replaceInSuite(build, "alpha", "Alpha1")("""test("fast") {}""", sendingWorkingDirectory)
         replaceInSuite(build, "beta", "Beta1")("""test("fast") {}""", sendingWorkingDirectory)
-        val (result, json) = runWritingJsonOutput(build)("alpha.test", "beta.test")
+        val (result, json) = runParsingJsonOutput(build)("alpha.test", "beta.test")
 
         withClue(result.debugString) {
           Then("Alpha1's test fast sends the path of the folder sandbox in alpha.test's module folder")
@@ -319,7 +317,7 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
         withSeveralModules { build =>
           Given("Alpha1's test slow fails")
           replaceInSuite(build, "alpha", "Alpha1")("""test("slow") {}""", """test("slow") { fail("fails as the scenario asks") }""")
-          val (result, _) = runWritingJsonOutput(build, millFlags*)("alpha.test", "beta.test")
+          val (result, _) = runParsingJsonOutput(build, millFlags*)("alpha.test", "beta.test")
 
           Then("the files Beta1.fast and Beta1.slow exist in <markers>")
           withClue(result.debugString) {
@@ -338,7 +336,7 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
       Scenario(s"broken.test does not compile, flags $flagsDescription") {
         withSeveralModules { build =>
           addBrokenTestThatDoesNotCompile(build)
-          val (result, json) = runWritingJsonOutput(build, millFlags*)("alpha.test", "broken.test", "beta.test")
+          val (result, json) = runParsingJsonOutput(build, millFlags*)("alpha.test", "broken.test", "beta.test")
 
           brokenTestShouldAbortWhileAlphaAndBetaRun(build, result, json, "broken.test.compile")
         }
@@ -363,7 +361,7 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
         withSeveralModules { build =>
           Given(s"the build also has the JVM test module broken.test, which tests with com.edc::scalatest at the release under test and $cause")
           addBrokenTest(build)(testModuleMember)
-          val (result, json) = runWritingJsonOutput(build)("alpha.test", "broken.test", "beta.test")
+          val (result, json) = runParsingJsonOutput(build)("alpha.test", "broken.test", "beta.test")
 
           brokenTestShouldAbortWhileAlphaAndBetaRun(build, result, json, failureText)
         }
@@ -385,7 +383,7 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
           colourMarkedLines.lift(moduleLine + 1) shouldBe Some("  {red}*** MODULE ABORTED ***{reset}")
 
           And("each line between *** MODULE ABORTED *** and the next line indented no more than *** MODULE ABORTED *** is in red and indented one level more than *** MODULE ABORTED ***")
-          val failureLines = lines.zip(colourMarkedLines).drop(moduleLine + 2).takeWhile { case (line, _) => indentationOf(line) > 2 }
+          val failureLines = lines.zip(colourMarkedLines).drop(moduleLine + 2).takeWhile { case (line, _) => TestCommandResult.indentationOf(line) > 2 }
           failureLines.foreach { case (line, colourMarkedLine) =>
             line shouldBe s"    ${line.trim}"
             colourMarkedLine shouldBe s"    {red}${line.trim}{reset}"
@@ -404,7 +402,7 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
       withSeveralModules { build =>
         Given("beta.test's testForkGrouping gives two fork groups, each holding only samples.Beta1")
         setForkGroupingOfBetaTest(build, """Seq(Seq("samples.Beta1"), Seq("samples.Beta1"))""")
-        val (result, json) = runWritingJsonOutput(build)("alpha.test", "beta.test")
+        val (result, json) = runParsingJsonOutput(build)("alpha.test", "beta.test")
 
         withClue(result.debugString) {
           Then("the files Alpha1.fast and Alpha1.slow exist in <markers>, and neither Beta1.fast nor Beta1.slow does")
@@ -430,7 +428,7 @@ final class SeveralModulesSpec extends AnyFeatureSpec with GivenWhenThen with sh
     Scenario("late.test compiles only after a test of alpha.test has run") {
       withSeveralModules { build =>
         addLateTestCompilingAfterAlpha1Fast(build)
-        val (result, _) = runWritingJsonOutput(build)("alpha.test", "late.test")
+        val (result, _) = runParsingJsonOutput(build)("alpha.test", "late.test")
 
         Then("the files Alpha1.fast and Late1.fast exist in <markers>")
         withClue(result.debugString) {
