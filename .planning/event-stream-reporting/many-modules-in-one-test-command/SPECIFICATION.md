@@ -4,7 +4,7 @@ Scale: feature.
 
 ## Summary
 
-The test command takes exactly one module selector, which must name one JVM test module, so a build with several test modules needs one test command per module and gets a separate consolidated output from each. This feature has the test command take several module selectors and run the tests of every test module they select in one test command, with one consolidated output. Each selected module's tests wait for every selected module's dependencies to resolve, but not for any other selected module to compile, and run whatever happens to the other selected modules.
+The test command takes exactly one module selector, which must name one JVM test module, so a build with several test modules needs one test command per module and gets a separate consolidated output from each. This feature has the test command take several module selectors and run the tests of every test module they select in one test command, with one consolidated output. Each selected module's tests wait for every selected module's dependencies to resolve, but not for any other selected module to compile. Each selected module's tests run whatever happens to the other selected modules.
 
 ## Plan
 
@@ -23,8 +23,12 @@ Bare `AC-nnn` IDs are this document's. The epic's requirements are cited as `../
 
 - Several module selectors on one test command, each resolved to the test modules it names, and each test module the module selectors resolve to selected once.
 - The module nodes of the consolidated output and the JSON root's `moduleSelectors` when several test modules are selected.
-- Running every selected JVM test module's tests in one test command: each module's tests wait for every selected module's dependencies to resolve, but not for any other selected module to compile, and run whatever happens to the other selected modules, whether or not Mill's `--keep-going` is given.
-- Each failure the test command can attribute to one selected test module, shown on that module's node in the JSON and human-readable outputs. Such failures include the module's class globs matching no test, and its tests not starting where it fails to compile, its dependencies fail to resolve, or another task its tests depend on fails.
+- Running every selected JVM test module's tests in one test command, whether or not Mill's `--keep-going` is given:
+  - each module's tests wait for every selected module's dependencies to resolve, but not for any other selected module to compile;
+  - each module's tests run whatever happens to the other selected modules.
+- Each failure the test command can attribute to one selected test module, shown on that module's node in the JSON and human-readable outputs. Such failures include:
+  - the module's class globs matching no test;
+  - the module's tests not starting, where the module fails to compile, its dependencies fail to resolve, or another task its tests depend on fails.
 - What Mill's test discovery writes for a selected test module, shown on that module's node in the JSON and human-readable outputs.
 - The class globs and framework arguments applying alike to every selected test module.
 - Failing the test command before any test starts where the test command is given no module selector, or a module selector resolves to no test module.
@@ -208,7 +212,7 @@ Feature: Every selected module runs, whatever happens to the others
       And there is at least one such line, and one of them contains `broken.test.compile`
       And the test command fails
 
-  Rule: A module two of whose fork groups each run only the same test class runs no test, has an aborted module node, fails the test command, and does not stop another module's tests
+  Rule: Where two of a module's fork groups each run only the same test class, the module runs no test, has an aborted module node, fails the test command, and does not stop another module's tests
     Scenario: AC-024 Two of beta.test's fork groups each hold only samples.Beta1
       Given `beta.test`'s `testForkGrouping` gives two fork groups, each holding only `samples.Beta1`
       When the test command is invoked with no flags and the module selectors `alpha.test beta.test`

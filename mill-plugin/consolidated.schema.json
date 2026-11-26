@@ -30,7 +30,7 @@
           "const": "aborted"
         },
         "failures": {
-          "description": "The failures attached to the root: those of no single module, such as a failure of the test command itself. Absent where none is attached.",
+          "description": "The failures attached to the root: those that belong to no single module, such as a failure of the test command itself. Absent where none is attached.",
           "type": "array",
           "minItems": 1,
           "items": { "$ref": "#/$defs/failure" }
@@ -103,7 +103,7 @@
       "additionalProperties": false
     },
     "failure": {
-      "description": "A failure attached to the root or to a module: one that belongs to no run, such as laying out a fork group or starting a worker failing. A failure attached to a module is not prefixed with that module's name, though text from the build tool that it holds, such as a task name, can name the module.",
+      "description": "A failure attached to the root or to a module: one that belongs to no run, such as a fork group failing to lay out or a worker failing to start. A failure attached to a module is not prefixed with that module's name. Text from the build tool in the failure, such as a task name, can still name the module.",
       "type": "object",
       "properties": {
         "message": {

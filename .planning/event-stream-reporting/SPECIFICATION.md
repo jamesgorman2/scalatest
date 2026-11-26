@@ -106,7 +106,7 @@ A throwable is compared on its class, its message and its chain of causes, and, 
 - R-043 All captured output keeps its order within a node, whatever its source.
 - R-076 Output captured from a forked execution, before any Runner is constructed, is associated with the most specific node that can be identified.
 - R-072a A runner that is not a run, such as Mill's discovery runner, creates no node.
-- R-072b An error that no run, suite, scope or test records is attached to the node of the one selected test module it can be attributed to, such as the module whose discovery runner failed, and otherwise to the root.
+- R-072b An error that no run, suite, scope or test records is attached to the node of the one selected test module it can be attributed to, such as the module whose discovery runner failed. Such an error that cannot be attributed to one selected test module is attached to the root.
 - R-136 The node tree is constructed from the consolidated test command's execution, each process's assigned test classes, and the events emitted by all Runners
 
 ### Outcomes and durations

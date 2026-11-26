@@ -8,12 +8,12 @@ Decisions behind `../SPECIFICATION.md` on how the root, runs and modules appear 
 
 **Alternatives**
 
-- Attaching it to the root mixes several modules' discovery output, unlabelled, on one node, and makes the human-readable output show the root (`../SPECIFICATION.md` R-143).
+- Attaching that output to the root mixes several modules' discovery output, unlabelled, on one node, and makes the human-readable output show the root (`../SPECIFICATION.md` R-143).
 - Leaving a module's output to a later feature keeps discovery output on the root, and no feature in `../ROADMAP.md` is planned to move it.
 
 **Reasoning** A discovery runner runs for one module, so that module is the most specific node its output can be attributed to. A module's output then sits beside the module's failures, where a reader looks for why that module's tests behaved as they did.
 
-**Costs** A module in the JSON output gains an `output` key and a module in the human-readable output gains output lines, and the test command must capture what Mill's discovery runner writes for each module.
+**Costs** A module gains an `output` key in the JSON output and output lines in the human-readable output. The test command must capture what Mill's discovery runner writes for each module.
 
 **Settled by** [Many modules in one test command - How a module's error is shown](https://github.com/jamesgorman2/scalatest/issues/241).
 
