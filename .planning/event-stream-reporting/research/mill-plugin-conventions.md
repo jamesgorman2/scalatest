@@ -175,7 +175,7 @@ These are outside the issue's list. They are recorded because they bear on the r
 
 - **`mill.exec.Execution`,** which the test command copies with fail-fast off (`.planning/event-stream-reporting/research/mill-nested-keep-going.md`), changed by 743 lines. `GroupExecution` changed by 754 lines and `ExecutionContexts` by 132, between `1.1.10` and `1.3.1` (`git diff --stat`). `1.3.0-M1` introduced per-task read/write locking between launchers. `EvaluatorImpl` still holds `private val execution: Execution` (`core/eval/src/mill/eval/EvaluatorImpl.scala`).
 - **`Logger`** gains a `private[mill] def waitMessageNeedsLabel: Boolean = false` (`core/api/daemon/src/mill/api/daemon/Logger.scala`). `PrefixLogger` changed by 4 lines. `TaskCtx` changed in one constructor call only.
-- *Inference:* the fail-fast-off copy of `Execution` made at `1.1.10` cannot be assumed to match `1.3.1`. It would need to be re-copied, and `.planning/event-stream-reporting/research/mill-nested-keep-going.md` re-checked, for any release the plugin supports at or after `1.3.0`.
+- The test command copies the running `Execution` at run time, with fail-fast off, rather than a copy of its source. That route works at `1.3.1` (`.planning/event-stream-reporting/research/mill-nested-module-run.md` § 2).
 
 ## 7. What was not determined
 
@@ -222,7 +222,7 @@ These are outside the issue's list. They are recorded because they bear on the r
 - **`1.1.10`.** Every research note ran there.
   - Under `.planning/event-stream-reporting/SPECIFICATION.md` § Scope the floor is `1.1.10`, and the plugin compiles on Scala `3.8.2`. By Mill's backward compatibility it loads on `1.3.x`.
   - Costs: under `.planning/event-stream-reporting/decisions/test-command.md` "A release of the Mill plugin supports exactly the Mill releases its integration tests passed on…", supporting `1.3.x` needs the integration tests to pass there.
-  - The `1.1.10` copies of the queue scheduling and of `Execution` differ from `1.3.1`'s (§ 5, § 6). Supporting both may need behaviour chosen by the running Mill version.
+  - The `1.1.10` copy of the queue scheduling differs from `1.3.1`'s (§ 5). Supporting both may need behaviour chosen by the running Mill version.
   - `1.1.10` is the last release of a line that `1.3` has superseded.
 - **`1.3.1`,** the newest stable 1.x.
   - Floor `1.3.1`, Scala `3.9.0`.

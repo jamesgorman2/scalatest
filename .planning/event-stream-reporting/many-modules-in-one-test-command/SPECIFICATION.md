@@ -13,6 +13,7 @@ The test command takes exactly one module selector, which must name one JVM test
 ## Spec documents
 
 - [../SPECIFICATION.md](../SPECIFICATION.md) — the epic's specification, which this feature is written against.
+- [TECHNICAL-DESIGN.md](TECHNICAL-DESIGN.md) — how each selected module's tests run inside the test command's nested evaluation.
 - [../../../mill-plugin/consolidated.schema.json](../../../mill-plugin/consolidated.schema.json) — the JSON schema of the JSON output, including the root's `moduleSelectors` and `contents` (`$defs/root`, `$defs/moduleSelector` and `$defs/module`).
 - [../ROADMAP.md](../ROADMAP.md) — the epic's later features, which own what this feature leaves out.
 

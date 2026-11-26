@@ -125,7 +125,7 @@ Decisions behind `../ARCHITECTURE.md` on how the test command runs each module's
 - Requiring `--keep-going` on the command line adds a flag to every run, and without it scheduling decides which modules report (`../SPECIFICATION.md` R-056a).
 - Setting `--keep-going` in the build's `mill-opts` turns fail-fast off for every Mill command in the project.
 
-**Reasoning** The nested evaluation is one `execute` call on a copy of `mill.exec.Execution`, made by reflection with `failFast` off, which meets `../SPECIFICATION.md` R-056a without `--keep-going`. R-044, R-089 and R-092 already rest on Mill internals that a Mill change can break at run time (`capture-and-console.md` "`../SPECIFICATION.md` R-040, R-097a and R-044 hold on every runtime…" and "Progress output is a summary of the number of suites and tests expected to run…"; `test-command.md` "A test module needs no change to its definition…"), and the JVM routes that met R-044 were observed only on the copy. Meeting R-056a through the copy adds one more such dependency, not a new kind of risk.
+**Reasoning** The nested evaluation is one `execute` call on a copy of `mill.exec.Execution`, made by reflection with `failFast` off, which meets `../SPECIFICATION.md` R-056a without `--keep-going`. On Mill 1.1.10 and on Mill 1.3.1, it ran every module's tests after another module's compile had failed, each module's tests starting on that module's own compile, with the results and start times of `--keep-going`. R-044, R-089 and R-092 already rest on Mill internals that a Mill change can break at run time (`capture-and-console.md` "`../SPECIFICATION.md` R-040, R-097a and R-044 hold on every runtime…" and "Progress output is a summary of the number of suites and tests expected to run…"; `test-command.md` "A test module needs no change to its definition…"), and the JVM routes that met R-044 were observed only on the copy. Meeting R-056a through the copy adds one more such dependency, not a new kind of risk.
 
 **Costs** The route reaches a `private val` of Mill's evaluator by reflection and copies `mill.exec.Execution`, both outside Mill's compatibility policy, so a Mill release that changes either breaks it at run time, not compile time. The copy may briefly draw its own failure count on Mill's prompt before the test command ends.
 
@@ -134,6 +134,7 @@ Decisions behind `../ARCHITECTURE.md` on how the test command runs each module's
 **See**
 
 - `../research/mill-nested-keep-going.md` § 3, § 4.1, § 4.4, § 5.
+- `../research/mill-nested-module-run.md` § 2, § 3, § 4.
 - `../research/mill-runner-progress-without-trait.md` § 1, § 9.
 - `../research/nested-prompt-console.md` § 4.
 
