@@ -36,7 +36,7 @@ One module selector as the build tool was given it, with the test modules it res
 
 ## Failure
 
-A failure attached to the root or to a module: one that belongs to no run, such as a module's tests not starting or a worker failing to start. A failure attached to a module does not name the module. Text from the build tool in it, such as a task name, can.
+A failure attached to the root or to a module: one that belongs to no run, such as a module's tests not starting or a worker failing to start. A failure attached to a module does not itself name the module, but text from the build tool in it, such as a task name, can.
 
 - `message` — string: the failure's text, such as `Starting worker 0 of fork group 1 failed: …`.
 
@@ -47,7 +47,7 @@ A build tool's unit of build, holding the runs its tests produced.
 - `kind` — string, always `module`.
 - `name` — string: the module name, such as `core.test` for a Mill module.
 - `outcome` — string, always `aborted`. Present exactly when `failures` is. No outcome is rolled up from the module's runs.
-- `failures` — array of one or more [Failure](#failure) objects: the failures attached to the module, which belong to none of its runs, in the order they were attached. Under the test command, these are the failures [README.md](README.md) § Running the test command lists as on the module's node, such as the module's tests not starting, its class globs matching no test, or a worker failing to start. Present exactly when `outcome` is; absent where no failure is attached.
+- `failures` — array of one or more [Failure](#failure) objects: the failures attached to the module, which belong to none of its runs, in the order they were attached. Under the test command, these are the failures that [README.md](README.md) § Running the test command lists as put on the module's node, such as the module's tests not starting, its class globs matching no test, or a worker failing to start. Present exactly when `outcome` is; absent where no failure is attached.
 - `startedAt` — integer, epoch milliseconds: the module's start time, which the consolidation library's caller gives. Absent where the caller gives none.
 - `endedAt` — integer, epoch milliseconds: the module's end time, which the consolidation library's caller gives. Absent where the caller gives none.
 - `duration` — integer, milliseconds: `endedAt` less `startedAt`. Present exactly when both `startedAt` and `endedAt` are.

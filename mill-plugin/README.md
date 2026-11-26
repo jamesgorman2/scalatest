@@ -90,9 +90,9 @@ For example, `mill scalatest/test core.test util.test`.
 - **Module selectors**: one or more, each a separate argument before the first `--`, in any order among the output arguments. `+` cannot join them, as Mill takes `+` to start its next goal.
   - Each resolves to the modules it names, such as `__.test`, and keeps only the test modules among them, so `__` selects every test module. Each test module it keeps must be a JVM test module.
   - A test module that several module selectors resolve to runs its tests once.
-  - The class globs and framework arguments apply alike to every selected module.
+  - The same class globs and framework arguments apply to every selected module.
   - Every selected module's tests run, whatever happens to the other modules' tests, whether or not Mill's `--keep-going` is given.
-  - A module's tests start once that module has compiled, without waiting for another selected module to compile. They wait for every selected module's dependencies to resolve.
+  - A module's tests start once every selected module's dependencies have resolved and that module has compiled. They do not wait for another selected module to compile.
 - **`-oH`, or no output argument**: stdout holds the human-readable output.
 - **`-o`**: stdout holds no consolidated output. The tests still run and decide the result.
 - **`-fJ <path>`**: once every run has ended, the file at `<path>` holds the JSON output ([JSON.md](JSON.md)), whatever the tests' outcomes. A relative path resolves against the workspace root, the folder holding `build.mill`. Missing parent folders are created. Once the arguments are accepted, any file already at `<path>` is deleted, so a file there is always the JSON output of the latest test command that wrote one.
@@ -121,7 +121,7 @@ Each worker receives the environment that a worker of Mill's own `testOnly` or `
 
 Where `propagateEnv` is on, each worker receives the variables that the `mill` launcher set for the test command's own `mill` command line, not those of the command that started a running Mill daemon. For example, on Windows `mill.bat` sets `MILL_PARAMS` to that command line's arguments, omitting a leading launcher option such as `--no-daemon`.
 
-The test command fails before any test starts, writes no consolidated output, and leaves the file at the `-fJ` path as it was, when:
+The test command fails before any test starts, and writes no consolidated output, in the cases below. It leaves the file at the `-fJ` path as it was when:
 
 - it is given any other output argument, such as `-oP`, `-oHd`, `-fH` or a second `-fJ`;
 - it is given `-fJ` with no path;
@@ -129,7 +129,7 @@ The test command fails before any test starts, writes no consolidated output, an
 - it is given one of `-D`, `-n`, `-l`, `-P`, `-m`, `-w`, `-F`, `-T`, `-t`, `-z`, `-S` or `-W`, alone or with its value joined to it, before the first `--`, or anywhere if no `--` is given;
 - a folder is at the `-fJ` path, or the file there cannot be deleted.
 
-It fails before any test starts, writes no consolidated output, and leaves nothing at the `-fJ` path, when:
+It leaves nothing at the `-fJ` path when:
 
 - it is given no module selector;
 - a module selector resolves to no module, or to no test module. The failure names the module selector;
@@ -137,7 +137,7 @@ It fails before any test starts, writes no consolidated output, and leaves nothi
 - the dependencies Mill resolves for a selected test module hold no `com.edc:scalatest-core_3` at the plugin's release, as for a module testing with MUnit, uTest, upstream `org.scalatest:scalatest` or another release of this fork;
 - a selected module's own ScalaTest arguments hold an argument ScalaTest's runner does not recognise.
 
-The failure names each selected test module the test command cannot run, and each such argument. A selected module whose dependencies fail to resolve is not a module the test command cannot run: only its own tests do not start (below).
+The failure names each selected test module the test command cannot run, and each unrecognised argument. A selected module whose dependencies fail to resolve does not cause this failure: only its own tests do not start (below).
 
 Where a goal before the test command on the same `mill` command line fails and Mill's `--keep-going` is not given, the test command does not run: it writes no consolidated output and leaves the file at the `-fJ` path as it was.
 
@@ -147,12 +147,12 @@ The test command also fails when:
 - a test worker dies;
 - the JSON output cannot be written to the `-fJ` path. The human-readable output is still written.
 
-It also fails, with the consolidated output written and a failure on the module's node ([JSON.md](JSON.md) § Module), when one of the cases below happens to a selected module. The module's node is aborted. The other modules' tests still run.
+It also fails when one of the cases below happens to a selected module. The consolidated output is still written, and the module's node is aborted with a failure ([JSON.md](JSON.md) § Module). The other modules' tests still run.
 
 - the module's dependencies fail to resolve, or a task that its tests depend on fails, such as its compile. The module's tests do not start. The failure holds the resolution's error, or names each failed task as Mill writes its name, with that task's error;
 - Mill's test discovery for the module throws. The failure holds the error;
 - class globs are given and none of them matches a test class of the module. No test of the module runs. The failure is the one Mill's `testOnly` gives: `Test selector does not match any test: <class globs>`, then `Run discoveredTestClasses to see available tests` on the next line;
-- class globs are given, and once every test worker of the module has ended, no run of the module has reported a test as succeeded, failed, ignored, pending or cancelled, or a suite as aborted. This happens, for example, where `-- samples.Alpha1 -- -z nothing-matches` leaves no test of `samples.Alpha1` to run. The module's node holds its runs and the same failure, unless laying out a fork group's files or starting or running a test worker of the module failed. The failure is also left out where a test worker's JVM ended without writing its result and the module has already failed, as where one of its runs aborted. Neither of these counts as such a report:
+- class globs are given, and once every test worker of the module has ended, no run of the module has reported a test as succeeded, failed, ignored, pending or cancelled, or a suite as aborted. This happens, for example, where `-- samples.Alpha1 -- -z nothing-matches` leaves no test of `samples.Alpha1` to run. The module's node holds its runs and the same failure. The failure is left out where laying out a fork group's files or starting or running a test worker of the module failed, or where a test worker's JVM ended without writing its result and the module has already failed, as where one of its runs aborted. The following do not count as such a report:
   - a test shown as ignored only because its suite's structure marks it ignored;
   - a suite or test shown as aborted only because it has no end event, such as one with reason *not run*;
 - laying out a fork group's files fails, or starting or running a test worker fails;
@@ -165,11 +165,11 @@ Under the test command, ScalaTest prints no end-of-run summary of its own. Inste
 
 ## The module folder
 
-The test command writes each selected module's files in that module's own module folder, `org.scalatest.mill.TestCommandModule/modules/<module>` in Mill's output folder (`out/` by default). `<module>` is the module's name as Mill writes it in a task name, such as `core.test`, or `core.3_3_8.test` for the `test` module of the cross module `core` at `3.3.8`.
+The test command writes each selected module's files in its module folder, `org.scalatest.mill.TestCommandModule/modules/<module>` in Mill's output folder (`out/` by default). `<module>` is the module's name as Mill writes it in a task name, such as `core.test`, or `core.3_3_8.test` for the `test` module of the cross module `core` at `3.3.8`.
 
 - Each file and folder that Mill's `testOnly` or `testForked` would write in its task folder, such as each worker's working directory `sandbox`, is at the same relative path in the module folder. The exception is Mill's JUnit XML report: the test command writes none, whatever the module's `testReportXml`.
-- Once it has resolved its module selectors and checked that it can run every selected test module, the test command deletes everything an earlier test command left in each selected module's folder. It does so before any test starts, and also for a module none of whose tests start, as where its compile fails or no class glob matches.
-- A test command that fails on its arguments, such as a framework argument it does not accept, on a module selector, or on a selected test module it cannot run, leaves every module folder as it was.
+- Once it has resolved its module selectors and checked that it can run every selected test module, the test command deletes everything an earlier test command left in each selected module's folder. It does so before any test starts, including for a module whose tests do not start, as where its compile fails or no class glob matches.
+- A test command that fails on its arguments (such as a framework argument it does not accept), on a module selector, or on a selected test module it cannot run leaves every module folder as it was.
 - It leaves Mill's own `testForked` and `testOnly` task folders as they were.
 
 ## Runs in the human-readable output
@@ -183,7 +183,7 @@ The output is laid out as:
 
 - The suites of every run whose line is not shown form one list directly under the module's line, ordered by name. A suite that ran in several runs appears once for each, in order of the runs' numbers.
 - Each run whose line is shown follows that list, in order of number, so `Run 10:` follows `Run 2:`. It holds its own suites, then its output, then `*** RUN ABORTED ***` or `*** RUN STOPPED ***` where the run aborted or stopped.
-- The module's own output follows its runs, at the same indent as their lines: each line Mill's test discovery wrote for the module, after `[stdout] `, or after `[stderr] ` with the whole line in yellow.
+- The module's own output follows its runs, at the same indent as their lines: each line Mill's test discovery wrote for the module, prefixed with `[stdout] `, or with `[stderr] ` and the whole line in yellow.
 - Where the module has failures, `*** MODULE ABORTED ***` comes last, in red, at the same indent. Each line of each failure follows it, in red, indented one level more.
 
 For example, fork group 0 runs `Zeta`, whose test writes `hello` to stdout, and fork group 1 runs `Alpha`. Run 1 has output of its own, so its line is shown. Run 2's line is not. The output, without its summary line, is:
@@ -198,7 +198,7 @@ For example, fork group 0 runs `Zeta`, whose test writes `hello` to stdout, and 
     [stdout] hello
 ```
 
-For example, `mill scalatest/test alpha.test beta.test -- 'samples.Alpha*'` matches no test class of `beta.test`. Its part of the output is:
+For example, in `mill scalatest/test alpha.test beta.test -- 'samples.Alpha*'`, the class glob matches no test class of `beta.test`. That module's part of the output is:
 
 ```
 [beta.test]
