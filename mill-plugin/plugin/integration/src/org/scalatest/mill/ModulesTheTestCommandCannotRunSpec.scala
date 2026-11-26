@@ -6,7 +6,7 @@ import org.scalatest.matchers.should
 
 final class ModulesTheTestCommandCannotRunSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with FixtureBuilds {
 
-  private val unrunnableModulesHeader: String = "The test command cannot run these selected test modules:"
+  private val cannotRunModulesHeader: String = "The test command cannot run these selected test modules:"
 
   private def withModulesTheTestCommandCannotRun[A](test: FixtureBuild => A): A =
     withFixtureBuild(FixtureName.modulesTheTestCommandCannotRun) { build =>
@@ -49,9 +49,9 @@ final class ModulesTheTestCommandCannotRunSpec extends AnyFeatureSpec with Given
         Seq("  }", "}")).mkString("\n")
     )
 
-  private def shouldNameUnrunnableModules(result: TestCommandResult, modules: Seq[String]): Unit =
+  private def shouldNameModulesTheTestCommandCannotRun(result: TestCommandResult, modules: Seq[String]): Unit =
     withClue(result.debugString) {
-      result.consoleText should include(unrunnableModulesHeader)
+      result.consoleText should include(cannotRunModulesHeader)
       modules.foreach(module => result.consoleLines.exists(line => line.contains(s"  $module ") || line.contains(s"  $module's ")) shouldBe true)
     }
 
@@ -77,7 +77,7 @@ final class ModulesTheTestCommandCannotRunSpec extends AnyFeatureSpec with Given
 
           Then(s"Mill reports that the test command failed, with a message naming $module")
           shouldFail(result)
-          shouldNameUnrunnableModules(result, Seq(module))
+          shouldNameModulesTheTestCommandCannotRun(result, Seq(module))
 
           shouldStartNoTestAndWriteNoConsolidatedOutput(build, result)
         }
@@ -90,7 +90,7 @@ final class ModulesTheTestCommandCannotRunSpec extends AnyFeatureSpec with Given
 
         Then("Mill reports that the test command failed, with a message naming each of munit.test, utest.test, upstream.test, other.test, js.test and native.test")
         shouldFail(result)
-        shouldNameUnrunnableModules(result, Seq("munit.test", "utest.test", "upstream.test", "other.test", "js.test", "native.test"))
+        shouldNameModulesTheTestCommandCannotRun(result, Seq("munit.test", "utest.test", "upstream.test", "other.test", "js.test", "native.test"))
 
         shouldStartNoTestAndWriteNoConsolidatedOutput(build, result)
       }
@@ -128,7 +128,7 @@ final class ModulesTheTestCommandCannotRunSpec extends AnyFeatureSpec with Given
 
         Then("Mill reports that the test command failed, with a message naming --not-a-scalatest-argument")
         shouldFail(result)
-        shouldNameUnrunnableModules(result, Seq("args.test"))
+        shouldNameModulesTheTestCommandCannotRun(result, Seq("args.test"))
         shouldWriteToTheConsole(result, "--not-a-scalatest-argument")
 
         shouldStartNoTestAndWriteNoConsolidatedOutput(build, result)
