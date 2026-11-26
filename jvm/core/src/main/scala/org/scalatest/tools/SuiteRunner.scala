@@ -44,7 +44,6 @@ private[scalatest] class SuiteRunner(
   def run(): Unit = {
 
     if (!stopper.stopRequested) {
-      val rawString = Resources.suiteExecutionStarting
       val formatter = formatterForSuiteStarting(suite)
       val suiteClassName = getSuiteClassName(suite)
       val tracker = suiteArgs.tracker
@@ -55,13 +54,13 @@ private[scalatest] class SuiteRunner(
       val start = startOfSuite(suite, suiteArgs.filter, suiteArgs.reporter)
       val reporter = start.reporter
       val args = if (reporter eq suiteArgs.reporter) suiteArgs else suiteArgs.copy(reporter = reporter)
-      def send(event: Event): Unit = {
+      def dispatch(event: Event): Unit = {
         handOffToTestEventLog(event)
         start.report(event)
       }
 
       if (!suite.isInstanceOf[DistributedTestRunnerSuite]) {
-        send(SuiteStart.suiteStartingReadInOrderOf3_2_20(start, suite, tracker) { (ordinal, theSuiteName, theSuiteId) =>
+        dispatch(SuiteStart.suiteStartingReadInOrderOf3_2_20(start, suite, tracker) { (ordinal, theSuiteName, theSuiteId) =>
           SuiteStarting(ordinal, theSuiteName, theSuiteId, Some(suiteClassName), formatter, Some(TopOfClass(suite.getClass.getName)), suite.rerunner)
         })
       }
@@ -81,11 +80,11 @@ private[scalatest] class SuiteRunner(
                 if (!succeeded)
                   status.setFailed()
                 if (!suite.isInstanceOf[DistributedTestRunnerSuite])
-                  send(SuiteCompleted(tracker.nextOrdinal(), suite.suiteName, suite.suiteId, Some(suiteClassName), Some(duration), formatter, Some(TopOfClass(suiteClassName)), suite.rerunner))
+                  dispatch(SuiteCompleted(tracker.nextOrdinal(), suite.suiteName, suite.suiteId, Some(suiteClassName), Some(duration), formatter, Some(TopOfClass(suiteClassName)), suite.rerunner))
               case Failure(ue) =>
                 status.setFailed() // Don't forward the unreportedException to the returned status, because reporting it here in this SuiteAborted
                 if (!suite.isInstanceOf[DistributedTestRunnerSuite])
-                  send(SuiteAborted(tracker.nextOrdinal(), String.valueOf(ue.getMessage), suite.suiteName, suite.suiteId, Some(suiteClassName), Some(ue), Some(duration), formatter, Some(SeeStackDepthException), suite.rerunner))
+                  dispatch(SuiteAborted(tracker.nextOrdinal(), String.valueOf(ue.getMessage), suite.suiteName, suite.suiteId, Some(suiteClassName), Some(ue), Some(duration), formatter, Some(SeeStackDepthException), suite.rerunner))
             }
           }
           finally status.setCompleted()
@@ -95,24 +94,22 @@ private[scalatest] class SuiteRunner(
         case e: NotAllowedException =>
           val formatter = Suite.formatterForSuiteAborted(suite, e.getMessage)
           val duration = System.currentTimeMillis - suiteStartTime
-          send(SuiteAborted(tracker.nextOrdinal(), e.getMessage, suite.suiteName, suite.suiteId, Some(suite.getClass.getName), Some(e), Some(duration), formatter, Some(SeeStackDepthException), suite.rerunner))
+          dispatch(SuiteAborted(tracker.nextOrdinal(), e.getMessage, suite.suiteName, suite.suiteId, Some(suite.getClass.getName), Some(e), Some(duration), formatter, Some(SeeStackDepthException), suite.rerunner))
           status.setFailed()
           status.setCompleted()
-        case e: RuntimeException => { // Do fire SuiteAborted even if a DistributedTestRunnerSuite 
+        case e: RuntimeException => // Do fire SuiteAborted even if a DistributedTestRunnerSuite
           val eMessage = e.getMessage
-          val rawString3 = 
-            if (eMessage != null && eMessage.length > 0)
+          val rawString =
+            if (eMessage != null && eMessage.nonEmpty)
                 Resources.executeExceptionWithMessage(eMessage)
               else
                 Resources.executeException
-          val formatter3 = formatterForSuiteAborted(suite, rawString3)
+          val formatter3 = formatterForSuiteAborted(suite, rawString)
 
           val duration = System.currentTimeMillis - suiteStartTime
-          send(SuiteAborted(tracker.nextOrdinal(), rawString3, suite.suiteName, suite.suiteId, Some(suite.getClass.getName), Some(e), Some(duration), formatter3, Some(SeeStackDepthException), suite.rerunner))
+          dispatch(SuiteAborted(tracker.nextOrdinal(), rawString, suite.suiteName, suite.suiteId, Some(suite.getClass.getName), Some(e), Some(duration), formatter3, Some(SeeStackDepthException), suite.rerunner))
           status.setFailed()
           status.setCompleted()
-          
-        }
         case e: Throwable => 
           // SKIP-SCALATESTJS,NATIVE-START
           if (Suite.anExceptionThatShouldCauseAnAbort(e) && args.distributor.isDefined && args.distributor.get.isInstanceOf[ConcurrentDistributor]) 

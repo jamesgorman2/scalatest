@@ -15,27 +15,17 @@
  */
 package org.scalatest.tools
 
-import org.scalatest.events._
 import org.scalatest.Reporter
-import org.scalatest.events.MotionToSuppress
+import org.scalatest.events._
 import org.scalatest.exceptions.StackDepthException
 
-import java.io.PrintWriter
-import java.io.BufferedOutputStream
-import java.io.FileOutputStream
-import java.io.File
-import java.util.Date
-import java.util.TimeZone
+import java.io.{ BufferedOutputStream, File, FileOutputStream, PrintWriter }
 import java.text.SimpleDateFormat
 import java.util.regex.Matcher.quoteReplacement
-
+import java.util.{ Date, TimeZone }
 import scala.collection.mutable
-import scala.collection.mutable.Stack
 import scala.collection.mutable.ListBuffer
-import scala.xml.XML
-import scala.xml.NodeSeq
-import scala.xml.Elem
-import scala.xml.Node
+import scala.xml.{ Elem, Node, NodeSeq, XML }
 
 /**
  * A <code>Reporter</code> that writes test status information in xml format
@@ -122,7 +112,7 @@ private[scalatest] class DashboardReporter(directory: String,
   def escape(s: String): String =
     scala.xml.Utility.escape(s).
       replaceAll("""\{""", """\\{""").
-      replaceAll("""\}""", """\\}""")
+      replaceAll("""}""", """\\}""")
 
   //
   // Formats date for inclusion in as 'date' attribute in xml.
@@ -158,7 +148,7 @@ private[scalatest] class DashboardReporter(directory: String,
   //
   def archiveOldFiles(oldRunsXml: NodeSeq): Unit = {
     val previousRunTimestamp = 
-      if (oldRunsXml.size > 0) Some("" + oldRunsXml(0) \ "@id")
+      if (oldRunsXml.nonEmpty) Some("" + oldRunsXml.head \ "@id")
       else None
 
     if (previousRunTimestamp.isDefined) {
@@ -315,8 +305,8 @@ private[scalatest] class DashboardReporter(directory: String,
                            oldRegressionsXml: NodeSeq): Option[Node] =
       {
         oldRegressionsXml.find(
-          node => (((node \ "@testName") == (test \ "@name")) &&
-                   ((node \ "@suiteId") == (suite \ "@id"))))
+          node => ((node \ "@testName") == (test \ "@name")) &&
+                   ((node \ "@suiteId") == (suite \ "@id")))
       }
 
       //
@@ -341,7 +331,7 @@ private[scalatest] class DashboardReporter(directory: String,
       def getLastRunId: Option[String] = {
         val previousRuns = oldSummaryXml \\ "run"
 
-        if (previousRuns.size > 0) Some("" + (previousRuns(0) \ "@id"))
+        if (previousRuns.nonEmpty) Some("" + (previousRuns.head \ "@id"))
         else None
       }
 
@@ -376,7 +366,7 @@ private[scalatest] class DashboardReporter(directory: String,
             if (matchingTest.isDefined) {
               found = true
               val result = "" + matchingTest.get \ "@result"
-              succeeded = (result == "succeeded")
+              succeeded = result == "succeeded"
             }
           }
         }
@@ -514,7 +504,7 @@ private[scalatest] class DashboardReporter(directory: String,
   def writeRunFile(event: Event, thisRunFile: File): Unit = {
     index = 0
     var suiteRecord: SuiteRecord = null
-    val stack = new Stack[SuiteRecord]
+    val stack = new mutable.Stack[SuiteRecord]
     val pw =
       new PrintWriter(
         new BufferedOutputStream(
@@ -782,7 +772,7 @@ private[scalatest] class DashboardReporter(directory: String,
     // Indicates whether an end event has been received yet for this
     // record.
     //
-    def isComplete: Boolean = (endEvent != null)
+    def isComplete: Boolean = endEvent != null
 
     //
     // Generates value for use as 'result' attribute of <test> element.
@@ -854,26 +844,26 @@ private[scalatest] class DashboardReporter(directory: String,
       if (event.throwable.isDefined) {
         val throwable = event.throwable.get
         val stackTrace = throwable.getStackTrace
-        require(stackTrace.size > 0)
+        require(stackTrace.nonEmpty)
 
         // PCData will enclose the message in CDATA.
         buf.append("<message>" + scala.xml.PCData(event.message) + "</message>\n")
 
-        if (throwable.isInstanceOf[StackDepthException]) {
-          val sde = throwable.asInstanceOf[StackDepthException]
+        throwable match {
+          case sde: StackDepthException =>
 
-          if (sde.failedCodeFileName.isDefined &&
-              sde.failedCodeLineNumber.isDefined)
-          {
-            buf.append(
-              "<stackDepth>\n" +
-              "<depth>" + sde.failedCodeStackDepth + "</depth>\n" +
-              "<fileName>" + sde.failedCodeFileName.get + "</fileName>\n" +
-              "<lineNumber>" +
-                sde.failedCodeLineNumber.get +
-              "</lineNumber>\n" +
-              "</stackDepth>\n")
-          }
+            if (sde.failedCodeFileName.isDefined &&
+              sde.failedCodeLineNumber.isDefined) {
+              buf.append(
+                "<stackDepth>\n" +
+                  "<depth>" + sde.failedCodeStackDepth + "</depth>\n" +
+                  "<fileName>" + sde.failedCodeFileName.get + "</fileName>\n" +
+                  "<lineNumber>" +
+                  sde.failedCodeLineNumber.get +
+                  "</lineNumber>\n" +
+                  "</stackDepth>\n")
+            }
+          case _                        =>
         }
 
         buf.append("<stackTrace>\n")
@@ -902,8 +892,10 @@ private[scalatest] class DashboardReporter(directory: String,
 
       buf.append(formatTestStart)
 
-      if (endEvent.isInstanceOf[TestFailed])
-        buf.append(formatException(endEvent.asInstanceOf[TestFailed]))
+      endEvent match {
+        case failed: TestFailed => buf.append(formatException(failed))
+        case _                  =>
+      }
 
       buf.append("</test>\n")
 

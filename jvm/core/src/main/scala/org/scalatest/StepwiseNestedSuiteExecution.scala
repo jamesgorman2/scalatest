@@ -27,7 +27,7 @@ import collection.mutable.ListBuffer
 /**
  * Trait that causes the nested suites of any suite it is mixed into to be run sequentially even if
  * a <a href="Distributor.html"><code>Distributor</code></a> is passed to <code>runNestedSuites</code>. This trait overrides the 
- * <code>runNestedSuites</code> method and fowards every parameter passed to it to a superclass invocation
+ * <code>runNestedSuites</code> method and forwards every parameter passed to it to a superclass invocation
  * of <code>runNestedSuites</code>, and make sure the nested suites are run and completed one after one in order.
  * Mix in this trait into any suite whose nested suites need to be run sequentially even with the rest of the
  * run is being executed concurrently.
@@ -54,7 +54,6 @@ trait StepwiseNestedSuiteExecution extends SuiteMixin { thisSuite: Suite =>
     def callExecuteOnSuite(nestedSuite: Suite): Status = {
 
       if (!stopper.stopRequested) {
-        val rawString = Resources.suiteExecutionStarting
         val formatter = formatterForSuiteStarting(nestedSuite)
         val suiteClassName = getSuiteClassName(nestedSuite)
         val start = SuiteStart.ofNestedSuite(nestedSuite, suiteReport)
@@ -70,7 +69,6 @@ trait StepwiseNestedSuiteExecution extends SuiteMixin { thisSuite: Suite =>
           // Same thread, so OK to send same tracker
           val status = start.run(nestedSuite.run(None, Args(report, stopper, filter, configMap, distributor, tracker, Set.empty)))
 
-          val rawString = Resources.suiteCompletedNormally
           val formatter = formatterForSuiteCompleted(nestedSuite)
 
           distributor match {
@@ -87,10 +85,10 @@ trait StepwiseNestedSuiteExecution extends SuiteMixin { thisSuite: Suite =>
           status
         }
         catch {       
-          case e: RuntimeException => {
+          case e: RuntimeException =>
             val eMessage = e.getMessage
-            val rawString = 
-              if (eMessage != null && eMessage.length > 0)
+            val rawString =
+              if (eMessage != null && eMessage.nonEmpty)
                 Resources.executeExceptionWithMessage(eMessage)
               else
                 Resources.executeException
@@ -99,7 +97,6 @@ trait StepwiseNestedSuiteExecution extends SuiteMixin { thisSuite: Suite =>
             val duration = System.currentTimeMillis - suiteStartTime
             start.report(SuiteAborted(tracker.nextOrdinal(), rawString, nestedSuite.suiteName, nestedSuite.suiteId, Some(suiteClassName), Some(e), Some(duration), formatter, Some(SeeStackDepthException), nestedSuite.rerunner))
             FailedStatus
-          }
         }
       }
       else

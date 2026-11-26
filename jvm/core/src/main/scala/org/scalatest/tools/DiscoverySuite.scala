@@ -99,10 +99,9 @@ private[scalatest] object DiscoverySuite {
       }
     }
     catch {
-      case t: Throwable => {
+      case t: Throwable =>
         val msg = Resources.cannotLoadDiscoveredSuite(suiteClassName, t.getMessage())
-        new DeferredAbortedSuite(suiteClassName, suiteClassName, new RuntimeException(msg, t))
-      }
+        DeferredAbortedSuite(suiteClassName, suiteClassName, new RuntimeException(msg, t))
     }
   }
 }
