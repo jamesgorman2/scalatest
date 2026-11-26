@@ -566,17 +566,19 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
     }
 
     Scenario("A module's output and abort sit one level deeper under the root's line") {
-      Given("a failure attached to the module `core.test`, which has no run, and a failure attached to the root")
+      Given("a stdout line and a failure attached to the module `core.test`, which has no run, and a failure attached to the root")
       When("the library consolidates it")
       val output = colourMarkedOutputAfter { consolidation =>
+        consolidation.addModuleOutput(module, CapturedLine.Stdout("loading samples.Noisy"))
         consolidation.addModuleFailure(module, "module failure")
         consolidation.addRootFailure("root failure")
       }
 
-      Then("the module's abort sits under the module's line, itself under the root's line, before the root's abort")
+      Then("the module's captured line and abort sit under the module's line, itself under the root's line, before the root's abort")
       output.tree shouldBe
         """{cyan}Consolidated tests:{reset}
           |  {cyan}[core.test]{reset}
+          |    [stdout] loading samples.Noisy
           |    {red}*** MODULE ABORTED ***{reset}
           |      {red}module failure{reset}
           |  {red}*** CONSOLIDATED TESTS ABORTED ***{reset}

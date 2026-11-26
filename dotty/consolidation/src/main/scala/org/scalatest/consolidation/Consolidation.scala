@@ -89,7 +89,7 @@ final class Consolidation private[consolidation] (
   def addProcessEndedBeforeAnyRun(module: ModuleName): Unit =
     synchronized {
       requireOpen()
-      failedModules += module
+      recordFailedModule(module)
       fail()
     }
 
@@ -117,7 +117,7 @@ final class Consolidation private[consolidation] (
     synchronized {
       requireOpen()
       attachToModule(module, _.withFailure(message))
-      failedModules += module
+      recordFailedModule(module)
       fail()
     }
 
@@ -189,7 +189,7 @@ final class Consolidation private[consolidation] (
         moduleAttachments.getOrElse(module, Attachments.none)
       )
     }
-    ConsolidatedRoot(buildTool, moduleSelectors, rootAttachments.failures, MeasuredTimes(startedAt, endedAt), modules, rootAttachments.output)
+    ConsolidatedRoot(buildTool, moduleSelectors, MeasuredTimes(startedAt, endedAt), modules, rootAttachments)
   }
 
   private def attachToModule(module: ModuleName, attach: Attachments => Attachments): Unit =

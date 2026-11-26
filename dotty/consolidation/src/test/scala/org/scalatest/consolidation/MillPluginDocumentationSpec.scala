@@ -99,6 +99,15 @@ final class MillPluginDocumentationSpec extends AnyFeatureSpec with GivenWhenThe
 
   Feature("The Mill plugin's documents describe the JSON output") {
 
+    Scenario("The JSON schema refuses a module's outcome without its failures") {
+      Given("a JSON output whose module holds an outcome but no failures")
+      val moduleNode = """{"kind":"module","name":"core.test","outcome":"aborted","contents":[]}"""
+      val root = s"""{"kind":"root","scalaTestVersion":"${Consolidation.scalaTestVersion}","moduleSelectors":[],"contents":[$moduleNode]}"""
+
+      Then("it does not validate against consolidated.schema.json")
+      MillPluginDocuments.schemaViolationsOf(root) should not be empty
+    }
+
     Scenario("The README links JSON.md") {
       Given("the Mill plugin's README")
       val readme = MillPluginDocuments.read("README.md")

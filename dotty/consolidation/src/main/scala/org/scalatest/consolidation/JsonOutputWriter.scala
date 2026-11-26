@@ -58,9 +58,9 @@ private[consolidation] object JsonOutputWriter {
         "scalaTestVersion" -> Some(JsonValue.Text(Consolidation.scalaTestVersion)),
         "buildTool" -> root.buildTool.map(_.toJson),
         "moduleSelectors" -> Some(JsonValue.Array(root.moduleSelectors.toVector.map(_.toJson)))
-      ) ++ failureFields(root.failures) ++ measuredTimeFields(root.times) ++ Vector[Field](
+      ) ++ failureFields(root.attachments) ++ measuredTimeFields(root.times) ++ Vector[Field](
         "contents" -> Some(JsonValue.Array(root.modules.map(moduleNode))),
-        "output" -> capturedOutputField(root.output)
+        "output" -> capturedOutputField(root.attachments)
       )
     )
 
@@ -69,19 +69,21 @@ private[consolidation] object JsonOutputWriter {
       Vector[Field](
         "kind" -> Some(JsonValue.Text("module")),
         "name" -> Some(JsonValue.Text(module.name.value))
-      ) ++ failureFields(module.failures) ++ measuredTimeFields(module.times) ++ Vector[Field](
+      ) ++ failureFields(module.attachments) ++ measuredTimeFields(module.times) ++ Vector[Field](
         "contents" -> Some(JsonValue.Array(module.runs.map(runNode))),
-        "output" -> capturedOutputField(module.output)
+        "output" -> capturedOutputField(module.attachments)
       )
     )
 
-  private def failureFields(failures: Vector[String]): Vector[Field] =
+  private def failureFields(attachments: Attachments): Vector[Field] = {
+    val failures = attachments.failures
     Vector(
       "outcome" -> Option.when(failures.nonEmpty)(JsonValue.Text("aborted")),
       "failures" -> nonEmptyArray(failures.map(failure => objectOf(Vector[Field]("message" -> Some(JsonValue.Text(failure))))))
     )
+  }
 
-  private def capturedOutputField(output: Vector[CapturedLine]): Option[JsonValue] = nonEmptyArray(output.map(capturedOutputItem))
+  private def capturedOutputField(attachments: Attachments): Option[JsonValue] = nonEmptyArray(attachments.output.map(capturedOutputItem))
 
   private def measuredTimeFields(times: MeasuredTimes): Vector[Field] =
     Vector(

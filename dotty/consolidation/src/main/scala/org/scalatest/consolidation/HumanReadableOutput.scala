@@ -47,18 +47,15 @@ private[consolidation] object HumanReadableOutput {
     treeLines(root) :+ OutputLine(0, SummaryLine.of(root.runs))
 
   private def treeLines(root: ConsolidatedRoot): Vector[OutputLine] =
-    if (root.output.isEmpty && root.failures.isEmpty) root.modules.flatMap(moduleLines(_, 0))
-    else
-      linesOf(rootLine, 0, AnsiCyan) ++ root.modules.flatMap(moduleLines(_, 1)) ++ root.output.flatMap(linesOf(_, 1)) ++
-        attachedFailureLines(rootAbortedLine, root.failures, 1)
+    if (root.attachments.isEmpty) root.modules.flatMap(moduleLines(_, 0))
+    else linesOf(rootLine, 0, AnsiCyan) ++ root.modules.flatMap(moduleLines(_, 1)) ++ attachmentLines(rootAbortedLine, root.attachments, 1)
 
   private def moduleLines(module: ConsolidatedModule, depth: Int): Vector[OutputLine] = {
     val (shownRuns, hiddenRuns) = module.runs.partition(showsItsLine)
     // A stable sort keeps suites that share a name in order of their runs' numbers, then in the order each run lists them.
     val hiddenRunsSuites = hiddenRuns.flatMap(_.assembled.eventStream.topLevelSuites).sortBy(_.name)
     linesOf("[" + module.name.value + "]", depth, AnsiCyan) ++ hiddenRunsSuites.flatMap(nodeLines(_, depth + 1)) ++
-      shownRuns.flatMap(runLines(_, depth + 1)) ++ module.output.flatMap(linesOf(_, depth + 1)) ++
-      attachedFailureLines(moduleAbortedLine, module.failures, depth + 1)
+      shownRuns.flatMap(runLines(_, depth + 1)) ++ attachmentLines(moduleAbortedLine, module.attachments, depth + 1)
   }
 
   private def showsItsLine(run: ConsolidatedRun): Boolean = {
@@ -66,9 +63,12 @@ private[consolidation] object HumanReadableOutput {
     assembled.output.nonEmpty || assembled.eventStream.endedAbnormally || assembled.ranNoneOfItsAssignedTestClasses
   }
 
-  private def attachedFailureLines(abortedLine: String, failures: Seq[String], depth: Int): Vector[OutputLine] =
-    if (failures.isEmpty) Vector.empty
-    else linesOf(abortedLine, depth, AnsiRed) ++ failures.flatMap(linesOf(_, depth + 1, AnsiRed))
+  private def attachmentLines(abortedLine: String, attachments: Attachments, depth: Int): Vector[OutputLine] = {
+    val failureLines =
+      if (attachments.failures.isEmpty) Vector.empty
+      else linesOf(abortedLine, depth, AnsiRed) ++ attachments.failures.flatMap(linesOf(_, depth + 1, AnsiRed))
+    attachments.output.flatMap(linesOf(_, depth)) ++ failureLines
+  }
 
   private def runLines(run: ConsolidatedRun, depth: Int): Vector[OutputLine] = {
     val assembled = run.assembled

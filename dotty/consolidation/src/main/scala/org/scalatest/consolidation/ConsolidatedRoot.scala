@@ -6,28 +6,26 @@ private[consolidation] final case class ConsolidatedModule(
   name: ModuleName,
   times: MeasuredTimes,
   runs: Vector[ConsolidatedRun],
-  failures: Vector[String],
-  output: Vector[CapturedLine]
+  attachments: Attachments
 )
 
 private[consolidation] object ConsolidatedModule {
 
-  def of(name: ModuleName, times: MeasuredTimes, runs: Vector[AssembledRun], attached: Attachments): ConsolidatedModule = {
+  def of(name: ModuleName, times: MeasuredTimes, runs: Vector[AssembledRun], attachments: Attachments): ConsolidatedModule = {
     val numbered = runs
       .sortBy(_.worker)(AssembledRun.numberingOrder)
       .zipWithIndex
       .map((run, index) => ConsolidatedRun(RunNumber(index + 1), run))
-    ConsolidatedModule(name, times, numbered, attached.failures, attached.output)
+    ConsolidatedModule(name, times, numbered, attachments)
   }
 }
 
 private[consolidation] final case class ConsolidatedRoot(
   buildTool: Option[BuildTool],
   moduleSelectors: Seq[ModuleSelector],
-  failures: Vector[String],
   times: MeasuredTimes,
   modules: Vector[ConsolidatedModule],
-  output: Vector[CapturedLine]
+  attachments: Attachments
 ) {
 
   def runs: Vector[AssembledRun] = modules.flatMap(_.runs.map(_.assembled))

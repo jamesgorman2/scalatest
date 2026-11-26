@@ -15,9 +15,12 @@ private[consolidation] object MillPluginDocuments {
 
   private val millPluginDirectory: Path = {
     val properties = new Properties
-    val resource = getClass.getResourceAsStream("/repository.properties")
+    val resource = Option(getClass.getResourceAsStream("/repository.properties"))
+      .getOrElse(throw new IllegalStateException("the test resource repository.properties is not on the classpath"))
     try properties.load(resource) finally resource.close()
-    Paths.get(properties.getProperty("millPlugin"))
+    Option(properties.getProperty("millPlugin"))
+      .map(Paths.get(_))
+      .getOrElse(throw new IllegalStateException("repository.properties does not give the millPlugin directory"))
   }
 
   private lazy val consolidatedSchema: Schema =

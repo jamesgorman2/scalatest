@@ -44,8 +44,8 @@ private[consolidation] trait JsonOutputs { this: Assertions & ConsolidatedRuns =
 
     def module: JsonValue = root("contents").only
 
-    def schemaValidModule(name: String): JsonValue =
-      schemaValidRoot("contents").items.find(_("name") == JsonValue.Text(name)).getOrElse(fail(s"expected the module $name"))
+    def schemaValidModule(name: ModuleName): JsonValue =
+      schemaValidRoot("contents").items.find(_("name") == JsonValue.Text(name.value)).getOrElse(fail(s"expected the module ${name.value}"))
 
     def runNode: JsonValue = module("contents").only
 

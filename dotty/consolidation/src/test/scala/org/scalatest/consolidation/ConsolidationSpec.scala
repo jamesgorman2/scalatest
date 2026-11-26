@@ -153,7 +153,7 @@ final class ConsolidationSpec extends AnyWordSpec with should.Matchers with Cons
       }
     }
 
-    "given a process that ended before any run existed in it after it has ended" should {
+    "ended, then given a process that ended before any run existed in it" should {
       "be refused" in {
         val consolidation = startedWithColour()
         consolidation.end()
