@@ -205,9 +205,8 @@ Feature: Every selected module runs, whatever happens to the others
 
     Scenario: AC-023 broken.test's failure in the human-readable output
       Given the build also has the JVM test module `broken.test`, which tests with `com.edc::scalatest` at the release under test and whose sources do not compile
-      And `<human>` is an absolute path at which nothing exists
-      When `mill -j 2 scalatest/test alpha.test broken.test beta.test -fH <human>` is invoked
-      Then in the file at `<human>`, the line after the line `[broken.test]` is `*** MODULE ABORTED ***`, in red and indented one level more than `[broken.test]`
+      When `mill -j 2 scalatest/test alpha.test broken.test beta.test -oH` is invoked
+      Then in the human-readable output on stdout, the line after the line `[broken.test]` is `*** MODULE ABORTED ***`, in red and indented one level more than `[broken.test]`
       And each line between `*** MODULE ABORTED ***` and the next line indented no more than `*** MODULE ABORTED ***` is in red and indented one level more than `*** MODULE ABORTED ***`
       And there is at least one such line, and one of them contains `broken.test.compile`
       And the test command fails

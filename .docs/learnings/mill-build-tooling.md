@@ -260,3 +260,11 @@ For a metadata-only resolution in the runtime configuration, either:
 1. Bypass `millResolver`. `mill.javalib.Lib.resolveDependenciesMetadataSafe` is public, fetches metadata only and takes `resolutionParams`. `CoursierModule.Resolver`'s constructor is public, and so is every module task `millResolver` builds it from: `allRepositories`, `bindDependency`, `mapDependencies`, `resolutionCustomizer`, `coursierCacheCustomizer`, `resolutionParams`, `checkGradleModules` and `coursierConfigModule().coursierConfig()`. Pass those tasks' values to `resolveDependenciesMetadataSafe`, or to a new `Resolver` and call its `resolution`, with `resolutionParams` mapped as `resolvedRunMvnDeps` maps it. This keeps `resolvedRunMvnDeps`'s parameters but ignores a module's override of `millResolver`.
 2. Call `millResolver().resolution`, which keeps a module's override but not `resolvedRunMvnDeps`'s parameters. Name the configuration on the root dependency yourself: `coursierDependencyTask().copy(variantSelector = VariantSelector.ConfigurationBased(Configuration.runtime))`. Mill gives every dependency of a module's Coursier project a configuration. Only a dependency or BOM that names none, or a Gradle module variant under `checkGradleModules`, can then resolve differently from `resolvedRunMvnDeps`.
 </learning>
+
+<learning>
+date: 2026-11-27
+---
+In Mill 1.3.1, `CoursierModule.Resolver.resolution` calls `.get` on the `Result` that `Lib.resolveDependenciesMetadataSafe` returns. A failed resolution therefore throws a `RuntimeException` from inside the task's body, and the evaluation records the task as `ExecResult.Exception`, not `ExecResult.Failure`. The exception's message is Coursier's error, which begins and ends with a line break.
+
+Code that reads a task's failure from `executionResults.transitiveResults` must handle both `ExecResult.Failure` (read `msg`) and `ExecResult.Exception` (read the throwable's message). Trim the message before writing it on one line or after a task name.
+</learning>

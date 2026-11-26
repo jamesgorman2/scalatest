@@ -10,6 +10,7 @@ import mill.api.Task
 import mill.api.TaskCtx
 import org.scalatest.consolidation.BuildTool
 import org.scalatest.consolidation.Consolidation
+import org.scalatest.consolidation.ConsolidationState
 import org.scalatest.consolidation.ModuleName
 import org.scalatest.consolidation.ScalaTestArgument
 import scala.concurrent.duration.DurationInt
@@ -24,17 +25,21 @@ private[mill] final class TestCommand private (
     systemProperty: String => Option[String]
 ) {
 
-  def checkAndRunTests(): Either[TestCommandFailure, Seq[Result.Failure]] = {
+  def checkAndRunTests(): Either[TestCommandFailure, ConsolidationState] = {
     val checkTasks = selection.modules.map(module => module -> ModuleCheck.task(module))
-    val checkEvaluation = failFastOffEvaluator.execute(checkTasks.map(_._2), logger = ctx.log)
-    val moduleChecks = TestCommand.successfulValues(checkEvaluation, checkTasks)
+    val checkResults = EvaluatedTasks.of(failFastOffEvaluator.execute(checkTasks.map(_._2), logger = ctx.log))
+    val (checkFailures, moduleChecks) = checkTasks.partitionMap { case (module, task) =>
+      checkResults.valueOrFailure(task).left.map(failure => module -> failure).map(check => module -> check)
+    }
     TestCommand
       .runArgumentsFrom(moduleChecks, commandArguments.frameworkArguments)
-      .flatMap(runSelectedModules)
-      .map(runFailures => TestCommand.failuresOf(checkEvaluation) ++ runFailures)
+      .flatMap(runArguments => runSelectedModules(runArguments, checkFailures))
   }
 
-  private def runSelectedModules(runArguments: Seq[(SelectedTestModule, RunArguments)]): Either[TestCommandFailure, Seq[Result.Failure]] = {
+  private def runSelectedModules(
+      runArguments: Seq[(SelectedTestModule, RunArguments)],
+      checkFailures: Seq[(SelectedTestModule, String)]
+  ): Either[TestCommandFailure, ConsolidationState] = {
     val moduleFolders =
       BuildCtx.withFilesystemCheckerDisabled(selection.modules.map(module => module -> clearedModuleFolder(module.name)).toMap)
     val output = ctx.log.streams.out
@@ -52,16 +57,19 @@ private[mill] final class TestCommand private (
       buildTool = Some(BuildTool("Mill", BuildInfo.millVersion)),
       startedAt = Some(now())
     )
+    TestCommand.addModuleFailures(consolidation, checkFailures)
     val workerCharset = WorkerOutputCapture.workerCharset(systemProperty)
     val moduleRunTasks = runArguments.map { case (module, moduleRunArguments) =>
-      moduleRunTask(module, moduleRunArguments, moduleFolders(module), consolidation, workerCharset)
+      module -> moduleRunTask(module, moduleRunArguments, moduleFolders(module), consolidation, workerCharset)
     }
-    val runEvaluation = failFastOffEvaluator.execute(moduleRunTasks, logger = ctx.log)
+    val runResults = EvaluatedTasks.of(failFastOffEvaluator.execute(moduleRunTasks.map(_._2), logger = ctx.log))
+    // Mill skips a module run task where a task upstream of it fails, so that module's run never adds the module.
+    TestCommand.addModuleFailures(
+      consolidation,
+      moduleRunTasks.flatMap { case (module, task) => runResults.valueOrFailure(task).left.toOption.map(module -> _) }
+    )
     val endedState = consolidation.end(Some(now()))
-    jsonOutputWritten.map { _ =>
-      TestCommand.failuresOf(runEvaluation) ++
-        Option.when(endedState.failed)(Result.Failure(s"The tests of ${EnglishList.of(selection.modules.map(_.name.value))} failed"))
-    }
+    jsonOutputWritten.map(_ => endedState)
   }
 
   // Each module's tests run in this task's body, downstream of only that module's inputs, so they start once that
@@ -122,12 +130,13 @@ private[mill] object TestCommand {
       selection <- ModuleSelection.from(evaluator, commandArguments.moduleSelectors)
       // Fail-fast off lets every module's tests run, whatever happens to the others' tasks.
       testCommand = new TestCommand(FailFastOffEvaluator.from(evaluator), commandArguments, jsonOutputFile, selection, ctx, now, systemProperty)
-      failures <- testCommand.checkAndRunTests()
-    } yield failures
+      endedState <- testCommand.checkAndRunTests()
+    } yield selection -> endedState
     outcome match {
       case Left(failure) => Result.Failure(failure.message)
-      case Right(Seq()) => Result.Success(())
-      case Right(failures) => Result.Failure.join(failures)
+      case Right((selection, endedState)) if endedState.failed =>
+        Result.Failure(s"The tests of ${EnglishList.of(selection.modules.map(_.name.value))} failed")
+      case Right(_) => Result.Success(())
     }
   }
 
@@ -139,14 +148,6 @@ private[mill] object TestCommand {
       check.runArguments(frameworkArguments).map(runArguments => module -> runArguments)
     })
 
-  private def failuresOf(evaluation: Evaluator.Result[?]): Seq[Result.Failure] =
-    evaluation.values match {
-      case failure: Result.Failure => Seq(failure)
-      case _: Result.Success[?] => Nil
-    }
-
-  private def successfulValues[K, V](evaluation: Evaluator.Result[V], tasks: Seq[(K, Task[V])]): Seq[(K, V)] =
-    tasks.flatMap { case (key, task) =>
-      evaluation.executionResults.transitiveResults.get(task).flatMap(_.asSuccess).map(success => key -> success.value.value.asInstanceOf[V])
-    }
+  private def addModuleFailures(consolidation: Consolidation, failures: Seq[(SelectedTestModule, String)]): Unit =
+    failures.foreach { case (module, failure) => consolidation.addModuleFailure(module.name, failure) }
 }
