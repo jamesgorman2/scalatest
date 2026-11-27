@@ -54,6 +54,12 @@ object other extends SampleModule {
   }
 }
 
+object unresolved extends SampleModule {
+  object test extends SampleTests, TestModule.ScalaTest {
+    def mvnDeps = Seq(mvn"com.edc::scalatest::3.2.20", mvn"com.example::absent:0.0.1")
+  }
+}
+
 object js extends ScalaJSModule {
   def scalaVersion = "3.3.8"
   def scalaJSVersion = "1.20.2"

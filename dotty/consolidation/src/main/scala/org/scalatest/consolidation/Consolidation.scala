@@ -27,6 +27,7 @@ final class Consolidation private[consolidation] (
   private val moduleAttachments = mutable.Map.empty[ModuleName, Attachments]
   private val modulesWithTestResult = mutable.Set.empty[ModuleName]
   private val failedModules = mutable.Set.empty[ModuleName]
+  private val modulesFailingTestCommand = mutable.Set.empty[ModuleName]
 
   /** A read made after an operation returns sees any failure that operation added. */
   def state: ConsolidationState = currentState
@@ -50,6 +51,18 @@ final class Consolidation private[consolidation] (
   def hasFailed(module: ModuleName): Boolean =
     synchronized {
       failedModules.contains(module)
+    }
+
+  /**
+   * Each module, ordered by name, that holds a node failing the test command: a failure attached to the module, a
+   * process of the module that ended before any run existed in it, or a run of the module that has an outcome other
+   * than completed, reports a test as failed or canceled or a suite as aborted, or holds a node aborted or not run once
+   * its event stream ends. A failure attached to the root belongs to no module. Unlike [[state]], this takes the
+   * consolidation's lock, and it answers before and after the consolidation ends.
+   */
+  def modulesFailingTheTestCommand: Vector[ModuleName] =
+    synchronized {
+      modulesFailingTestCommand.toVector.sortBy(_.value)
     }
 
   /**
@@ -89,8 +102,7 @@ final class Consolidation private[consolidation] (
   def addProcessEndedBeforeAnyRun(module: ModuleName): Unit =
     synchronized {
       requireOpen()
-      recordFailedModule(module)
-      fail()
+      failModule(module)
     }
 
   /**
@@ -117,8 +129,7 @@ final class Consolidation private[consolidation] (
     synchronized {
       requireOpen()
       attachToModule(module, _.withFailure(message))
-      recordFailedModule(module)
-      fail()
+      failModule(module)
     }
 
   /**
@@ -208,9 +219,16 @@ final class Consolidation private[consolidation] (
     modulesWithTestResult += module
   }
 
-  private[consolidation] def recordFailedModule(module: ModuleName): Unit = {
+  private[consolidation] def failModule(module: ModuleName): Unit = {
     assertLockHeld()
     failedModules += module
+    failTestCommandFrom(module)
+  }
+
+  private[consolidation] def failTestCommandFrom(module: ModuleName): Unit = {
+    assertLockHeld()
+    modulesFailingTestCommand += module
+    fail()
   }
 
   private[consolidation] def assertLockHeld(): Unit = assert(Thread.holdsLock(this), "the consolidation's lock is not held")
@@ -271,11 +289,10 @@ final class RunFeed private[consolidation] (consolidation: Consolidation, newRun
         throw new IllegalStateException(s"the event stream of a run under ${run.get.module.value} has ended")
       }
       run.set(run.get.added(event.decoded))
-      if (RunAssembly.reportsFailure(event.decoded) || RunAssembly.endsRunAbnormally(event.decoded)) {
-        consolidation.fail()
-      }
       if (RunAssembly.endsRunAbnormally(event.decoded)) {
-        consolidation.recordFailedModule(run.get.module)
+        consolidation.failModule(run.get.module)
+      } else if (RunAssembly.reportsFailure(event.decoded)) {
+        consolidation.failTestCommandFrom(run.get.module)
       }
       if (RunAssembly.reportsTestResult(event.decoded)) {
         consolidation.recordTestResult(run.get.module)
@@ -297,11 +314,10 @@ final class RunFeed private[consolidation] (consolidation: Consolidation, newRun
       if (endedEventStream.get.isEmpty) {
         val eventStream = run.get.assembledWholeEventStream
         endedEventStream.set(Some(eventStream))
-        if (eventStream.failsTestCommand) {
-          consolidation.fail()
-        }
         if (eventStream.endedOtherThanCompleted) {
-          consolidation.recordFailedModule(run.get.module)
+          consolidation.failModule(run.get.module)
+        } else if (eventStream.failsTestCommand) {
+          consolidation.failTestCommandFrom(run.get.module)
         }
       }
     }

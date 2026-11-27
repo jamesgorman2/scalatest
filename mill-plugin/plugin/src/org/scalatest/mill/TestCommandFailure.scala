@@ -1,6 +1,7 @@
 package org.scalatest.mill
 
 import java.nio.file.Path
+import org.scalatest.consolidation.ModuleName
 import scala.util.control.NoStackTrace
 
 private[mill] enum TestCommandFailure extends Exception with NoStackTrace {
@@ -11,10 +12,11 @@ private[mill] enum TestCommandFailure extends Exception with NoStackTrace {
   case NoModuleSelector
   case NoTestModule(selector: ModuleSelectorArgument)
   case UnresolvedModuleSelector(selector: ModuleSelectorArgument, error: String)
-  case CannotRunModules(reasons: Seq[CannotRunReason])
+  case CannotRunModules(reasons: Seq[CannotRunReason], failedChecks: Seq[FailedModuleCheck])
   case JsonOutputPathIsFolder(path: Path)
   case JsonOutputNotDeleted(path: Path, cause: Throwable)
   case JsonOutputNotWritten(path: Path, cause: Throwable, partlyWrittenFileDeleteFailure: Option[Throwable])
+  case ModulesFailed(modules: Seq[ModuleName])
 
   override def getMessage: String = message
 
@@ -37,8 +39,12 @@ private[mill] enum TestCommandFailure extends Exception with NoStackTrace {
         s"Module selector ${selector.text} resolves to no test module"
       case UnresolvedModuleSelector(selector, error) =>
         s"Module selector ${selector.text} resolves to no module: $error"
-      case CannotRunModules(reasons) =>
-        ("The test command cannot run these selected test modules:" +: reasons.map(reason => s"  ${reason.line}")).mkString("\n")
+      case CannotRunModules(reasons, failedChecks) =>
+        val cannotRunLines = "The test command cannot run these selected test modules:" +: reasons.map(reason => s"  ${reason.line}")
+        val failedCheckLines =
+          if (failedChecks.isEmpty) Seq.empty
+          else "The tests of these selected test modules cannot start:" +: failedChecks.flatMap(_.lines).map("  " + _)
+        (cannotRunLines ++ failedCheckLines).mkString("\n")
       case JsonOutputPathIsFolder(path) =>
         s"The test command cannot delete $path, the file $jsonOutputArgument names: it is a folder"
       case JsonOutputNotDeleted(path, cause) =>
@@ -46,6 +52,10 @@ private[mill] enum TestCommandFailure extends Exception with NoStackTrace {
       case JsonOutputNotWritten(path, cause, partlyWrittenFileDeleteFailure) =>
         s"The test command cannot write its JSON output to $path, the file $jsonOutputArgument names: $cause" +
           partlyWrittenFileDeleteFailure.fold("")(deleteFailure => s"; it cannot delete the partly written file either: $deleteFailure")
+      case ModulesFailed(Seq()) =>
+        "The test command failed outside the tests of every selected module"
+      case ModulesFailed(modules) =>
+        s"The tests of ${EnglishList.of(modules.map(_.value))} failed"
     }
   }
 }

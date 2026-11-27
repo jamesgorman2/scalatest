@@ -49,14 +49,17 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
       s"object broken extends SampleModule {\n  object test extends SampleTests {\n${testModuleMembers.map("    " + _).mkString("\n")}\n  }\n}"
     )
 
-  private val sharedSeveralModulesWithAlpha1SlowFailing: SharedFixtureBuild =
-    sharedSeveralModules(build => replaceInSuite(build, "alpha", "Alpha1")("""test("slow") {}""", """test("slow") { fail("fails as the scenario asks") }"""))
+  private def failAlpha1Slow(build: FixtureBuild): Unit =
+    replaceInSuite(build, "alpha", "Alpha1")("""test("slow") {}""", """test("slow") { fail("fails as the scenario asks") }""")
 
-  private val sharedSeveralModulesWithBrokenTestThatDoesNotCompile: SharedFixtureBuild =
-    sharedSeveralModules { build =>
-      addBrokenTest(build)()
-      replaceInSuite(build, "broken", "Broken1")("""test("fast") {}""", """test("fast") { notDefinedAnywhere }""")
-    }
+  private def addBrokenTestThatDoesNotCompile(build: FixtureBuild): Unit = {
+    addBrokenTest(build)()
+    replaceInSuite(build, "broken", "Broken1")("""test("fast") {}""", """test("fast") { notDefinedAnywhere }""")
+  }
+
+  private val sharedSeveralModulesWithAlpha1SlowFailing: SharedFixtureBuild = sharedSeveralModules(failAlpha1Slow)
+
+  private val sharedSeveralModulesWithBrokenTestThatDoesNotCompile: SharedFixtureBuild = sharedSeveralModules(addBrokenTestThatDoesNotCompile)
 
   private def inSharedSeveralModulesWithBrokenTestThatDoesNotCompile[A](test: FixtureBuild => A): A =
     inSharedSeveralModules(sharedSeveralModulesWithBrokenTestThatDoesNotCompile) { build =>
@@ -223,6 +226,20 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
 
         And("the test command succeeds")
         shouldSucceed(result)
+      }
+    }
+
+    Scenario("A test of alpha.test fails and broken.test does not compile") {
+      withSeveralModules { build =>
+        Given("Alpha1's test slow fails")
+        failAlpha1Slow(build)
+        And("the build also has the JVM test module broken.test, which tests with com.edc::scalatest at the release under test and whose sources do not compile")
+        addBrokenTestThatDoesNotCompile(build)
+        val (result, _) = runParsingJsonOutput(build)("alpha.test", "broken.test", "beta.test")
+
+        Then("Mill reports that the test command failed, with the message The tests of alpha.test and broken.test failed")
+        shouldFail(result)
+        shouldWriteToTheConsole(result, "The tests of alpha.test and broken.test failed")
       }
     }
   }

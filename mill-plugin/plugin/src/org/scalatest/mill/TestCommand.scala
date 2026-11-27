@@ -10,7 +10,6 @@ import mill.api.Task
 import mill.api.TaskCtx
 import org.scalatest.consolidation.BuildTool
 import org.scalatest.consolidation.Consolidation
-import org.scalatest.consolidation.ConsolidationState
 import org.scalatest.consolidation.ModuleName
 import scala.concurrent.duration.DurationInt
 
@@ -24,12 +23,12 @@ private[mill] final class TestCommand private (
     systemProperty: String => Option[String]
 ) {
 
-  def checkAndRunTests(): Either[TestCommandFailure, ConsolidationState] = {
+  def checkAndRunTests(): Either[TestCommandFailure, Unit] = {
     val (jvmModules, otherModules) = selection.modules.partition(_.isJvm)
     val checkTasks = jvmModules.map(module => module -> ModuleCheckTask.of(module))
     val checkResults = EvaluatedTasks.of(failFastOffEvaluator.execute(checkTasks.map(_._2), logger = ctx.log))
-    // A module whose check task failed is not a module the test command cannot run: its failure goes on its module
-    // node, and its tests do not start.
+    // A module whose check task failed is not a module the test command cannot run. Its tests do not start, and its
+    // failure goes on its module node, or, where the test command cannot run another module, into the command's failure.
     val (checkFailures, moduleChecks) = checkTasks.partitionMap { case (module, task) =>
       checkResults.valueOrFailure(task).left.map(failure => module -> failure).map(check => module -> check)
     }
@@ -37,16 +36,18 @@ private[mill] final class TestCommand private (
       check.runArguments(module.name, commandArguments.frameworkArguments).map(module -> _)
     }
     val cannotRunReasons = otherModules.map(module => CannotRunReason.NotJvm(module.name)) ++ jvmModuleReasons.flatten
-    if (cannotRunReasons.nonEmpty)
-      Left(TestCommandFailure.CannotRunModules(cannotRunReasons.sortBy(_.module.value)))
-    else
+    if (cannotRunReasons.nonEmpty) {
+      val failedChecks = checkFailures.map { case (module, failure) => FailedModuleCheck(module.name, failure) }
+      Left(TestCommandFailure.CannotRunModules(cannotRunReasons.sortBy(_.module.value), failedChecks.sortBy(_.module.value)))
+    } else {
       consolidateSelectedModules(runArguments, checkFailures)
+    }
   }
 
   private def consolidateSelectedModules(
       runArguments: Seq[(SelectedTestModule, RunArguments)],
       checkFailures: Seq[(SelectedTestModule, String)]
-  ): Either[TestCommandFailure, ConsolidationState] = {
+  ): Either[TestCommandFailure, Unit] = {
     val moduleFolders =
       BuildCtx.withFilesystemCheckerDisabled(selection.modules.map(module => module -> clearedModuleFolder(module.name)).toMap)
     val output = ctx.log.streams.out
@@ -77,7 +78,9 @@ private[mill] final class TestCommand private (
       moduleRunTasks.flatMap { case (module, task) => runResults.valueOrFailure(task).left.toOption.map(module -> _) }
     )
     val endedState = consolidation.end(Some(now()))
-    jsonOutputWritten.map(_ => endedState)
+    jsonOutputWritten.flatMap { _ =>
+      Either.cond(!endedState.failed, (), TestCommandFailure.ModulesFailed(consolidation.modulesFailingTheTestCommand))
+    }
   }
 
   // Each module's tests run in this task's body, downstream of only that module's inputs, so they start once that
@@ -138,14 +141,9 @@ private[mill] object TestCommand {
       selection <- ModuleSelection.from(evaluator, commandArguments.moduleSelectors)
       // Fail-fast off lets every module's tests run, whatever happens to the others' tasks.
       testCommand = new TestCommand(FailFastOffEvaluator.from(evaluator), commandArguments, jsonOutputFile, selection, ctx, now, systemProperty)
-      endedState <- testCommand.checkAndRunTests()
-    } yield selection -> endedState
-    outcome match {
-      case Left(failure) => Result.Failure(failure.message)
-      case Right((selection, endedState)) if endedState.failed =>
-        Result.Failure(s"The tests of ${EnglishList.of(selection.modules.map(_.name.value))} failed")
-      case Right(_) => Result.Success(())
-    }
+      _ <- testCommand.checkAndRunTests()
+    } yield ()
+    outcome.fold(failure => Result.Failure(failure.message), _ => Result.Success(()))
   }
 
   private def addModuleFailures(consolidation: Consolidation, failures: Seq[(SelectedTestModule, String)]): Unit =

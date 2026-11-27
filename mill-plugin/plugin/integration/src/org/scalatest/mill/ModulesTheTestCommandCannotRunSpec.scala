@@ -11,6 +11,8 @@ final class ModulesTheTestCommandCannotRunSpec extends AnyFeatureSpec with Given
 
   private val cannotRunModulesHeader: String = "The test command cannot run these selected test modules:"
 
+  private val modulesWhoseTestsCannotStartHeader: String = "The tests of these selected test modules cannot start:"
+
   private val sharedModulesTheTestCommandCannotRun: SharedFixtureBuild =
     sharedFixtureBuildWithEarlierReport(FixtureName.modulesTheTestCommandCannotRun, _ => ())(invokeTestCommandOnAlpha)
 
@@ -41,6 +43,10 @@ final class ModulesTheTestCommandCannotRunSpec extends AnyFeatureSpec with Given
         "other.test, on the JVM, testing with com.edc::scalatest at a release other than the release under test, which a repository the build uses holds; " +
         "js.test, on Scala.js, testing with com.edc::scalatest at the release under test, in NodeJs; " +
         "native.test, on Native, testing with com.edc::scalatest at the release under test"
+    )
+    And(
+      "the build also has the JVM test module unresolved.test, which tests with com.edc::scalatest at the release under test, holds one test that succeeds, " +
+        "and whose mvnDeps also holds com.example::absent:0.0.1, which no repository the build uses holds"
     )
     And("<markers> is an absolute path at which an empty folder exists, and each test, when it runs, creates a file in <markers>")
     And("<report> is an absolute path at which a file exists that an earlier test command wrote")
@@ -102,6 +108,13 @@ final class ModulesTheTestCommandCannotRunSpec extends AnyFeatureSpec with Given
         Then("Mill reports that the test command failed, with a message naming each of munit.test, utest.test, upstream.test, other.test, js.test and native.test")
         shouldFail(result)
         shouldNameModulesTheTestCommandCannotRun(result, Seq("munit.test", "utest.test", "upstream.test", "other.test", "js.test", "native.test"))
+
+        And("that message names unresolved.test as a module whose tests cannot start, with a failure that contains com.example:absent_3:0.0.1")
+        withClue(result.debugString) {
+          val linesAfterHeader = result.consoleLines.dropWhile(line => !line.contains(modulesWhoseTestsCannotStartHeader))
+          linesAfterHeader.exists(_.contains("  unresolved.test:")) shouldBe true
+          linesAfterHeader.exists(_.contains("com.example:absent_3:0.0.1")) shouldBe true
+        }
 
         shouldStartNoTestAndWriteNoConsolidatedOutput(build, result)
       }

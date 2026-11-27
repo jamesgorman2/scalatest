@@ -77,7 +77,7 @@ Run a tag when one of its files changes. Paths are from the repository root. A n
 | Tags | Files |
 |---|---|
 | `Arguments` | `TestCommandArguments`, `AllowedFlag`, `FrameworkArguments`, `ClassGlob`, `StdoutContent`, `RunArguments`, `ModuleScalaTestArguments`, `ModuleSelectorArgument`; `ScalaTestArgument` in the library |
-| `Modules` | `ModuleSelection`, `SelectedTestModule`, `ModuleCheck`, `ModuleCheckTask`, `CannotRunReason`, `ResolvedDependency`, `Organization`, `ArtifactName`, `LibraryVersion`, `FailFastOffEvaluator`, `EvaluatedTasks`, `FailedTask`, `FirstFailure`, `TaskName` |
+| `Modules` | `ModuleSelection`, `SelectedTestModule`, `ModuleCheck`, `ModuleCheckTask`, `CannotRunReason`, `ResolvedDependency`, `Organization`, `ArtifactName`, `LibraryVersion`, `FailFastOffEvaluator`, `EvaluatedTasks`, `FailedTask`, `FailedModuleCheck`, `FirstFailure`, `TaskName` |
 | `Workers` | `JvmTestModuleInputs`, `WorkerLayout`, `ForkGroupLabel`, `PaddedIndex`, `PathUnderModule`, `WorkerRun`, `WorkerProcess`, `ProcessExit`, `DelegatingTaskCtx`, `ModuleFolder`, `ModuleFolderTaskCtx` |
 | `Capture` | `OutputCapture`, `LineSplitter`, `StreamLines`, `EventLogReader`, `EventLogFile`, `EventLogLines`, `WorkerTaskCtx` |
 | `HumanReadable` | `HumanReadableOutput` and `ConsolidationState` in the library |
@@ -204,7 +204,7 @@ It leaves nothing at the `-fJ` path when:
 - the dependencies Mill resolves for a selected test module hold no `com.edc:scalatest-core_3` at the plugin's release, as for a module testing with MUnit, uTest, upstream `org.scalatest:scalatest` or another release of this fork;
 - a selected module's own ScalaTest arguments hold an argument ScalaTest's runner does not recognise.
 
-The failure names each selected test module the test command cannot run, and each unrecognised argument. A selected module whose dependencies fail to resolve does not cause this failure: only its own tests do not start (below).
+The failure names each selected test module the test command cannot run, and each unrecognised argument. A selected module whose dependencies fail to resolve does not cause this failure: only its own tests do not start (below). Where the test command fails this way for another module, the failure also names, under `The tests of these selected test modules cannot start:`, each module whose dependencies fail to resolve, with the resolution's error.
 
 Where a goal before the test command on the same `mill` command line fails and Mill's `--keep-going` is not given, the test command does not run: it writes no consolidated output and leaves the file at the `-fJ` path as it was.
 
@@ -227,6 +227,8 @@ It also fails when one of the cases below happens to a selected module. The cons
 - a test worker's test event log cannot be read, or holds a line that cannot be decoded;
 - two of the module's fork groups would share a `processFolder`, as where each runs only the same test class or, on a case-insensitive filesystem, only classes whose names differ only in case. No test of the module runs;
 - two or more of the module's fork groups hold a test class to run, and the test command cannot tell whether the filesystem is case-insensitive. No test of the module runs.
+
+Where the test command fails for any of these reasons other than its JSON output, its failure names only the selected modules that failed, such as `The tests of alpha.test and broken.test failed`.
 
 Under the test command, ScalaTest prints no end-of-run summary of its own. Instead, the human-readable output ends with one summary line that counts the suites and tests of every run. Mill's own test tasks still print ScalaTest's summary.
 

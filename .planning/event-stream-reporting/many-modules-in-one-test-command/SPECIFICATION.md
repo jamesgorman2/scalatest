@@ -29,6 +29,7 @@ Bare `AC-nnn` IDs are this document's. The epic's requirements are cited as `../
 - Each failure the test command can attribute to one selected test module, shown on that module's node in the JSON and human-readable outputs. Such failures include:
   - the module's class globs matching no test;
   - the module's tests not starting, where the module fails to compile, its dependencies fail to resolve, or another task its tests depend on fails.
+- The test command's failure naming exactly the selected test modules that failed, and, where it fails before any test starts, each selected test module whose tests cannot start, with that module's failure.
 - What Mill's test discovery writes for a selected test module, shown on that module's node in the JSON and human-readable outputs.
 - The class globs and framework arguments applying alike to every selected test module.
 - Failing the test command before any test starts where the test command is given no module selector, or a module selector resolves to no test module.
@@ -229,6 +230,15 @@ Feature: Every selected module runs, whatever happens to the others
       When the test command is invoked with no flags and the module selectors `alpha.test late.test`
       Then the files `Alpha1.fast` and `Late1.fast` exist in `<markers>`
       And the test command succeeds
+
+  Rule: Where the test command fails once its tests have run, its failure names exactly the selected modules that failed
+    A selected module has failed where its module node, or any node under it, fails the test command (`../SPECIFICATION.md` R-137), such as an aborted module node, a run whose outcome is not completed, a failed test, or an aborted suite.
+
+    Scenario: AC-027 A test of alpha.test fails and broken.test does not compile
+      Given `Alpha1`'s test `slow` fails
+      And the build also has the JVM test module `broken.test`, which tests with `com.edc::scalatest` at the release under test and whose sources do not compile
+      When the test command is invoked with no flags and the module selectors `alpha.test broken.test beta.test`
+      Then Mill reports that the test command failed, with the message `The tests of alpha.test and broken.test failed`
 ```
 
 ```gherkin
@@ -328,6 +338,7 @@ Feature: Modules the test command cannot run
       | `other.test`    | JVM      | `com.edc::scalatest` at a release other than the release under test, which a repository the build uses holds |
       | `js.test`       | Scala.js | `com.edc::scalatest` at the release under test, in `NodeJs`                                                 |
       | `native.test`   | Native   | `com.edc::scalatest` at the release under test                                                              |
+    And the build also has the JVM test module `unresolved.test`, which tests with `com.edc::scalatest` at the release under test, holds one test that succeeds, and whose `mvnDeps` also holds `com.example::absent:0.0.1`, which no repository the build uses holds
     And `<markers>` is an absolute path at which an empty folder exists, and each test, when it runs, creates a file in `<markers>`
     And `<report>` is an absolute path at which a file exists that an earlier test command wrote
     And the test command is invoked as `mill -j 2 scalatest/test <selectors> -fJ <report>`, each argument reaching `mill` exactly as written, with no shell expansion
@@ -349,10 +360,14 @@ Feature: Modules the test command cannot run
         | `js.test`       |
         | `native.test`   |
 
-  Rule: The failure names every test module the test command cannot run
+  Rule: The failure names every test module the test command cannot run, and every other selected test module whose tests cannot start, with that module's failure
+    Before any test starts, a module's tests are known not to start where its dependencies fail to resolve, or where its `testArgsDefault` or a task its dependency resolution depends on fails.
+    The failure gives such a module's failure as its module node would hold it, as in AC-015.
+
     Scenario: AC-011 A module selector that resolves to every test module
       When the test command is invoked with the module selector `__.test`
       Then Mill reports that the test command failed, with a message naming each of `munit.test`, `utest.test`, `upstream.test`, `other.test`, `js.test` and `native.test`
+      And that message names `unresolved.test` as a module whose tests cannot start, with a failure that contains `com.example:absent_3:0.0.1`
       And no file exists in `<markers>`
       And nothing exists at `<report>`
       And Mill's console shows no consolidated output
@@ -438,5 +453,5 @@ Each epic requirement this feature enables, with the criteria that test it:
 | `../SPECIFICATION.md` R-106d | AC-023, AC-026                                         |
 | `../SPECIFICATION.md` R-106e | AC-026                                                 |
 | `../SPECIFICATION.md` R-110  | AC-004                                                 |
-| `../SPECIFICATION.md` R-137  | AC-005, AC-006, AC-009, AC-015, AC-022, AC-024         |
+| `../SPECIFICATION.md` R-137  | AC-005, AC-006, AC-009, AC-015, AC-022, AC-024, AC-027 |
 | `../SPECIFICATION.md` R-142  | AC-019                                                 |

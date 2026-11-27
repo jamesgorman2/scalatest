@@ -68,7 +68,8 @@ final class TestCommandFailureSpec extends AnyWordSpec with should.Matchers {
               CannotRunReason.NotJvm(ModuleName("js.test")),
               CannotRunReason.WithoutThisRelease(ModuleName("munit.test")),
               CannotRunReason.UnrecognisedArguments(ModuleName("args.test"), Seq("-x", "--not-a-scalatest-argument"))
-            )
+            ),
+            Seq.empty
           )
           .message shouldBe
           Seq(
@@ -78,6 +79,45 @@ final class TestCommandFailureSpec extends AnyWordSpec with should.Matchers {
               "the release of this fork that the Mill plugin belongs to",
             "  args.test's testArgsDefault holds -x and --not-a-scalatest-argument, which ScalaTest does not recognise"
           ).mkString("\n")
+      }
+
+      "also name, after them, each module whose tests cannot start, with each line of its failure beneath it" in {
+        TestCommandFailure
+          .CannotRunModules(
+            Seq(CannotRunReason.NotJvm(ModuleName("js.test"))),
+            Seq(
+              FailedModuleCheck(ModuleName("broken.test"), "Resolution failed for 1 modules:\n  com.example:absent_3:0.0.1 not found"),
+              FailedModuleCheck(ModuleName("unread.test"), "unread.test.testArgsDefault testArgsDefault fails")
+            )
+          )
+          .message shouldBe
+          Seq(
+            "The test command cannot run these selected test modules:",
+            "  js.test is a Scala.js or Native test module",
+            "The tests of these selected test modules cannot start:",
+            "  broken.test:",
+            "    Resolution failed for 1 modules:",
+            "      com.example:absent_3:0.0.1 not found",
+            "  unread.test:",
+            "    unread.test.testArgsDefault testArgsDefault fails"
+          ).mkString("\n")
+      }
+    }
+
+    "the tests of selected modules failed" should {
+      "name the one module that failed" in {
+        TestCommandFailure.ModulesFailed(Seq(ModuleName("broken.test"))).message shouldBe "The tests of broken.test failed"
+      }
+
+      "name each module that failed" in {
+        TestCommandFailure.ModulesFailed(Seq(ModuleName("alpha.test"), ModuleName("broken.test"), ModuleName("core.test"))).message shouldBe
+          "The tests of alpha.test, broken.test and core.test failed"
+      }
+    }
+
+    "the test command failed and no selected module did" should {
+      "say the failure is outside the tests of every selected module" in {
+        TestCommandFailure.ModulesFailed(Seq.empty).message shouldBe "The test command failed outside the tests of every selected module"
       }
     }
 
