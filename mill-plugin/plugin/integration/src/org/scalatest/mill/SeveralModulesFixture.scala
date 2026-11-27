@@ -35,19 +35,33 @@ trait SeveralModulesFixture extends JsonOutputFixture with SharedFixtureBuilds {
   protected def andEachArgumentReachesMillAsWritten(): Unit =
     And("each argument of a mill command line reaches mill exactly as written, with no shell expansion")
 
-  protected def andTheJsonOutputIsReadFromTheReport(): Unit = {
+  protected def andNothingExistsAtTheReport(): Unit =
     And("<report> is an absolute path at which nothing exists")
+
+  protected def andTheJsonOutputIsParsedFromTheReport(): Unit =
     And("the JSON output is the JSON value parsed from the file at <report> once the test command has ended")
-  }
 
-  protected def addToBetaTest(build: FixtureBuild, member: String): Unit =
-    addToTestModule(build, "beta", member)
-
-  protected def addToTestModule(build: FixtureBuild, module: String, member: String): Unit =
+  protected def addToTestModule(build: FixtureBuild, module: String, members: String*): Unit =
     build.replaceInBuild(
-      s"object $module extends SampleModule {\n  object test extends SampleTests\n}",
-      s"object $module extends SampleModule {\n  object test extends SampleTests {\n${member.linesIterator.map("    " + _).mkString("\n")}\n  }\n}"
+      Seq(
+        s"object $module extends SampleModule {",
+        "  object test extends SampleTests",
+        "}"
+      ).mkString("\n"),
+      testModuleHolding(module, members*)
     )
+
+  protected def testModuleHolding(module: String, members: String*): String =
+    Seq(
+      s"object $module extends SampleModule {",
+      "  object test extends SampleTests {",
+      indented(2)(members.mkString("\n\n")),
+      "  }",
+      "}"
+    ).mkString("\n")
+
+  protected def indented(levels: Int)(code: String): String =
+    code.linesIterator.map(line => if (line.isEmpty) line else "  " * levels + line).mkString("\n")
 
   protected def replaceInSuite(build: FixtureBuild, module: String, suite: String)(from: String, to: String): Unit =
     build.replaceInSource(build.workspace / module / "test" / "src" / "samples" / s"$suite.scala", from, to)
@@ -55,13 +69,14 @@ trait SeveralModulesFixture extends JsonOutputFixture with SharedFixtureBuilds {
   protected def runTestCommand(build: FixtureBuild, millFlags: String*)(arguments: String*): TestCommandResult =
     build.runTestCommandWithMillArguments(FixtureBuild.jobsArguments(2) ++ millFlags)(arguments*)
 
-  protected def runParsingJsonOutput(build: FixtureBuild, millFlags: String*)(selectors: String*): (TestCommandResult, JsonNode) = {
-    whenTheTestCommandIsInvokedWritingJsonOutput(millFlags*)(selectors*)
-    resultAndJsonOutputOfTestCommand(build, millFlags*)(selectors*)
-  }
+  protected def whenTheTestCommandIsInvokedWith(arguments: String): Unit =
+    When(s"the test command is invoked with $arguments")
 
-  protected def whenTheTestCommandIsInvokedWritingJsonOutput(millFlags: String*)(selectors: String*): Unit =
-    When(s"the test command is invoked as mill -j 2 ${millFlags.map(_ + " ").mkString}scalatest/test ${selectors.mkString(" ")} -fJ <report>")
+  protected def theModuleSelectors(selectors: Seq[String]): String =
+    selectors match {
+      case Seq(selector) => s"the module selector $selector"
+      case _ => s"the module selectors ${selectors.mkString(" ")}"
+    }
 
   protected def resultAndJsonOutputOfTestCommand(build: FixtureBuild, millFlags: String*)(selectors: String*): (TestCommandResult, JsonNode) =
     build.resultAndJsonOutput(runTestCommand(build, millFlags*)((selectors :+ "-fJ" :+ build.jsonOutputFile.toString)*))

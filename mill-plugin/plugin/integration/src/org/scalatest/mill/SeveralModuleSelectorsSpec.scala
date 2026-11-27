@@ -17,7 +17,8 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
     And("<markers> is an absolute path at which an empty folder exists, and each test, when it runs, appends one line to the file <suite>.<test> in <markers>")
     And("the test command is invoked as mill -j 2 scalatest/test <selectors> -fJ <report> unless the scenario states its own mill command line")
     andEachArgumentReachesMillAsWritten()
-    andTheJsonOutputIsReadFromTheReport()
+    andNothingExistsAtTheReport()
+    andTheJsonOutputIsParsedFromTheReport()
   }
 
   private val sharedUnchangedSeveralModules: SharedFixtureBuild = sharedSeveralModules(_ => ())
@@ -45,8 +46,13 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
 
   private def givenWhenSharedRunOnAlphaAndEveryTestModule(): RunAndMarkerLineCounts = {
     givenTheBackground()
-    whenTheTestCommandIsInvokedWritingJsonOutput()(alphaAndEveryTestModule*)
+    whenTheTestCommandIsInvokedWith(theModuleSelectors(alphaAndEveryTestModule))
     sharedRunOnAlphaAndEveryTestModule
+  }
+
+  private def runParsingJsonOutput(build: FixtureBuild)(selectors: String*): (TestCommandResult, JsonNode) = {
+    whenTheTestCommandIsInvokedWith(theModuleSelectors(selectors))
+    resultAndJsonOutputOfTestCommand(build)(selectors*)
   }
 
   private def moduleSelectorsOf(json: JsonNode): Seq[(String, Seq[String])] =
@@ -150,10 +156,10 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
         moduleSelectors should have size 2
 
         And("the first entry's selector is alpha.test and its modules holds exactly alpha.test")
-        moduleSelectors.head shouldBe ("alpha.test" -> Seq("alpha.test"))
+        moduleSelectors.head shouldBe (("alpha.test", Seq("alpha.test")))
 
         And("the second entry's selector is __.test and its modules holds exactly alpha.test and beta.test, in that order")
-        moduleSelectors(1) shouldBe ("__.test" -> Seq("alpha.test", "beta.test"))
+        moduleSelectors(1) shouldBe (("__.test", Seq("alpha.test", "beta.test")))
       }
     }
 

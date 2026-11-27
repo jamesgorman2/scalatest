@@ -303,9 +303,9 @@ Before splitting test classes to shorten a run, compare the worker count with th
 <learning>
 date: 2026-11-27
 ---
-In Mill 1.3.1, a task evaluates every task its body calls before the body runs, in parallel. An override such as `def compile = Task { awaitMarker(); super.compile() }` therefore does not delay the compile: `super.compile` runs while `awaitMarker` is still waiting, and only the override's own body waits. In one run, the compile's result was written 20 ms after the marker it was meant to wait for.
+In Mill 1.3.1, a task evaluates every task its body calls before the body runs, in parallel. An override such as `def compile: T[CompilationResult] = Task { awaitMarker(); super.compile() }` therefore does not delay the compile: `super.compile` runs while `awaitMarker` is still waiting, and only the override's own body waits.
 
-To make a build's work start only after a condition, such as a marker file another process writes, put the wait upstream of that work. For a compile, wait in an input of the compiler, as in `def allSourceFiles = Task { awaitMarker(); super.allSourceFiles() }`.
+To make a build's work start only after a condition, such as a marker file another process writes, put the wait upstream of that work. For a compile, wait in an input of the compiler, as in `def allSourceFiles: T[Seq[PathRef]] = Task { awaitMarker(); super.allSourceFiles() }`.
 
 Declare the wait as a `Task.Input`, which Mill evaluates on every run, so that the wait still happens where the downstream task is cached, as on a test fixture build that several scenarios reuse.
 </learning>

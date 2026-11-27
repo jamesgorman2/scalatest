@@ -17,7 +17,8 @@ trait ClassGlobsAcrossModulesFixture extends SeveralModulesFixture { this: Suite
     And("each of those modules holds the object samples.Fast, which extends org.scalatest.Tag with the name samples.Fast and is not a test class")
     And("<markers> is an absolute path at which an empty folder exists, and each test, when it runs, creates the file <suite>.<test> in <markers>")
     And("the test command is invoked as mill -j 2 scalatest/test alpha.test beta.test -fJ <report> <arguments>, each argument reaching mill exactly as written, with no shell expansion")
-    andTheJsonOutputIsReadFromTheReport()
+    andNothingExistsAtTheReport()
+    andTheJsonOutputIsParsedFromTheReport()
   }
 
   protected def runOnBothModulesParsingJsonOutput(build: FixtureBuild, arguments: String*): (TestCommandResult, JsonNode) = {

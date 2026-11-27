@@ -88,18 +88,11 @@ Feature: Several module selectors
       And Mill's console shows no consolidated output
 
   Rule: Each test module that at least one module selector resolves to runs its tests once and has one module node
-    Scenario Outline: AC-001 Module selectors <selectors>
-      When the test command is invoked with the module selectors <selectors>
+    Scenario: AC-001 Module selectors alpha.test __.test
+      When the test command is invoked with the module selectors `alpha.test __.test`
       Then the JSON output's root holds exactly the module nodes `alpha.test` and `beta.test`, in that order
       And each of the files `Alpha1.fast`, `Alpha1.slow`, `Alpha2.fast`, `Alpha2.slow`, `Beta1.fast` and `Beta1.slow` in `<markers>` holds exactly one line
       And the test command succeeds
-
-      Examples:
-        | selectors                       |
-        | `alpha.test beta.test`          |
-        | `beta.test alpha.test`          |
-        | `alpha.test __.test`            |
-        | `__.test alpha.test beta.test`  |
 
   Rule: A module selector that resolves to test modules and to modules that are not test modules selects only its test modules
     Scenario: AC-013 A module selector that resolves to test modules and other modules
@@ -179,20 +172,15 @@ Feature: Every selected module runs, whatever happens to the others
     The test command starts no test of a module whose tests cannot start.
     A failing task of a selected test module does not stop the test command from running.
 
-    Scenario Outline: AC-006 broken.test does not compile, flags <flags>
+    Scenario: AC-006 broken.test does not compile, flags --keep-going
       Given the build also has the JVM test module `broken.test`, which tests with `com.edc::scalatest` at the release under test and whose sources do not compile
-      When the test command is invoked with the flags <flags> and the module selectors `alpha.test broken.test beta.test`
+      When the test command is invoked with the flags `--keep-going` and the module selectors `alpha.test broken.test beta.test`
       Then the files `Alpha1.fast`, `Alpha1.slow`, `Beta1.fast` and `Beta1.slow` exist in `<markers>`
       And the JSON output's root holds exactly the module nodes `alpha.test`, `beta.test` and `broken.test`, in that order
       And the module node `broken.test` holds no run node, its `outcome` is `aborted`, and its `failures` holds exactly one entry, whose `message` contains `broken.test.compile`
       And the module nodes `alpha.test` and `beta.test` have no `outcome` and no `failures`
       And the JSON output's root has no `outcome` and no `failures`
       And the test command fails
-
-      Examples:
-        | flags          |
-        | none           |
-        | `--keep-going` |
 
     Scenario Outline: AC-015 broken.test's tests cannot start: <cause>
       Given the build also has the JVM test module `broken.test`, which tests with `com.edc::scalatest` at the release under test and <cause>

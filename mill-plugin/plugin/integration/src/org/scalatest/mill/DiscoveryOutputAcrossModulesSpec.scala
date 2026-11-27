@@ -32,7 +32,7 @@ final class DiscoveryOutputAcrossModulesSpec extends AnyFeatureSpec with GivenWh
       val sharedBuildForTheJavaHome = javaHome.fold(sharedClassGlobsAcrossModulesWithNoisy) { path =>
         sharedClassGlobsAcrossModules { build =>
           addNoisyToBetaTest(build)
-          addToBetaTest(build, s"def javaHome = Task { Some(PathRef(os.Path(\"\"\"$path\"\"\"))) }")
+          addToTestModule(build, "beta", s"def javaHome = Task { Some(PathRef(os.Path(\"\"\"$path\"\"\"))) }")
         }
       }
 
