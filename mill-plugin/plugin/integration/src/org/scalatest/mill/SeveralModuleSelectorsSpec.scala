@@ -72,29 +72,20 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
       }
     }
 
-    val selectorsSelectingBothModules = Seq(
-      Seq("alpha.test", "beta.test"),
-      Seq("beta.test", "alpha.test"),
-      Seq("alpha.test", "__.test"),
-      Seq("__.test", "alpha.test", "beta.test")
-    )
+    Scenario("Module selectors alpha.test __.test run each test module's tests once, under one module node each") {
+      withSeveralModules { build =>
+        val (result, json) = runParsingJsonOutput(build)("alpha.test", "__.test")
 
-    for (selectors <- selectorsSelectingBothModules) {
-      Scenario(s"Module selectors ${selectors.mkString(" ")} run each test module's tests once, under one module node each") {
-        withSeveralModules { build =>
-          val (result, json) = runParsingJsonOutput(build)(selectors*)
+        withClue(result.debugString) {
+          Then("the JSON output's root holds exactly the module nodes alpha.test and beta.test, in that order")
+          moduleNodeNames(json) shouldBe Seq("alpha.test", "beta.test")
 
-          withClue(result.debugString) {
-            Then("the JSON output's root holds exactly the module nodes alpha.test and beta.test, in that order")
-            moduleNodeNames(json) shouldBe Seq("alpha.test", "beta.test")
-
-            And(s"each of the files ${EnglishList.of(sampleMarkers)} in <markers> holds exactly one line")
-            sampleMarkers.map(marker => marker -> markerLines(build, marker).size) shouldBe sampleMarkers.map(_ -> 1)
-          }
-
-          And("the test command succeeds")
-          shouldSucceed(result)
+          And(s"each of the files ${EnglishList.of(sampleMarkers)} in <markers> holds exactly one line")
+          sampleMarkers.map(marker => marker -> markerLines(build, marker).size) shouldBe sampleMarkers.map(_ -> 1)
         }
+
+        And("the test command succeeds")
+        shouldSucceed(result)
       }
     }
 

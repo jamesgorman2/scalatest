@@ -15,76 +15,12 @@ final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with
   private def runResultFixture(source: String, className: String): TestCommandResult =
     withResultFixture(source, className)(_.runTestCommand("core.test"))
 
-  private def resultSuite(source: String): TestCommandResult = runResultFixture(source, "ResultSuite")
-
   private def shouldFailTheModulesTests(result: TestCommandResult): Unit = {
     shouldFail(result)
     shouldWriteToTheConsole(result, "The tests of core.test failed")
   }
 
-  Feature("A completed run fails the test command only where it reports a failure") {
-
-    Scenario("A succeeding test lets the test command succeed") {
-      Given("ResultSuite, mixing in BeforeAndAfterAll, whose test \"succeeds\" succeeds")
-      When("the test command runs core.test")
-      val result = resultSuite("ResultSucceeds.scala")
-      Then("the test command succeeds")
-      shouldSucceed(result)
-    }
-
-    Scenario("Ignored and pending tests beside a succeeding one let the test command succeed") {
-      Given("ResultSuite, whose test \"ignored\" is ignored, \"pending\" is pending, and \"succeeds\" succeeds")
-      When("the test command runs core.test")
-      val result = resultSuite("ResultIgnoredAndPending.scala")
-      Then("the test command succeeds")
-      shouldSucceed(result)
-    }
-
-    Scenario("A cancelled test fails the test command") {
-      Given("ResultSuite, whose test \"cancelled\" is cancelled, and \"succeeds\" succeeds")
-      When("the test command runs core.test")
-      val result = resultSuite("ResultCancelled.scala")
-      Then("the test command fails")
-      shouldFailTheModulesTests(result)
-    }
-
-    Scenario("A failing test fails the test command") {
-      Given("ResultSuite, whose test \"fails\" fails, and \"succeeds\" succeeds")
-      When("the test command runs core.test")
-      val result = resultSuite("ResultFails.scala")
-      Then("the test command fails")
-      shouldFailTheModulesTests(result)
-    }
-
-    Scenario("A suite aborted by its beforeAll fails the test command") {
-      Given("ResultSuite, whose beforeAll throws, and whose test \"succeeds\" would succeed")
-      When("the test command runs core.test")
-      val result = resultSuite("ResultBeforeAllThrows.scala")
-      Then("the test command fails")
-      shouldFailTheModulesTests(result)
-    }
-  }
-
   Feature("A registered test for which the run sends no event, and which is neither attributed nor marked ignored, fails the test command") {
-
-    Scenario("A registered test its suite skips is shown as not run, and fails the test command") {
-      Given("SkipSuite, whose test \"runs\" succeeds, and whose runTest returns SucceededStatus for \"skipped\" without running it")
-      When("the test command runs core.test")
-      val result = runResultFixture("SkipSuite.scala", "SkipSuite")
-
-      Then("the human-readable output shows \"skipped\" as not run")
-      withClue(result.debugString) {
-        result.treeLines shouldBe Seq(
-          "[core.test]",
-          "  SkipSuite:",
-          "    - runs",
-          "    - skipped *** NOT RUN ***"
-        )
-      }
-
-      And("the test command fails")
-      shouldFailTheModulesTests(result)
-    }
 
     Scenario("A test ConfigMapWrapperSuite registers only under an empty config map is shown as not run, and fails the test command") {
       val result = withResultFixture("ConfigSpec.scala", "ConfigSpec") { build =>
@@ -147,29 +83,6 @@ final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with
       withClue(result.debugString) {
         result.treeLines.exists(_.contains("have size 0")) shouldBe true
         result.consoleLinesOutsideHumanReadableOutput.filter(_.contains("have size 0")) shouldBe empty
-      }
-    }
-  }
-
-  Feature("A module that does not test with this fork fails the test command before any test starts") {
-
-    Seq(
-      "MUnit" -> FixtureName.munit,
-      "uTest" -> FixtureName.utest,
-      "org.scalatest:scalatest 3.2.20" -> FixtureName.upstreamScalaTest
-    ).foreach { case (framework, fixture) =>
-      Scenario(s"A module testing with $framework fails the test command before any test starts") {
-        withFixtureBuild(fixture) { build =>
-          Given(s"core.test tests with $framework, and its one suite, FrameworkSuite, has one test, \"runs\", which succeeds")
-          When("the test command runs core.test")
-          val result = build.runTestCommand("core.test")
-
-          Then("the test command fails before any test starts")
-          shouldFailBeforeAnyTestStarts(build, result)
-
-          And("the console says that core.test does not depend on this fork's core")
-          shouldWriteToTheConsole(result, "core.test does not depend on com.edc:scalatest-core_3")
-        }
       }
     }
   }

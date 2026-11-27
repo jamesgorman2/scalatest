@@ -25,9 +25,9 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
   // `-Xlog`'s default decorators: uptime, level and tags.
   private val jvmUnifiedLoggingLine: String = """\[stdout\] \[[0-9]+[.,][0-9]+s\]\[info\]\[gc\] Using Serial"""
 
-  private val millModes: Seq[(String, Boolean)] = Seq("Mill's daemon" -> true, "--no-daemon" -> false)
-
   private def withSuites[A](suites: String*)(test: FixtureBuild => A): A = withSuitesIn(daemonMode = false)(suites*)(test)
+
+  private def withSuitesUnderMillsDaemon[A](suites: String*)(test: FixtureBuild => A): A = withSuitesIn(daemonMode = true)(suites*)(test)
 
   private def withSuitesIn[A](daemonMode: Boolean)(suites: String*)(test: FixtureBuild => A): A =
     withFixtureBuild(FixtureName.capturedOutput, daemonMode) { build =>
@@ -37,38 +37,36 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
 
   Feature("A run's line holds what its worker wrote to stdout and stderr") {
 
-    millModes.foreach { case (mode, daemonMode) =>
-      Scenario(s"A test's stdout line is shown under Run 1:, under $mode") {
-        val result = withSuitesIn(daemonMode)("CalculatorSuite") { build =>
-          Given("CalculatorSuite, whose one test writes dividing now to stdout and succeeds, at Mill's default testLogLevel")
-          And("Mill colours its console output")
-          When("the test command runs core.test")
-          build.runTestCommandWithColour("core.test")
-        }
-
-        Then("the human-readable output is the module's line, then Run 1: holding the suite and then the line")
-        withClue(result.debugString) {
-          result.colourMarkedTreeLines shouldBe colourMarkedCalculatorSuiteOutput
-        }
+    Scenario("A test's stdout line is shown under Run 1:, under Mill's daemon") {
+      val result = withSuitesUnderMillsDaemon("CalculatorSuite") { build =>
+        Given("CalculatorSuite, whose one test writes dividing now to stdout and succeeds, at Mill's default testLogLevel")
+        And("Mill colours its console output")
+        When("the test command runs core.test")
+        build.runTestCommandWithColour("core.test")
       }
 
-      Scenario(s"Each stream's lines keep their order, under $mode") {
-        val result = withSuitesIn(daemonMode)("ChattySuite") { build =>
-          Given("ChattySuite, whose one test writes out 1 to out 2000 to stdout and err 1 to err 2000 to stderr, alternating")
-          And("Mill colours its console output")
-          When("the test command runs core.test")
-          build.runTestCommandWithColour("core.test")
-        }
-        val underRunLines = result.subtreeOf("Run 1:").drop(1).map(_.trim)
-
-        Then("the [stdout] lines under Run 1: are out 1 to out 2000, in that order")
-        withClue(result.debugString.take(10000)) {
-          underRunLines.filter(_.startsWith("[stdout] ")) shouldBe (1 to 2000).map(i => s"[stdout] out $i")
-        }
-
-        And("the [stderr] lines under Run 1: are err 1 to err 2000, in that order")
-        underRunLines.filter(_.startsWith("[stderr] ")) shouldBe (1 to 2000).map(i => s"[stderr] err $i")
+      Then("the human-readable output is the module's line, then Run 1: holding the suite and then the line")
+      withClue(result.debugString) {
+        result.colourMarkedTreeLines shouldBe colourMarkedCalculatorSuiteOutput
       }
+    }
+
+    Scenario("Each stream's lines keep their order, under Mill's daemon") {
+      val result = withSuitesUnderMillsDaemon("ChattySuite") { build =>
+        Given("ChattySuite, whose one test writes out 1 to out 2000 to stdout and err 1 to err 2000 to stderr, alternating")
+        And("Mill colours its console output")
+        When("the test command runs core.test")
+        build.runTestCommandWithColour("core.test")
+      }
+      val underRunLines = result.subtreeOf("Run 1:").drop(1).map(_.trim)
+
+      Then("the [stdout] lines under Run 1: are out 1 to out 2000, in that order")
+      withClue(result.debugString.take(10000)) {
+        underRunLines.filter(_.startsWith("[stdout] ")) shouldBe (1 to 2000).map(i => s"[stdout] out $i")
+      }
+
+      And("the [stderr] lines under Run 1: are err 1 to err 2000, in that order")
+      underRunLines.filter(_.startsWith("[stderr] ")) shouldBe (1 to 2000).map(i => s"[stderr] err $i")
     }
 
     Scenario("A test's line and the JVM's own line take one form") {

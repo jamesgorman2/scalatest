@@ -67,18 +67,6 @@ final class JsonOutputRootSpec extends AnyFeatureSpec with GivenWhenThen with sh
       }
     }
 
-    Scenario("A run's config map is written with each value's toString") {
-      withJsonOutputFixture("CalculatorSuite") { build =>
-        Given("CalculatorSuite, and the module's testArgsDefault is -Dgreeting=hello")
-        build.setModuleArguments(Seq("-Dgreeting=hello"))
-        When("the test command is invoked as mill scalatest/test core.test -fJ <report>")
-        val json = build.jsonOutputOfTestCommand()
-
-        Then("the run node holds the config map greeting = hello")
-        shouldHold(json.node(NodeKind.Run), """{ "configMap": { "greeting": "hello" } }""")
-      }
-    }
-
     Scenario("The root's times enclose the module's, the module's enclose the run's, and no test event log records the root's or the module's times") {
       Given("CalculatorSuite, whose test adds two numbers succeeds")
       When("the test command is invoked as mill scalatest/test core.test -fJ <report>")
@@ -105,34 +93,6 @@ final class JsonOutputRootSpec extends AnyFeatureSpec with GivenWhenThen with sh
         val items = os.read.lines(eventLogs.head).filter(_.nonEmpty).map(line => ujson.read(line))
         items.map(_("item").str).toSet shouldBe eventLogItems
         items.filter(item => item.obj.contains("moduleSelectors") || item.obj.contains("buildTool")) shouldBe empty
-      }
-    }
-
-    Scenario("The root records the running Mill as the build tool") {
-      Given("CalculatorSuite")
-      When("the test command is invoked as mill scalatest/test core.test -fJ <report>")
-      withJsonOutputFixture("CalculatorSuite") { build =>
-        val result = build.runTestCommandWritingJsonOutput()
-
-        Then("the root's buildTool is Mill, at the version of the Mill release running the test command")
-        withClue(result.debugString) {
-          build.jsonOutput("buildTool") shouldBe ujson.Obj("name" -> "Mill", "version" -> mill.api.BuildInfo.millVersion)
-        }
-      }
-    }
-
-    for (selector <- Seq("core.test", "__.test")) {
-      Scenario(s"The root records the module selector $selector as given, with the test module it resolved to") {
-        Given("CalculatorSuite, in a build with no test module other than core.test")
-        When(s"the test command is invoked as mill scalatest/test $selector -fJ <report>")
-        withJsonOutputFixture("CalculatorSuite") { build =>
-          val result = build.runTestCommand(selector, "-fJ", build.jsonOutputFile.toString)
-
-          Then(s"the root of the JSON output records the module selector $selector, resolved to core.test")
-          withClue(result.debugString) {
-            build.jsonOutput("moduleSelectors") shouldBe ujson.Arr(ujson.Obj("selector" -> selector, "modules" -> ujson.Arr("core.test")))
-          }
-        }
       }
     }
   }

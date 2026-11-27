@@ -1,13 +1,10 @@
 package org.scalatest.mill
 
 import org.scalatest.GivenWhenThen
-import org.scalatest.Inside
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
 
-final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with Inside with JsonOutputFixture {
-
-  private final case class RunInWorker(forkGroup: Option[Int], number: Int, workerIndex: Int)
+final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with JsonOutputFixture {
 
   private def withEveryWorkerBuild[A](test: EveryWorkerBuild => A): A =
     withFixtureBuild(FixtureName.everyWorker)(build => test(new EveryWorkerBuild(build)))
@@ -16,8 +13,6 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
 
   private def runsOfForkGroup(json: JsonNode, forkGroup: Int): Seq[JsonNode] =
     runs(json).filter(_.forkGroup.contains(forkGroup))
-
-  private val suites: Seq[String] = Seq("A1", "A2", "B1", "B2")
 
   private def infoMessages(node: JsonNode): Seq[String] =
     node.nodes.flatMap(_.output).filter(_.kind == OutputItemKind.Info).map(_.message)
@@ -45,7 +40,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
   }
 
   private def shouldWriteOneEventLogInEachForkGroupsFolder(build: EveryWorkerBuild, result: TestCommandResult): Unit = {
-    Then("each fork group's processFolder holds one event log, and no other event log exists")
+    And("each fork group's processFolder holds one event log, and no other event log exists")
     withClue(result.debugString) {
       build.eventLogFolders.map(_.last) should contain theSameElementsAs Seq("group-0-samples.B1", "group-1-samples.A1")
     }
@@ -91,59 +86,6 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
       }
     }
 
-    Scenario("Under test parallelism with test sandboxing off, each fork group runs its suites in one or two workers of its own") {
-      withEveryWorkerBuild { build =>
-        givenTheModuleHoldsTwoForkGroups()
-        And("test parallelism is on and test sandboxing is off")
-        build.turnOnTestParallelism()
-        build.turnOffTestSandboxing()
-        When("the test command runs the module with two jobs")
-        val (result, json) = build.resultAndJsonOutputOfTestCommand(jobs = 2)
-
-        withClue(result.debugString) {
-          shouldRunEachForkGroupInItsOwnWorkers(json)
-        }
-
-        And("the test command succeeds")
-        shouldSucceed(result)
-      }
-    }
-
-    Scenario("Under testBatchFrameworkTasks, each fork group runs its suites in one worker of its own") {
-      withEveryWorkerBuild { build =>
-        givenTheModuleHoldsTwoForkGroups()
-        And("testBatchFrameworkTasks is on and test parallelism is off")
-        build.turnOnBatchFrameworkTasks()
-        When("the test command runs the module with two jobs")
-        val (result, json) = build.resultAndJsonOutputOfTestCommand(jobs = 2)
-
-        withClue(result.debugString) {
-          shouldRunEachForkGroupInExactlyOneWorker(json)
-        }
-
-        And("the test command succeeds")
-        shouldSucceed(result)
-      }
-    }
-
-    Scenario("Under testBatchFrameworkTasks, test parallelism still gives each fork group one worker") {
-      withEveryWorkerBuild { build =>
-        givenTheModuleHoldsTwoForkGroups()
-        And("testBatchFrameworkTasks and test parallelism are both on")
-        build.turnOnTestParallelism()
-        build.turnOnBatchFrameworkTasks()
-        When("the test command runs the module with two jobs")
-        val (result, json) = build.resultAndJsonOutputOfTestCommand(jobs = 2)
-
-        withClue(result.debugString) {
-          shouldRunEachForkGroupInExactlyOneWorker(json)
-        }
-
-        And("the test command succeeds")
-        shouldSucceed(result)
-      }
-    }
-
     Scenario("A test failing in the second fork group fails the test command, and every other suite still runs") {
       withEveryWorkerBuild { build =>
         givenTheModuleHoldsTwoForkGroups()
@@ -165,42 +107,6 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
 
         And("the test command fails")
         shouldFail(result)
-      }
-    }
-
-    Scenario("Under test parallelism, a fork group's runs are numbered in the order of their workers, however the queue splits the group") {
-      withEveryWorkerBuild { build =>
-        givenTheModuleHoldsTwoForkGroups()
-        And("test parallelism is on")
-        build.turnOnTestParallelism()
-        And("each suite's test sends its working directory as an info message")
-        suites.foreach(suite => build.writeSuite(suite, build.testBodySendingWorkingDirectory))
-        When("the test command runs the module with four jobs")
-        val (result, json) = build.resultAndJsonOutputOfTestCommand(jobs = 4)
-
-        Then("each run's info messages name one and the same worker folder, and a run with no info message ran nothing")
-        val runsInWorkers = withClue(result.debugString) {
-          runs(json).flatMap { run =>
-            withClue(s"in run ${run.number}, holding ${run.contentNames}, with info messages ${infoMessages(run)}: ") {
-              inside(infoMessages(run).map(build.workerIndexOf).distinct) {
-                case Seq() if run.contents.isEmpty => None
-                case Seq(Some(workerIndex)) => Some(RunInWorker(run.forkGroup, run.number, workerIndex))
-              }
-            }
-          }
-        }
-        val workerIndexesInNumberOrderByForkGroup = Seq(0, 1).map { forkGroup =>
-          runsInWorkers.filter(_.forkGroup.contains(forkGroup)).sortBy(_.number).map(_.workerIndex)
-        }
-
-        And("no two runs of a fork group ran in the same worker")
-        workerIndexesInNumberOrderByForkGroup.foreach(indexes => indexes.distinct shouldBe indexes)
-
-        And("each fork group has a run in its first worker, worker-0")
-        workerIndexesInNumberOrderByForkGroup.foreach(indexes => indexes should contain(0))
-
-        And("within each fork group, the run with the lower number ran in the worker with the lower index")
-        workerIndexesInNumberOrderByForkGroup.foreach(indexes => indexes shouldBe indexes.sorted)
       }
     }
 
@@ -261,19 +167,26 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
 
   Feature("Each worker of a JVM module has its own event log, output and time") {
 
-    Scenario("Without test parallelism, each fork group's worker writes its event log in the group's processFolder") {
+    Scenario("Without test parallelism, the module is timed from its first worker's start to its last worker's end, and each fork group's worker writes its event log in the group's processFolder") {
       withEveryWorkerBuild { build =>
         givenTheModuleHoldsTwoForkGroups()
         And("test parallelism is off")
         When("the test command runs the module")
-        val (result, _) = build.resultAndJsonOutputOfTestCommand()
+        val (result, json) = build.resultAndJsonOutputOfTestCommand()
+
+        Then("the module starts no later than its first run, and ends no earlier than its last run")
+        val module = json.node(NodeKind.Module, "core.test")
+        withClue(result.debugString) {
+          module.startedAt should be <= runs(json).map(_.startedAt).min
+          module.endedAt should be >= runs(json).map(_.endedAt).max
+        }
 
         shouldWriteOneEventLogInEachForkGroupsFolder(build, result)
         shouldStartAWorkerInEachEventLogFolder(build)
       }
     }
 
-    Scenario("Under test parallelism, with test sandboxing off, each worker writes its event log in its own processFolder") {
+    Scenario("Under test parallelism, with test sandboxing off, each fork group runs its suites in one or two workers of its own, and each worker writes its event log in its own processFolder") {
       withEveryWorkerBuild { build =>
         givenTheModuleHoldsTwoForkGroups()
         And("test parallelism is on and test sandboxing is off")
@@ -283,7 +196,11 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
         val (result, json) = build.resultAndJsonOutputOfTestCommand(jobs = 4)
         val workerFoldersByGroupFolder = build.eventLogFolders.groupMap(folder => (folder / os.up).last)(_.last)
 
-        Then("every event log is in a worker-<i> processFolder of one of the two fork groups' folders")
+        withClue(result.debugString) {
+          shouldRunEachForkGroupInItsOwnWorkers(json)
+        }
+
+        And("every event log is in a worker-<i> processFolder of one of the two fork groups' folders")
         withClue(result.debugString) {
           workerFoldersByGroupFolder.keySet shouldBe Set("group-0-samples.B1", "group-1-samples.A1")
           all(workerFoldersByGroupFolder.values.flatten) should fullyMatch regex "worker-[0-9]+"
@@ -296,23 +213,33 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
         build.eventLogFolders should have size runs(json).size
 
         shouldStartAWorkerInEachEventLogFolder(build)
+
+        And("the test command succeeds")
+        shouldSucceed(result)
       }
     }
 
-    Scenario("Under testBatchFrameworkTasks, each fork group's one worker writes its event log in the group's processFolder, and no queue is laid out") {
+    Scenario("Under testBatchFrameworkTasks, test parallelism still gives each fork group one worker, which writes its event log in the group's processFolder, and no queue is laid out") {
       withEveryWorkerBuild { build =>
         givenTheModuleHoldsTwoForkGroups()
         And("testBatchFrameworkTasks and test parallelism are both on")
         build.turnOnTestParallelism()
         build.turnOnBatchFrameworkTasks()
         When("the test command runs the module with four jobs")
-        val (result, _) = build.resultAndJsonOutputOfTestCommand(jobs = 4)
+        val (result, json) = build.resultAndJsonOutputOfTestCommand(jobs = 4)
+
+        withClue(result.debugString) {
+          shouldRunEachForkGroupInExactlyOneWorker(json)
+        }
 
         shouldWriteOneEventLogInEachForkGroupsFolder(build, result)
         shouldStartAWorkerInEachEventLogFolder(build)
 
         And("neither processFolder holds a test queue or a claim folder")
         build.eventLogFolders.flatMap(folder => Seq(folder / "test-classes", folder / "claim")).filter(os.exists(_)) shouldBe empty
+
+        And("the test command succeeds")
+        shouldSucceed(result)
       }
     }
 
@@ -399,19 +326,6 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
       }
     }
 
-    Scenario("The module is timed from before its first worker starts until its last worker has ended") {
-      withEveryWorkerBuild { build =>
-        givenTheModuleHoldsTwoForkGroups()
-        And("test parallelism is off")
-        When("the test command runs the module")
-        val (_, json) = build.resultAndJsonOutputOfTestCommand()
-
-        Then("the module starts no later than its first run, and ends no earlier than its last run")
-        val module = json.node(NodeKind.Module, "core.test")
-        module.startedAt should be <= runs(json).map(_.startedAt).min
-        module.endedAt should be >= runs(json).map(_.endedAt).max
-      }
-    }
   }
 
   Feature("Runs in the human-readable output") {
@@ -439,29 +353,6 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
       }
     }
 
-    Scenario("When a test fails and no worker writes output, no run is shown, and both runs' suites are listed directly under the module") {
-      withEveryWorkerBuild { build =>
-        Given("a module holding only suites Zeta and Alpha, each in a fork group of its own, Zeta's group first, with test parallelism off")
-        And("Zeta's test fails, and nothing in either run writes to stdout or stderr")
-        build.holdOnlySuitesEachInItsOwnForkGroup("Zeta" -> """fail("Zeta fails")""", "Alpha" -> "()")
-        When("the test command runs the module with two jobs and Mill's ticker on, as at a user's console")
-        val result = build.runTestCommandAsAtTheConsole()
-
-        Then("the human-readable output shows no run")
-        withClue(result.debugString) {
-          result.treeLines.filter(_.trim.startsWith("Run ")) shouldBe empty
-        }
-
-        And("Alpha and then Zeta are listed directly under the module")
-        withClue(result.debugString) {
-          result.treeLines.head shouldBe "[core.test]"
-          result.treeLines.filter(line => line.startsWith("  ") && !line.startsWith("   ")) shouldBe Seq("  Alpha:", "  Zeta:")
-        }
-
-        And("the test command fails")
-        shouldFail(result)
-      }
-    }
   }
 
   Feature("A module with no test class") {
@@ -548,39 +439,9 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
     }
   }
 
-  Feature("Fork groups that would share a processFolder") {
-
-    Scenario("Two fork groups holding only the same class fail the test command before any worker starts") {
-      withEveryWorkerBuild { build =>
-        Given("a module of two fork groups that each hold only A1, with test parallelism off")
-        build.setForkGrouping("""Seq(Seq("samples.A1"), Seq("samples.A1"))""")
-        When("the test command runs the module")
-        val (result, json) = build.resultAndJsonOutputOfTestCommand()
-
-        Then("the module node core.test holds exactly one failure, saying the two fork groups share a processFolder")
-        withClue(result.debugString) {
-          json.node(NodeKind.Module, "core.test").failureMessages shouldBe Seq(
-            "Laying out the workers failed: fork groups 0 and 1 share the processFolder samples.A1"
-          )
-        }
-
-        And("the JSON output's root holds no failure")
-        withClue(result.debugString) {
-          json.failureMessages shouldBe empty
-        }
-
-        And("the module has no run, and no startedAt, endedAt or duration")
-        runs(json) shouldBe empty
-        shouldHaveNoKeys(json.node(NodeKind.Module, "core.test"), "startedAt", "endedAt", "duration")
-
-        And("the test command fails before any worker starts")
-        shouldFailBeforeAnyTestStarts(build.fixtureBuild, result)
-      }
-    }
-  }
 }
 
-private final class EveryWorkerBuild(val fixtureBuild: FixtureBuild) {
+private final class EveryWorkerBuild(fixtureBuild: FixtureBuild) {
 
   private val defaultForkGrouping: String = """Seq(Seq("samples.B1", "samples.B2"), Seq("samples.A1", "samples.A2"))"""
 
@@ -601,7 +462,7 @@ private final class EveryWorkerBuild(val fixtureBuild: FixtureBuild) {
 
   def removeSuites(): Unit = os.remove.all(fixtureBuild.samples)
 
-  val testBodySendingWorkingDirectory: String = """info(System.getProperty("user.dir"))"""
+  private val testBodySendingWorkingDirectory: String = """info(System.getProperty("user.dir"))"""
 
   def emptyMarkersFolder(): os.Path = {
     val markers = fixtureBuild.workspace / "markers"

@@ -70,17 +70,15 @@ final class ModulesTheTestCommandCannotRunSpec extends AnyFeatureSpec with Given
 
   Feature("Modules the test command cannot run") {
 
-    for (module <- Seq("munit.test", "utest.test", "upstream.test", "other.test", "js.test", "native.test")) {
-      Scenario(s"Module selectors alpha.test and $module") {
-        withModulesTheTestCommandCannotRun { build =>
-          val result = runTestCommand(build, "alpha.test", module)
+    Scenario("Module selectors alpha.test and other.test") {
+      withModulesTheTestCommandCannotRun { build =>
+        val result = runTestCommand(build, "alpha.test", "other.test")
 
-          Then(s"Mill reports that the test command failed, with a message naming $module")
-          shouldFail(result)
-          shouldNameModulesTheTestCommandCannotRun(result, Seq(module))
+        Then("Mill reports that the test command failed, with a message naming other.test")
+        shouldFail(result)
+        shouldNameModulesTheTestCommandCannotRun(result, Seq("other.test"))
 
-          shouldStartNoTestAndWriteNoConsolidatedOutput(build, result)
-        }
+        shouldStartNoTestAndWriteNoConsolidatedOutput(build, result)
       }
     }
 

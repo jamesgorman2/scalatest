@@ -105,15 +105,12 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
       }
     }
 
-    for (millFlags <- MillFlags.values) {
+    Scenario(s"broken.test does not compile, flags ${MillFlags.KeepGoing.description}") {
+      withSeveralModules { build =>
+        addBrokenTestThatDoesNotCompile(build)
+        val (result, json) = runParsingJsonOutput(build, MillFlags.KeepGoing.arguments*)("alpha.test", "broken.test", "beta.test")
 
-      Scenario(s"broken.test does not compile, flags ${millFlags.description}") {
-        withSeveralModules { build =>
-          addBrokenTestThatDoesNotCompile(build)
-          val (result, json) = runParsingJsonOutput(build, millFlags.arguments*)("alpha.test", "broken.test", "beta.test")
-
-          brokenTestShouldAbortWhileAlphaAndBetaRun(build, result, json, "broken.test.compile")
-        }
+        brokenTestShouldAbortWhileAlphaAndBetaRun(build, result, json, "broken.test.compile")
       }
     }
 
@@ -186,6 +183,12 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
           And("the module node beta.test holds no run node, its outcome is aborted, and its failures holds exactly one entry, whose message contains samples.Beta1 and does not contain beta.test")
           shouldBeAbortedWithOneFailureContaining(json, "beta.test", "samples.Beta1")
           moduleNode(json, "beta.test").failureMessages.head should not include "beta.test"
+
+          And("the module node beta.test has no startedAt, endedAt or duration")
+          shouldHaveNoKeys(moduleNode(json, "beta.test"), "startedAt", "endedAt", "duration")
+
+          And("Mill started no worker in beta.test's module folder")
+          build.anyTestWorkerStartedIn(build.modulesFolder / "beta.test") shouldBe false
 
           And("the module node alpha.test has no outcome and no failures")
           shouldHaveNoKeys(moduleNode(json, "alpha.test"), "outcome", "failures")

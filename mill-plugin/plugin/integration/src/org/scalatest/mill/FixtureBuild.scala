@@ -150,9 +150,11 @@ final class FixtureBuild(tester: IntegrationTester) {
     json
   }
 
-  def anyTestWorkerStarted: Boolean =
+  def anyTestWorkerStarted: Boolean = anyTestWorkerStartedIn(workspace / "out")
+
+  def anyTestWorkerStartedIn(folder: os.Path): Boolean =
     // Mill writes a `testargs` file for each worker it starts.
-    os.exists(workspace / "out") && os.walk(workspace / "out").exists(_.last == "testargs")
+    os.exists(folder) && os.walk(folder).exists(_.last == "testargs")
 
   def eventLogFiles: Seq[os.Path] = os.walk(workspace / "out").filter(_.last == JvmTestModuleRun.eventLogFileName)
 
