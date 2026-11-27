@@ -37,8 +37,11 @@ trait SharedSandboxes extends FixtureBuilds with BeforeAndAfterAll { this: Suite
   protected def sharedSandbox(fixture: FixtureName, reset: SandboxReset)(setUp: FixtureBuild => Unit): SharedSandbox =
     new SharedSandbox(fixture, reset, setUp)
 
-  protected def sharedSandboxWithReportFromAnEarlierTestCommand(fixture: FixtureName)(earlierTestCommand: FixtureBuild => TestCommandResult): SharedSandbox =
+  protected def sharedSandboxWithReportFromAnEarlierTestCommand(fixture: FixtureName, setUp: FixtureBuild => Unit)(
+      earlierTestCommand: FixtureBuild => TestCommandResult
+  ): SharedSandbox =
     sharedSandbox(fixture, SandboxReset.emptyMarkersFolder.and(SandboxReset.jsonOutputFileAsSavedIn(savedEarlierReport))) { build =>
+      setUp(build)
       writeReportFromAnEarlierTestCommand(build)(earlierTestCommand)
       os.copy(build.jsonOutputFile, build.workspace / savedEarlierReport)
     }

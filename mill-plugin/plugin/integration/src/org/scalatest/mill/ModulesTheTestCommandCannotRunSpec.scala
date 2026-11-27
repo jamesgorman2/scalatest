@@ -9,7 +9,7 @@ final class ModulesTheTestCommandCannotRunSpec extends AnyFeatureSpec with Given
   private val cannotRunModulesHeader: String = "The test command cannot run these selected test modules:"
 
   private val sharedModulesTheTestCommandCannotRun: SharedSandbox =
-    sharedSandboxWithReportFromAnEarlierTestCommand(FixtureName.modulesTheTestCommandCannotRun)(invokeTestCommandOnAlpha)
+    sharedSandboxWithReportFromAnEarlierTestCommand(FixtureName.modulesTheTestCommandCannotRun, _ => ())(invokeTestCommandOnAlpha)
 
   private def inSharedModulesTheTestCommandCannotRun[A](test: FixtureBuild => A): A = {
     givenTheBuild()

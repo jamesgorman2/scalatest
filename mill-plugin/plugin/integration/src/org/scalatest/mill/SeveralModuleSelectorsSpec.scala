@@ -6,8 +6,6 @@ import org.scalatest.matchers.should
 
 final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with SeveralModulesFixture {
 
-  private val sampleMarkers: Seq[String] = Seq("Alpha1.fast", "Alpha1.slow", "Alpha2.fast", "Alpha2.slow", "Beta1.fast", "Beta1.slow")
-
   private val sharedUnchangedSeveralModules: SharedSandbox = sharedSeveralModules(_ => ())
 
   private val sharedSeveralModulesWithModulesThatSortByCharacterCode: SharedSandbox =
@@ -23,12 +21,12 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
 
   private val alphaAndEveryTestModule: Seq[String] = Seq("alpha.test", "__.test")
 
-  private final case class RunWithMarkers(result: TestCommandResult, json: JsonNode, markerLineCounts: Seq[(String, Int)])
+  private final case class RunWithMarkers(result: TestCommandResult, json: JsonNode, markerLineCounts: Seq[(SampleMarker, Int)])
 
   private lazy val sharedRunOnAlphaAndEveryTestModule: RunWithMarkers =
     sharedUnchangedSeveralModules.use { build =>
       val (result, json) = resultAndJsonOutputOfTestCommand(build)(alphaAndEveryTestModule*)
-      RunWithMarkers(result, json, sampleMarkers.map(marker => marker -> markerLines(build, marker).size))
+      RunWithMarkers(result, json, SampleMarker.all.map(marker => marker -> markerLines(build, marker).size))
     }
 
   private def givenAndWhenOfTheSharedRunOnAlphaAndEveryTestModule(): RunWithMarkers = {
@@ -40,8 +38,8 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
   private def moduleSelectorsOf(json: JsonNode): Seq[(String, Seq[String])] =
     json("moduleSelectors").arr.toSeq.map(entry => entry("selector").str -> entry("modules").arr.toSeq.map(_.str))
 
-  private def markerLines(build: FixtureBuild, marker: String): Seq[String] =
-    if (os.exists(build.markersFolder / marker)) os.read.lines(build.markersFolder / marker) else Nil
+  private def markerLines(build: FixtureBuild, marker: SampleMarker): Seq[String] =
+    if (os.exists(build.markersFolder / marker.fileName)) os.read.lines(build.markersFolder / marker.fileName) else Nil
 
   private def infoMessagesOfTest(json: JsonNode, suite: String, test: String): Seq[String] =
     json
@@ -103,8 +101,8 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
         Then("the JSON output's root holds exactly the module nodes alpha.test and beta.test, in that order")
         moduleNodeNames(run.json) shouldBe Seq("alpha.test", "beta.test")
 
-        And(s"each of the files ${EnglishList.of(sampleMarkers)} in <markers> holds exactly one line")
-        run.markerLineCounts shouldBe sampleMarkers.map(_ -> 1)
+        And(s"each of the files ${EnglishList.of(SampleMarker.all.map(_.fileName))} in <markers> holds exactly one line")
+        run.markerLineCounts shouldBe SampleMarker.all.map(_ -> 1)
       }
 
       And("the test command succeeds")
