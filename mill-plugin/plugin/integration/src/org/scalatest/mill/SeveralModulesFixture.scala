@@ -6,9 +6,11 @@ import org.scalatest.matchers.should
 
 trait SeveralModulesFixture extends JsonOutputFixture with SharedFixtureBuilds { this: Suite & should.Matchers & GivenWhenThen =>
 
+  protected def givenTheBackground(): Unit
+
   protected def withSeveralModules[A](test: FixtureBuild => A): A =
     withFixtureBuild(FixtureName.severalModules) { build =>
-      givenTheSeveralModules()
+      givenTheBackground()
       os.makeDir.all(build.markersFolder)
       test(build)
     }
@@ -16,20 +18,35 @@ trait SeveralModulesFixture extends JsonOutputFixture with SharedFixtureBuilds {
   protected def sharedSeveralModules(setUp: FixtureBuild => Unit): SharedFixtureBuild =
     sharedFixtureBuild(FixtureName.severalModules, WorkspaceReset.emptyMarkersFolder.and(WorkspaceReset.noJsonOutputFile))(setUp)
 
-  protected def inSharedSeveralModules[A](sharedBuild: SharedFixtureBuild)(test: FixtureBuild => A): A = {
-    givenTheSeveralModules()
+  protected def inSharedBuild[A](sharedBuild: SharedFixtureBuild)(test: FixtureBuild => A): A = {
+    givenTheBackground()
     sharedBuild.use(test)
   }
 
-  protected def givenTheSeveralModules(): Unit = {
-    Given("the JVM test modules alpha.test, holding Alpha1 and Alpha2, and beta.test, holding Beta1")
-    And("each suite's tests fast and slow succeed, and each test, when it runs, appends one line to the file <suite>.<test> in <markers>")
+  protected def givenABuildThatAddsTheMillPlugin(): Unit =
+    Given("a Mill 1.3.1 build that adds the Mill plugin, at the release of this fork under test, as the entry com.edc::scalatest-mill of its build.mill header's mvnDeps")
+
+  protected def andAlphaTestAndBetaTestUseThatRelease(): Unit =
+    And("the build's JVM test modules alpha.test and beta.test each test with com.edc::scalatest at that release, and their definitions name nothing of the plugin")
+
+  protected def andAlphaTestHoldsAlpha1AndAlpha2AndBetaTestHoldsBeta1(): Unit =
+    And("alpha.test holds the suites Alpha1 and Alpha2, whose classes are samples.Alpha1 and samples.Alpha2, and beta.test holds the suite Beta1, whose class is samples.Beta1")
+
+  protected def andEachArgumentReachesMillAsWritten(): Unit =
+    And("each argument of a mill command line reaches mill exactly as written, with no shell expansion")
+
+  protected def andTheJsonOutputIsReadFromTheReport(): Unit = {
+    And("<report> is an absolute path at which nothing exists")
+    And("the JSON output is the JSON value parsed from the file at <report> once the test command has ended")
   }
 
   protected def addToBetaTest(build: FixtureBuild, member: String): Unit =
+    addToTestModule(build, "beta", member)
+
+  protected def addToTestModule(build: FixtureBuild, module: String, member: String): Unit =
     build.replaceInBuild(
-      "object beta extends SampleModule {\n  object test extends SampleTests\n}",
-      s"object beta extends SampleModule {\n  object test extends SampleTests {\n    $member\n  }\n}"
+      s"object $module extends SampleModule {\n  object test extends SampleTests\n}",
+      s"object $module extends SampleModule {\n  object test extends SampleTests {\n${member.linesIterator.map("    " + _).mkString("\n")}\n  }\n}"
     )
 
   protected def replaceInSuite(build: FixtureBuild, module: String, suite: String)(from: String, to: String): Unit =

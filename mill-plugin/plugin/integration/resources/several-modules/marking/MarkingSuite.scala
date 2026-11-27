@@ -9,8 +9,12 @@ import org.scalatest.funsuite.AnyFunSuite
 abstract class MarkingSuite extends AnyFunSuite {
 
   override def withFixture(test: NoArgTest): Outcome = {
-    val marker = Paths.get(sys.props("markers")).resolve(s"$suiteName.${test.name}")
-    Files.writeString(marker, "ran\n", StandardOpenOption.CREATE, StandardOpenOption.APPEND)
-    super.withFixture(test)
+    val markers = Paths.get(sys.props("markers"))
+    Files.writeString(markers.resolve(s"$suiteName.${test.name}"), "ran\n", StandardOpenOption.CREATE, StandardOpenOption.APPEND)
+    val outcome = super.withFixture(test)
+    if (outcome.isFailed) {
+      Files.write(markers.resolve(s"$suiteName.${test.name}.failed"), Array.emptyByteArray)
+    }
+    outcome
   }
 }

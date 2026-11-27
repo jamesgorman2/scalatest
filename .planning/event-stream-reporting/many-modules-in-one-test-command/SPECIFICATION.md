@@ -148,17 +148,21 @@ Feature: Every selected module runs, whatever happens to the others
   Background:
     Given a Mill 1.3.1 build that adds the Mill plugin, at the release of this fork under test, as the entry `com.edc::scalatest-mill` of its `build.mill` header's `mvnDeps`
     And the build's JVM test modules `alpha.test` and `beta.test` each test with `com.edc::scalatest` at that release, and their definitions name nothing of the plugin
-    And `alpha.test` holds the suite `Alpha1`, whose class is `samples.Alpha1`, and `beta.test` holds the suite `Beta1`, whose class is `samples.Beta1`
+    And `alpha.test` holds the suites `Alpha1` and `Alpha2`, whose classes are `samples.Alpha1` and `samples.Alpha2`, and `beta.test` holds the suite `Beta1`, whose class is `samples.Beta1`
     And each of those suites is an `AnyFunSuite` with two tests, `fast` and `slow`, both of which succeed unless the scenario says otherwise
-    And `<markers>` is an absolute path at which an empty folder exists, and each test, when it runs, creates the file `<suite>.<test>` in `<markers>`
+    And `<markers>` is an absolute path at which an empty folder exists, and each test, when it runs, creates the file `<suite>.<test>` in `<markers>`, and, once it has failed, also creates the file `<suite>.<test>.failed`
     And the test command is invoked as `mill -j 2 <flags> scalatest/test <selectors> -fJ <report>` unless the scenario states its own `mill` command line
     And each argument of a `mill` command line reaches `mill` exactly as written, with no shell expansion
     And `<report>` is an absolute path at which nothing exists
     And the JSON output is the JSON value parsed from the file at `<report>` once the test command has ended
 
   Rule: A failing test in one module fails the test command and does not stop another module's tests
+    In AC-005, `beta.test` compiles only after `Alpha1`'s test `slow` has failed, so that `Beta1`'s tests start after that failure.
+    A failing test fails no Mill task, so both rows take the same path through the test command. The `none` row shows that another module's tests still start after a test has failed where Mill's `--keep-going` is not given, and the `--keep-going` row shows the same where it is given.
+
     Scenario Outline: AC-005 A test of alpha.test fails, flags <flags>
       Given `Alpha1`'s test `slow` fails
+      And `beta.test`'s compile depends on a task that ends once the file `Alpha1.slow.failed` exists in `<markers>`, and fails if that file does not exist within 120 seconds
       When the test command is invoked with the flags <flags> and the module selectors `alpha.test beta.test`
       Then the files `Beta1.fast` and `Beta1.slow` exist in `<markers>`
       And the test command fails
@@ -214,11 +218,17 @@ Feature: Every selected module runs, whatever happens to the others
       And the test command fails
 
   Rule: Where two of a module's fork groups each run only the same test class, the module runs no test, has an aborted module node, fails the test command, and does not stop another module's tests
+    In AC-024, `alpha.test` compiles only after `beta.test` has compiled, so that `alpha.test`'s tests start after `beta.test` has aborted.
+
     Scenario: AC-024 Two of beta.test's fork groups each hold only samples.Beta1
       Given `beta.test`'s `testForkGrouping` gives two fork groups, each holding only `samples.Beta1`
+      And `beta.test`'s compile, once it has compiled, creates the file `beta.test.compiled` in `<markers>`
+      And `alpha.test`'s compile depends on a task that ends once the file `beta.test.compiled` exists in `<markers>`, and fails if that file does not exist within 120 seconds
       When the test command is invoked with no flags and the module selectors `alpha.test beta.test`
       Then the files `Alpha1.fast` and `Alpha1.slow` exist in `<markers>`, and neither `Beta1.fast` nor `Beta1.slow` does
       And the module node `beta.test` holds no run node, its `outcome` is `aborted`, and its `failures` holds exactly one entry, whose `message` contains `samples.Beta1` and does not contain `beta.test`
+      And the module node `beta.test` has no `startedAt`, `endedAt` or `duration`
+      And Mill started no worker in `beta.test`'s module folder
       And the module node `alpha.test` has no `outcome` and no `failures`
       And the JSON output's root has no `outcome` and no `failures`
       And the test command fails

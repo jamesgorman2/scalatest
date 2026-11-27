@@ -37,7 +37,7 @@ final class DiscoveryOutputAcrossModulesSpec extends AnyFeatureSpec with GivenWh
       }
 
       Scenario(s"beta.test's discovery output in the JSON output, with javaHome $javaHomeDescription") {
-        inSharedClassGlobsAcrossModules(sharedBuildForTheJavaHome) { build =>
+        inSharedBuild(sharedBuildForTheJavaHome) { build =>
           givenNoisyInBetaTest()
           And(s"beta.test's javaHome is $javaHomeDescription")
           val (result, json) = runOnBothModulesParsingJsonOutput(build, "--", "samples.*", "--", "-z", "nothing-matches")
@@ -62,7 +62,7 @@ final class DiscoveryOutputAcrossModulesSpec extends AnyFeatureSpec with GivenWh
     }
 
     Scenario("beta.test's runs, output and failure in the human-readable output", AreaTag.HumanReadable) {
-      inSharedClassGlobsAcrossModules(sharedClassGlobsAcrossModulesWithNoisy) { build =>
+      inSharedBuild(sharedClassGlobsAcrossModulesWithNoisy) { build =>
         givenNoisyInBetaTest()
         When("the test command is invoked with -oH -- samples.* -- -z nothing-matches")
         val result = runOnBothModulesWithReport(build, "-oH", "--", "samples.*", "--", "-z", "nothing-matches")

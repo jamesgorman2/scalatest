@@ -20,7 +20,7 @@ final class ClassGlobsAndFrameworkArgumentsAcrossModulesSpec extends AnyFeatureS
 
     for ((arguments, markers) <- argumentsAndMarkers) {
       Scenario(s"Arguments ${arguments.mkString(" ")}") {
-        inSharedClassGlobsAcrossModules(sharedUnchangedClassGlobsAcrossModules) { build =>
+        inSharedBuild(sharedUnchangedClassGlobsAcrossModules) { build =>
           val (result, _) = runOnBothModulesParsingJsonOutput(build, arguments*)
 
           Then(s"the files in <markers> are exactly ${EnglishList.of(markers)}")
@@ -35,14 +35,14 @@ final class ClassGlobsAndFrameworkArgumentsAcrossModulesSpec extends AnyFeatureS
     }
 
     Scenario("Class globs that match only alpha.test's classes") {
-      inSharedClassGlobsAcrossModules(sharedUnchangedClassGlobsAcrossModules) { build =>
+      inSharedBuild(sharedUnchangedClassGlobsAcrossModules) { build =>
         val (result, json) = runOnBothModulesParsingJsonOutput(build, "--", "samples.Alpha*")
 
         withClue(result.debugString) {
           Then("the files in <markers> are exactly Alpha1.fast, Alpha1.slow, Alpha2.fast and Alpha2.slow")
           build.markers shouldBe Seq("Alpha1.fast", "Alpha1.slow", "Alpha2.fast", "Alpha2.slow")
 
-          And("the module node beta.test holds no run node, its outcome is aborted, and its failures holds exactly one entry")
+          And("in the JSON output, the module node beta.test holds no run node, its outcome is aborted, and its failures holds exactly one entry")
           val beta = moduleNode(json, "beta.test")
           runNodesOf(json, "beta.test") shouldBe empty
           beta.outcome shouldBe Some("aborted")
@@ -51,7 +51,7 @@ final class ClassGlobsAndFrameworkArgumentsAcrossModulesSpec extends AnyFeatureS
           And("that entry's message is Test selector does not match any test: samples.Alpha* and Run discoveredTestClasses to see available tests, joined by a line feed")
           beta.failureMessages.head shouldBe noTestMatchedMessageNaming("samples.Alpha*")
 
-          And("the module node alpha.test has no outcome and no failures")
+          And("in the JSON output, the module node alpha.test has no outcome and no failures")
           shouldHaveNoKeys(moduleNode(json, "alpha.test"), "outcome", "failures")
 
           And("the JSON output's root has no outcome and no failures")
@@ -64,15 +64,15 @@ final class ClassGlobsAndFrameworkArgumentsAcrossModulesSpec extends AnyFeatureS
     }
 
     Scenario("Framework arguments that exclude every test the class globs keep") {
-      inSharedClassGlobsAcrossModules(sharedUnchangedClassGlobsAcrossModules) { build =>
+      inSharedBuild(sharedUnchangedClassGlobsAcrossModules) { build =>
         val (result, json) = runOnBothModulesParsingJsonOutput(build, "--", "*1", "--", "-z", "nothing-matches")
 
         withClue(result.debugString) {
           Then("no file exists in <markers>")
           build.markers shouldBe empty
 
+          And("in the JSON output, the module nodes alpha.test and beta.test each hold one or more run nodes, and each has the outcome aborted and a failures that holds exactly one entry")
           for (module <- Seq("alpha.test", "beta.test")) {
-            And(s"the module node $module holds one or more run nodes, and has the outcome aborted and a failures that holds exactly one entry")
             runNodesOf(json, module) should not be empty
             moduleNode(json, module).outcome shouldBe Some("aborted")
             moduleNode(json, module).failureMessages should have size 1

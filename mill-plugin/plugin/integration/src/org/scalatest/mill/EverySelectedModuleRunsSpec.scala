@@ -17,6 +17,44 @@ private enum MillFlags(val arguments: Seq[String]) {
 @Modules
 final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with SeveralModulesFixture {
 
+  protected def givenTheBackground(): Unit = {
+    givenABuildThatAddsTheMillPlugin()
+    andAlphaTestAndBetaTestUseThatRelease()
+    andAlphaTestHoldsAlpha1AndAlpha2AndBetaTestHoldsBeta1()
+    And("each of those suites is an AnyFunSuite with two tests, fast and slow, both of which succeed unless the scenario says otherwise")
+    And("<markers> is an absolute path at which an empty folder exists, and each test, when it runs, creates the file <suite>.<test> in <markers>, and, once it has failed, also creates the file <suite>.<test>.failed")
+    And("the test command is invoked as mill -j 2 <flags> scalatest/test <selectors> -fJ <report> unless the scenario states its own mill command line")
+    andEachArgumentReachesMillAsWritten()
+    andTheJsonOutputIsReadFromTheReport()
+  }
+
+  // Mill evaluates a task's upstream tasks before its body, so the wait is upstream of the source files rather than in
+  // `compile`'s body: the compiler then starts only once the marker exists. The wait is a `Task.Input`, which Mill
+  // evaluates on every run, so a scenario on a shared build waits even where the compile itself is cached.
+  private def compileAfterMarker(marker: String): String =
+    s"""def awaitMarker: T[Unit] = Task.Input {
+       |  val marker = BuildCtx.workspaceRoot / "markers" / "$marker"
+       |  val deadline = System.nanoTime() + 120L * 1000000000L
+       |  while (!os.exists(marker) && System.nanoTime() < deadline) {
+       |    Thread.sleep(100)
+       |  }
+       |  if (os.exists(marker)) mill.api.Result.Success(()) else mill.api.Result.Failure(s"$$marker does not exist after 120 seconds")
+       |}
+       |
+       |def allSourceFiles: T[Seq[PathRef]] = Task {
+       |  awaitMarker()
+       |  super.allSourceFiles()
+       |}""".stripMargin
+
+  private def compileCreatingMarker(marker: String): String =
+    s"""def compile: T[mill.javalib.api.CompilationResult] = Task {
+       |  val compiled = super.compile()
+       |  BuildCtx.withFilesystemCheckerDisabled {
+       |    os.write.over(BuildCtx.workspaceRoot / "markers" / "$marker", "")
+       |  }
+       |  compiled
+       |}""".stripMargin
+
   private def addLateTestCompilingAfterAlpha1Fast(build: FixtureBuild): Unit = {
     Given("the build also has the JVM test module late.test, which tests with com.edc::scalatest at the release under test and holds the suite Late1, whose class is samples.Late1")
     And("Late1 is an AnyFunSuite whose test fast creates the file Late1.fast in <markers>")
@@ -24,23 +62,7 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
     // The wait is in late's compile, which late.test's compile depends on. The scenario therefore also fails where the
     // check compiles a module that late.test depends on through moduleDeps.
     build.appendToBuild(
-      """object late extends SampleModule {
-        |  def awaitAlpha1Fast: Task[Unit] = Task.Anon {
-        |    val marker = BuildCtx.workspaceRoot / "markers" / "Alpha1.fast"
-        |    val deadline = System.nanoTime() + 120L * 1000000000L
-        |    while (!os.exists(marker) && System.nanoTime() < deadline) {
-        |      Thread.sleep(100)
-        |    }
-        |    if (os.exists(marker)) mill.api.Result.Success(()) else mill.api.Result.Failure(s"$marker does not exist after 120 seconds")
-        |  }
-        |
-        |  def compile: T[mill.javalib.api.CompilationResult] = Task {
-        |    awaitAlpha1Fast()
-        |    super.compile()
-        |  }
-        |
-        |  object test extends SampleTests
-        |}""".stripMargin
+      s"object late extends SampleModule {\n${compileAfterMarker("Alpha1.fast").linesIterator.map("  " + _).mkString("\n")}\n\n  object test extends SampleTests\n}"
     )
   }
 
@@ -57,18 +79,19 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
     replaceInSuite(build, "broken", "Broken1")("""test("fast") {}""", """test("fast") { notDefinedAnywhere }""")
   }
 
-  private val sharedSeveralModulesWithAlpha1SlowFailing: SharedFixtureBuild = sharedSeveralModules(failAlpha1Slow)
+  private val sharedSeveralModulesWithBetaTestCompilingAfterAlpha1SlowFails: SharedFixtureBuild =
+    sharedSeveralModules { build =>
+      failAlpha1Slow(build)
+      addToBetaTest(build, compileAfterMarker("Alpha1.slow.failed"))
+    }
 
   private val sharedSeveralModulesWithBrokenTestThatDoesNotCompile: SharedFixtureBuild = sharedSeveralModules(addBrokenTestThatDoesNotCompile)
 
   private def inSharedSeveralModulesWithBrokenTestThatDoesNotCompile[A](test: FixtureBuild => A): A =
-    inSharedSeveralModules(sharedSeveralModulesWithBrokenTestThatDoesNotCompile) { build =>
+    inSharedBuild(sharedSeveralModulesWithBrokenTestThatDoesNotCompile) { build =>
       Given("the build also has the JVM test module broken.test, which tests with com.edc::scalatest at the release under test and whose sources do not compile")
       test(build)
     }
-
-  private def setForkGroupingOfBetaTest(build: FixtureBuild, forkGrouping: String): Unit =
-    addToBetaTest(build, s"def testForkGrouping = Task { $forkGrouping }")
 
   private def shouldBeAbortedWithOneFailureContaining(json: JsonNode, module: String, text: String): Unit = {
     val node = moduleNode(json, module)
@@ -104,8 +127,9 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
 
     for (millFlags <- MillFlags.values) {
       Scenario(s"A test of alpha.test fails, flags ${millFlags.description}", CoreTag.when(millFlags == MillFlags.Empty)*) {
-        inSharedSeveralModules(sharedSeveralModulesWithAlpha1SlowFailing) { build =>
+        inSharedBuild(sharedSeveralModulesWithBetaTestCompilingAfterAlpha1SlowFails) { build =>
           Given("Alpha1's test slow fails")
+          And("beta.test's compile depends on a task that ends once the file Alpha1.slow.failed exists in <markers>, and fails if that file does not exist within 120 seconds")
           val (result, _) = runParsingJsonOutput(build, millFlags.arguments*)("alpha.test", "beta.test")
 
           Then("the files Beta1.fast and Beta1.slow exist in <markers>")
@@ -184,7 +208,10 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
     Scenario("Two of beta.test's fork groups each hold only samples.Beta1", AreaTag.Workers) {
       withSeveralModules { build =>
         Given("beta.test's testForkGrouping gives two fork groups, each holding only samples.Beta1")
-        setForkGroupingOfBetaTest(build, """Seq(Seq("samples.Beta1"), Seq("samples.Beta1"))""")
+        And("beta.test's compile, once it has compiled, creates the file beta.test.compiled in <markers>")
+        addToBetaTest(build, s"""def testForkGrouping = Task { Seq(Seq("samples.Beta1"), Seq("samples.Beta1")) }\n\n${compileCreatingMarker("beta.test.compiled")}""")
+        And("alpha.test's compile depends on a task that ends once the file beta.test.compiled exists in <markers>, and fails if that file does not exist within 120 seconds")
+        addToTestModule(build, "alpha", compileAfterMarker("beta.test.compiled"))
         val (result, json) = runParsingJsonOutput(build)("alpha.test", "beta.test")
 
         withClue(result.debugString) {

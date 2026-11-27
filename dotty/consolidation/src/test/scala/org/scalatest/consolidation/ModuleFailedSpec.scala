@@ -89,8 +89,9 @@ final class ModuleFailedSpec extends AnyFeatureSpec with GivenWhenThen with shou
     }
 
     Scenario("A process of a module that ended before any run existed in it fails that module and no other") {
-      Given("a consolidation")
+      Given("a consolidation with a run of another module that ends completed")
       val consolidation = startedWithColour()
+      consolidation.addRun(otherModule)(_.addAll(runWithSucceededTest))
 
       When("a process of the module that ended before any run existed in it is added")
       consolidation.addProcessEndedBeforeAnyRun(module)
