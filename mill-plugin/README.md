@@ -77,7 +77,7 @@ Run a tag when one of its files changes. Paths are from the repository root. A n
 | Tags | Files |
 |---|---|
 | `Arguments` | `TestCommandArguments`, `AllowedFlag`, `FrameworkArguments`, `ClassGlob`, `StdoutContent`, `RunArguments`, `ModuleScalaTestArguments`, `ModuleSelectorArgument`; `ScalaTestArgument` in the library |
-| `Modules` | `ModuleSelection`, `SelectedTestModule`, `ModuleCheck`, `ModuleCheckTask`, `CannotRunReason`, `ResolvedDependency`, `Organization`, `ArtifactName`, `LibraryVersion`, `FailFastOffEvaluator`, `EvaluatedTasks`, `FailedTask`, `FailedModuleCheck`, `FirstFailure`, `TaskName` |
+| `Modules` | `ModuleSelection`, `SelectedTestModule`, `ModuleCheck`, `ModuleCheckTask`, `CannotRunReason`, `ResolvedDependency`, `Organization`, `ArtifactName`, `LibraryVersion`, `FailFastOffEvaluator`, `EvaluatedTasks`, `FailedTask`, `FailedModuleCheck`, `ModuleSelectorFailure`, `ThrownException`, `TaskName` |
 | `Workers` | `JvmTestModuleInputs`, `WorkerLayout`, `ForkGroupLabel`, `PaddedIndex`, `PathUnderModule`, `WorkerRun`, `WorkerProcess`, `ProcessExit`, `DelegatingTaskCtx`, `ModuleFolder`, `ModuleFolderTaskCtx` |
 | `Capture` | `OutputCapture`, `LineSplitter`, `StreamLines`, `EventLogReader`, `EventLogFile`, `EventLogLines`, `WorkerTaskCtx` |
 | `HumanReadable` | `HumanReadableOutput` and `ConsolidationState` in the library |

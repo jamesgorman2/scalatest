@@ -85,7 +85,7 @@ private[mill] final class TestCommand private (
       consolidation: Consolidation,
       workerCharset: Charset
   ): Task[Unit] = {
-    val inputsTask = JvmTestModuleInputs.task(runnable.module.module)
+    val inputsTask = JvmTestModuleInputs.task(runnable.module.testModule)
     Task.Anon {
       val moduleRun = new JvmTestModuleRun(
         runnable.module.name,

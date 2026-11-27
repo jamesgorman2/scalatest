@@ -1,11 +1,12 @@
 package org.scalatest.mill
 
+import org.scalatest.consolidation.ScalaTestArgument
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 final class ModuleScalaTestArgumentsSpec extends AnyWordSpec with should.Matchers {
 
-  private def keptArguments(moduleArguments: Seq[String]): Either[Seq[String], Seq[String]] =
+  private def keptArguments(moduleArguments: Seq[String]): Either[Seq[ScalaTestArgument.Unrecognised], Seq[String]] =
     ModuleScalaTestArguments.kept(moduleArguments).map(_.flatMap(_.arguments))
 
   "A module's own ScalaTest arguments" when {
@@ -54,7 +55,7 @@ final class ModuleScalaTestArgumentsSpec extends AnyWordSpec with should.Matcher
     "they hold arguments ScalaTest does not recognise" should {
       "keep none, giving each such argument in the order given" in {
         keptArguments(Seq("-x", "-l", "samples.Slow", "--not-a-scalatest-argument")) shouldBe
-          Left(Seq("-x", "--not-a-scalatest-argument"))
+          Left(Seq(ScalaTestArgument.Unrecognised("-x"), ScalaTestArgument.Unrecognised("--not-a-scalatest-argument")))
       }
     }
 

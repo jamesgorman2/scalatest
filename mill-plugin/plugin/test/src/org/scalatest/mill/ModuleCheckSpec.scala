@@ -17,6 +17,8 @@ final class ModuleCheckSpec extends AnyWordSpec with should.Matchers {
   private val frameworkArguments: Seq[ScalaTestArgument.Flagged] =
     ScalaTestArgument.split(Seq("-z", "adds")).collect { case flagged: ScalaTestArgument.Flagged => flagged }
 
+  private def unrecognised(arguments: String*): Seq[ScalaTestArgument.Unrecognised] = arguments.map(ScalaTestArgument.Unrecognised(_))
+
   private def runArguments(testArgsDefault: Seq[String], runtimeDependencies: ResolvedDependency*): Either[Seq[CannotRunReason], Seq[String]] =
     ModuleCheck(testArgsDefault, runtimeDependencies.toSet).runArguments(module, frameworkArguments).map(_.commandLine)
 
@@ -44,14 +46,14 @@ final class ModuleCheckSpec extends AnyWordSpec with should.Matchers {
     "its testArgsDefault holds arguments ScalaTest does not recognise" should {
       "name each such argument" in {
         runArguments(Seq("-x", "-l", "samples.Slow", "--not-a-scalatest-argument"), forkCore) shouldBe
-          Left(Seq(CannotRunReason.UnrecognisedArguments(module, Seq("-x", "--not-a-scalatest-argument"))))
+          Left(Seq(CannotRunReason.UnrecognisedArguments(module, unrecognised("-x", "--not-a-scalatest-argument"))))
       }
     }
 
     "it does not test with this release and its testArgsDefault holds an argument ScalaTest does not recognise" should {
       "give both reasons" in {
         runArguments(Seq("-x"), scalaLibrary) shouldBe
-          Left(Seq(CannotRunReason.WithoutThisRelease(module), CannotRunReason.UnrecognisedArguments(module, Seq("-x"))))
+          Left(Seq(CannotRunReason.WithoutThisRelease(module), CannotRunReason.UnrecognisedArguments(module, unrecognised("-x"))))
       }
     }
   }

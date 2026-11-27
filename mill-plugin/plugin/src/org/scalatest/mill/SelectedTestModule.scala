@@ -6,9 +6,9 @@ import mill.scalajslib.ScalaJSModule
 import mill.scalanativelib.ScalaNativeModule
 import org.scalatest.consolidation.ModuleName
 
-private[mill] final case class SelectedTestModule(module: TestModule & JavaModule) {
+private[mill] final case class SelectedTestModule(testModule: TestModule & JavaModule) {
 
-  def name: ModuleName = ModuleName(module.moduleSegments.render)
+  def name: ModuleName = ModuleName(testModule.moduleSegments.render)
 
-  def isJvm: Boolean = !module.isInstanceOf[ScalaJSModule] && !module.isInstanceOf[ScalaNativeModule]
+  def isJvm: Boolean = !testModule.isInstanceOf[ScalaJSModule] && !testModule.isInstanceOf[ScalaNativeModule]
 }

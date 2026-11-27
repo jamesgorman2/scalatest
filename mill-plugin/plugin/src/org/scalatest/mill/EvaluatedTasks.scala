@@ -2,6 +2,7 @@ package org.scalatest.mill
 
 import mill.api.Evaluator
 import mill.api.ExecResult
+import mill.api.Result
 import mill.api.Task
 import mill.api.Val
 import scala.annotation.tailrec
@@ -44,9 +45,19 @@ private[mill] object EvaluatedTasks {
   private def errorOf(failing: ExecResult.Failing[?]): String = {
     val error = failing match {
       case failure: ExecResult.Failure[?] => failure.msg
-      case exception: ExecResult.Exception => Option(exception.throwable.getMessage).getOrElse(exception.throwable.toString)
+      case exception: ExecResult.Exception => thrownExceptionOf(exception.throwable).error
     }
     // A failed Coursier resolution reaches a task as an exception whose message begins and ends with a line break.
     error.strip
+  }
+
+  private def thrownExceptionOf(throwable: Throwable): ThrownException = {
+    val cause = Option(throwable.getCause).map(thrownExceptionOf)
+    throwable match {
+      // Mill replaces an exception thrown in a class loader of its own, such as test discovery's, with one that keeps
+      // the original's class name and message only in its `info`.
+      case serialized: Result.SerializedException => ThrownException(serialized.info.clsName, Option(serialized.info.msg), cause)
+      case other => ThrownException(other.getClass.getName, Option(other.getMessage), cause)
+    }
   }
 }

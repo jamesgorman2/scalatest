@@ -21,7 +21,11 @@ private[mill] object ModuleSelection {
     if (moduleSelectors.isEmpty) {
       Left(TestCommandFailure.NoModuleSelector)
     } else {
-      FirstFailure.orValues(moduleSelectors.map(selector => ResolvedModuleSelector.from(evaluator, selector))).map(ModuleSelection(_))
+      val (failures, resolvedSelectors) = moduleSelectors.map(selector => ResolvedModuleSelector.from(evaluator, selector)).partitionMap(identity)
+      if (failures.nonEmpty)
+        Left(TestCommandFailure.ModuleSelectorsWithNoTestModule(failures))
+      else
+        Right(ModuleSelection(resolvedSelectors))
     }
 
   private def distinctSortedByName(modules: Seq[SelectedTestModule]): Seq[SelectedTestModule] = modules.distinctBy(_.name).sortBy(_.name.value)
@@ -31,15 +35,15 @@ private[mill] final case class ResolvedModuleSelector(selector: ModuleSelectorAr
 
 private[mill] object ResolvedModuleSelector {
 
-  def from(evaluator: Evaluator, selector: ModuleSelectorArgument): Either[TestCommandFailure, ResolvedModuleSelector] =
+  def from(evaluator: Evaluator, selector: ModuleSelectorArgument): Either[ModuleSelectorFailure, ResolvedModuleSelector] =
     evaluator.resolveModulesOrTasks(Seq(selector.text), SelectMode.Multi) match {
       case Result.Success(resolved) =>
         val testModules = resolved.collect { case Left(module: (TestModule & JavaModule)) => SelectedTestModule(module) }
         if (testModules.isEmpty)
-          Left(TestCommandFailure.NoTestModule(selector))
+          Left(ModuleSelectorFailure.NoTestModule(selector))
         else
           Right(ResolvedModuleSelector(selector, testModules))
       case failure: Result.Failure =>
-        Left(TestCommandFailure.UnresolvedModuleSelector(selector, failure.error))
+        Left(ModuleSelectorFailure.Unresolved(selector, failure.error))
     }
 }

@@ -4,9 +4,9 @@ import org.scalatest.consolidation.ScalaTestArgument
 
 private[mill] object ModuleScalaTestArguments {
 
-  def kept(moduleArguments: Seq[String]): Either[Seq[String], Seq[ScalaTestArgument.Flagged]] = {
+  def kept(moduleArguments: Seq[String]): Either[Seq[ScalaTestArgument.Unrecognised], Seq[ScalaTestArgument.Flagged]] = {
     val split = ScalaTestArgument.split(moduleArguments)
-    val unrecognised = split.collect { case ScalaTestArgument.Unrecognised(argument) => argument }
+    val unrecognised = split.collect { case argument: ScalaTestArgument.Unrecognised => argument }
     if (unrecognised.nonEmpty)
       Left(unrecognised)
     else

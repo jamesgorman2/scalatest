@@ -10,8 +10,7 @@ private[mill] enum TestCommandFailure extends Exception with NoStackTrace {
   case FrameworkArgumentAmongOwnArguments(argument: String)
   case FrameworkArgumentNotPassedOn(argument: String)
   case NoModuleSelector
-  case NoTestModule(selector: ModuleSelectorArgument)
-  case UnresolvedModuleSelector(selector: ModuleSelectorArgument, error: String)
+  case ModuleSelectorsWithNoTestModule(failures: Seq[ModuleSelectorFailure])
   case CannotRunModules(reasons: Seq[CannotRunReason], failedChecks: Seq[FailedModuleCheck])
   case JsonOutputPathIsFolder(path: Path)
   case JsonOutputNotDeleted(path: Path, cause: Throwable)
@@ -35,10 +34,8 @@ private[mill] enum TestCommandFailure extends Exception with NoStackTrace {
         s"The test command takes only ScalaTest's $frameworkFlags as framework arguments, each with the values ScalaTest's runner takes with it, but was given: $argument"
       case NoModuleSelector =>
         "The test command takes one or more module selectors, but was given none"
-      case NoTestModule(selector) =>
-        s"Module selector ${selector.text} resolves to no test module"
-      case UnresolvedModuleSelector(selector, error) =>
-        s"Module selector ${selector.text} resolves to no module: $error"
+      case ModuleSelectorsWithNoTestModule(failures) =>
+        failures.map(_.line).mkString("\n")
       case CannotRunModules(reasons, failedChecks) =>
         val cannotRunLines = "The test command cannot run these selected test modules:" +: reasons.map(reason => s"  ${reason.line}")
         val failedCheckLines =

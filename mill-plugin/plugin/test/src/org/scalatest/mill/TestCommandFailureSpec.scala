@@ -4,6 +4,7 @@ import java.io.IOException
 import java.nio.file.Paths
 import org.scalatest.consolidation.Consolidation
 import org.scalatest.consolidation.ModuleName
+import org.scalatest.consolidation.ScalaTestArgument
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -49,14 +50,35 @@ final class TestCommandFailureSpec extends AnyWordSpec with should.Matchers {
 
     "a module selector resolves to no test module" should {
       "name the selector" in {
-        TestCommandFailure.NoTestModule(ModuleSelectorArgument("core")).message shouldBe "Module selector core resolves to no test module"
+        TestCommandFailure.ModuleSelectorsWithNoTestModule(Seq(ModuleSelectorFailure.NoTestModule(ModuleSelectorArgument("core")))).message shouldBe
+          "Module selector core resolves to no test module"
       }
     }
 
     "a module selector resolves to no module" should {
       "name the selector and Mill's error" in {
-        TestCommandFailure.UnresolvedModuleSelector(ModuleSelectorArgument("missing"), "Cannot resolve missing").message shouldBe
-          "Module selector missing resolves to no module: Cannot resolve missing"
+        TestCommandFailure
+          .ModuleSelectorsWithNoTestModule(Seq(ModuleSelectorFailure.Unresolved(ModuleSelectorArgument("missing"), "Cannot resolve missing")))
+          .message shouldBe "Module selector missing resolves to no module: Cannot resolve missing"
+      }
+    }
+
+    "several module selectors resolve to no test module" should {
+      "name each selector, on its own line, in the order given" in {
+        TestCommandFailure
+          .ModuleSelectorsWithNoTestModule(
+            Seq(
+              ModuleSelectorFailure.NoTestModule(ModuleSelectorArgument("util")),
+              ModuleSelectorFailure.Unresolved(ModuleSelectorArgument("missing"), "Cannot resolve missing"),
+              ModuleSelectorFailure.NoTestModule(ModuleSelectorArgument("core"))
+            )
+          )
+          .message shouldBe
+          Seq(
+            "Module selector util resolves to no test module",
+            "Module selector missing resolves to no module: Cannot resolve missing",
+            "Module selector core resolves to no test module"
+          ).mkString("\n")
       }
     }
 
@@ -67,7 +89,10 @@ final class TestCommandFailureSpec extends AnyWordSpec with should.Matchers {
             Seq(
               CannotRunReason.NotJvm(ModuleName("js.test")),
               CannotRunReason.WithoutThisRelease(ModuleName("munit.test")),
-              CannotRunReason.UnrecognisedArguments(ModuleName("args.test"), Seq("-x", "--not-a-scalatest-argument"))
+              CannotRunReason.UnrecognisedArguments(
+                ModuleName("args.test"),
+                Seq(ScalaTestArgument.Unrecognised("-x"), ScalaTestArgument.Unrecognised("--not-a-scalatest-argument"))
+              )
             ),
             Seq.empty
           )

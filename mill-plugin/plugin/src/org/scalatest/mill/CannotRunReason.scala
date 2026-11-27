@@ -1,11 +1,12 @@
 package org.scalatest.mill
 
 import org.scalatest.consolidation.ModuleName
+import org.scalatest.consolidation.ScalaTestArgument
 
 private[mill] enum CannotRunReason {
   case NotJvm(module: ModuleName)
   case WithoutThisRelease(module: ModuleName)
-  case UnrecognisedArguments(module: ModuleName, arguments: Seq[String])
+  case UnrecognisedArguments(module: ModuleName, arguments: Seq[ScalaTestArgument.Unrecognised])
 
   def module: ModuleName
 
@@ -17,6 +18,6 @@ private[mill] enum CannotRunReason {
         s"${module.value} does not depend on ${ResolvedDependency.forkCoreOfThisRelease.text}, " +
           "the release of this fork that the Mill plugin belongs to"
       case UnrecognisedArguments(module, arguments) =>
-        s"${module.value}'s testArgsDefault holds ${EnglishList.of(arguments)}, which ScalaTest does not recognise"
+        s"${module.value}'s testArgsDefault holds ${EnglishList.of(arguments.map(_.argument))}, which ScalaTest does not recognise"
     }
 }
