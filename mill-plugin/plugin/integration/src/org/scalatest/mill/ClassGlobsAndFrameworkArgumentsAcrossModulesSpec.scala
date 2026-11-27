@@ -21,7 +21,7 @@ final class ClassGlobsAndFrameworkArgumentsAcrossModulesSpec extends AnyFeatureS
     for ((arguments, markers) <- argumentsAndMarkers) {
       Scenario(s"Arguments ${arguments.mkString(" ")}") {
         inSharedBuild(sharedUnchangedClassGlobsAcrossModules) { build =>
-          val (result, _) = runOnBothModulesParsingJsonOutput(build, arguments*)
+          val (result, _) = whenTheTestCommandIsInvokedOnBothModulesParsingJsonOutput(build, arguments*)
 
           Then(s"the files in <markers> are exactly ${EnglishList.of(markers)}")
           withClue(result.debugString) {
@@ -36,7 +36,7 @@ final class ClassGlobsAndFrameworkArgumentsAcrossModulesSpec extends AnyFeatureS
 
     Scenario("Class globs that match only alpha.test's classes") {
       inSharedBuild(sharedUnchangedClassGlobsAcrossModules) { build =>
-        val (result, json) = runOnBothModulesParsingJsonOutput(build, "--", "samples.Alpha*")
+        val (result, json) = whenTheTestCommandIsInvokedOnBothModulesParsingJsonOutput(build, "--", "samples.Alpha*")
 
         withClue(result.debugString) {
           Then("the files in <markers> are exactly Alpha1.fast, Alpha1.slow, Alpha2.fast and Alpha2.slow")
@@ -63,7 +63,7 @@ final class ClassGlobsAndFrameworkArgumentsAcrossModulesSpec extends AnyFeatureS
 
     Scenario("Framework arguments that exclude every test the class globs keep") {
       inSharedBuild(sharedUnchangedClassGlobsAcrossModules) { build =>
-        val (result, json) = runOnBothModulesParsingJsonOutput(build, "--", "*1", "--", "-z", "nothing-matches")
+        val (result, json) = whenTheTestCommandIsInvokedOnBothModulesParsingJsonOutput(build, "--", "*1", "--", "-z", "nothing-matches")
 
         withClue(result.debugString) {
           Then("no file exists in <markers>")

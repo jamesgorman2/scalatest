@@ -52,7 +52,7 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
     sharedRunOnAlphaAndEveryTestModule
   }
 
-  private def runParsingJsonOutput(build: FixtureBuild)(selectors: String*): (TestCommandResult, JsonNode) =
+  private def whenTheTestCommandIsInvokedWithTwoJobsParsingJsonOutput(build: FixtureBuild)(selectors: String*): (TestCommandResult, JsonNode) =
     build.resultAndJsonOutput(whenTheTestCommandIsInvokedWithTwoJobsWritingJsonOutput(build, selectors*))
 
   private def moduleSelectorsOf(json: JsonNode): Seq[ModuleSelectorEntry] =
@@ -122,7 +122,7 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
     Scenario("A module selector that resolves to test modules and other modules", AreaTag.Modules) {
       inSharedBuild(sharedUnchangedSeveralModules) { build =>
         Given("the build's modules alpha and beta, which hold alpha.test and beta.test, are JVM modules that are not test modules")
-        val (result, json) = runParsingJsonOutput(build)("__")
+        val (result, json) = whenTheTestCommandIsInvokedWithTwoJobsParsingJsonOutput(build)("__")
 
         withClue(result.debugString) {
           Then("the JSON output's root holds exactly the module nodes alpha.test and beta.test, in that order")
@@ -155,7 +155,7 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
 
     Scenario("A module selector's test modules are ordered by name", AreaTag.Modules) {
       inSharedSeveralModulesWithModulesThatSortByCharacterCode { build =>
-        val (result, json) = runParsingJsonOutput(build)("__.test")
+        val (result, json) = whenTheTestCommandIsInvokedWithTwoJobsParsingJsonOutput(build)("__.test")
 
         val moduleSelectors = moduleSelectorsOf(json)
 
@@ -171,7 +171,7 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
 
     Scenario("Module names that sort by character code", AreaTag.Modules) {
       inSharedSeveralModulesWithModulesThatSortByCharacterCode { build =>
-        val (result, json) = runParsingJsonOutput(build)("b2.test", "beta.test", "b10.test", "alpha.test", "B1.test")
+        val (result, json) = whenTheTestCommandIsInvokedWithTwoJobsParsingJsonOutput(build)("b2.test", "beta.test", "b10.test", "alpha.test", "B1.test")
 
         Then("the JSON output's root holds exactly the module nodes B1.test, alpha.test, b10.test, b2.test and beta.test, in that order")
         withClue(result.debugString) {
@@ -186,7 +186,7 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
         val sendingWorkingDirectory = """test("fast") { info(System.getProperty("user.dir")) }"""
         replaceInSuite(build, "alpha", "Alpha1")("""test("fast") {}""", sendingWorkingDirectory)
         replaceInSuite(build, "beta", "Beta1")("""test("fast") {}""", sendingWorkingDirectory)
-        val (result, json) = runParsingJsonOutput(build)("alpha.test", "beta.test")
+        val (result, json) = whenTheTestCommandIsInvokedWithTwoJobsParsingJsonOutput(build)("alpha.test", "beta.test")
 
         withClue(result.debugString) {
           Then("in the JSON output, the output of Alpha1's test fast holds an info message whose message is the path of the folder sandbox in out/org.scalatest.mill.TestCommandModule/modules/alpha.test in the build's workspace")

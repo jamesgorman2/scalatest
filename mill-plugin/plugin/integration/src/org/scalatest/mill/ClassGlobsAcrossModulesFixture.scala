@@ -21,10 +21,10 @@ trait ClassGlobsAcrossModulesFixture extends SeveralModulesFixture { this: Suite
     andTheJsonOutputIsParsedFromTheReport()
   }
 
-  protected def runOnBothModulesParsingJsonOutput(build: FixtureBuild, arguments: String*): (TestCommandResult, JsonNode) =
-    build.resultAndJsonOutput(runOnBothModulesWithReport(build, arguments*))
+  protected def whenTheTestCommandIsInvokedOnBothModulesParsingJsonOutput(build: FixtureBuild, arguments: String*): (TestCommandResult, JsonNode) =
+    build.resultAndJsonOutput(whenTheTestCommandIsInvokedOnBothModulesWithReport(build, arguments*))
 
-  protected def runOnBothModulesWithReport(build: FixtureBuild, arguments: String*): TestCommandResult = {
+  protected def whenTheTestCommandIsInvokedOnBothModulesWithReport(build: FixtureBuild, arguments: String*): TestCommandResult = {
     whenTheTestCommandIsInvokedWith(arguments.mkString(" "))
     runTestCommandWithTwoJobs(build)((Seq("alpha.test", "beta.test", "-fJ", build.jsonOutputFile.toString) ++ arguments)*)
   }

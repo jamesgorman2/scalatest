@@ -40,7 +40,7 @@ final class DiscoveryOutputAcrossModulesSpec extends AnyFeatureSpec with GivenWh
         inSharedBuild(sharedBuildForTheJavaHome) { build =>
           givenNoisyInBetaTest()
           And(s"beta.test's javaHome is $javaHomeDescription")
-          val (result, json) = runOnBothModulesParsingJsonOutput(build, "--", "samples.*", "--", "-z", "nothing-matches")
+          val (result, json) = whenTheTestCommandIsInvokedOnBothModulesParsingJsonOutput(build, "--", "samples.*", "--", "-z", "nothing-matches")
 
           withClue(result.debugString) {
             Then("in the JSON output, the module node beta.test has an output that holds exactly one item, a stdio item whose stream is stdout and whose text is loading samples.Noisy followed by a line terminator")
@@ -64,7 +64,7 @@ final class DiscoveryOutputAcrossModulesSpec extends AnyFeatureSpec with GivenWh
     Scenario("beta.test's runs, output and failure in the human-readable output", AreaTag.HumanReadable) {
       inSharedBuild(sharedClassGlobsAcrossModulesWithNoisy) { build =>
         givenNoisyInBetaTest()
-        val result = runOnBothModulesWithReport(build, "-oH", "--", "samples.*", "--", "-z", "nothing-matches")
+        val result = whenTheTestCommandIsInvokedOnBothModulesWithReport(build, "-oH", "--", "samples.*", "--", "-z", "nothing-matches")
         val betaSubtree = result.subtreeOf("[beta.test]")
         val underBeta = betaSubtree.drop(1)
         val (beforeLastFour, lastFour) = underBeta.splitAt(underBeta.size - 4)

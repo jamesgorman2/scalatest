@@ -90,12 +90,12 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
       test(build)
     }
 
-  private def runWithFlagsParsingJsonOutput(build: FixtureBuild, millFlags: MillFlags)(selectors: String*): (TestCommandResult, JsonNode) = {
+  private def whenTheTestCommandIsInvokedWithFlagsParsingJsonOutput(build: FixtureBuild, millFlags: MillFlags)(selectors: String*): (TestCommandResult, JsonNode) = {
     whenTheTestCommandIsInvokedWith(s"the flags ${millFlags.description} and ${theModuleSelectors(selectors)}")
     runTestCommandWithTwoJobsParsingJsonOutput(build, millFlags.arguments*)(selectors*)
   }
 
-  private def runWithNoFlagsParsingJsonOutput(build: FixtureBuild)(selectors: String*): (TestCommandResult, JsonNode) = {
+  private def whenTheTestCommandIsInvokedWithNoFlagsParsingJsonOutput(build: FixtureBuild)(selectors: String*): (TestCommandResult, JsonNode) = {
     whenTheTestCommandIsInvokedWith(s"no flags and ${theModuleSelectors(selectors)}")
     runTestCommandWithTwoJobsParsingJsonOutput(build)(selectors*)
   }
@@ -130,7 +130,7 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
         inSharedBuild(sharedSeveralModulesWithBetaTestCompilingAfterAlpha1SlowFails) { build =>
           Given("Alpha1's test slow fails")
           And("beta.test's compile depends on a task that ends once the file Alpha1.slow.failed exists in <markers>, and fails if that file does not exist within 120 seconds")
-          val (result, _) = runWithFlagsParsingJsonOutput(build, millFlags)("alpha.test", "beta.test")
+          val (result, _) = whenTheTestCommandIsInvokedWithFlagsParsingJsonOutput(build, millFlags)("alpha.test", "beta.test")
 
           Then("the files Beta1.fast and Beta1.slow exist in <markers>")
           withClue(result.debugString) {
@@ -145,7 +145,7 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
 
     Scenario(s"broken.test does not compile, flags ${MillFlags.KeepGoing.description}") {
       inSharedSeveralModulesWithBrokenTestThatDoesNotCompile { build =>
-        val (result, json) = runWithFlagsParsingJsonOutput(build, MillFlags.KeepGoing)("alpha.test", "broken.test", "beta.test")
+        val (result, json) = whenTheTestCommandIsInvokedWithFlagsParsingJsonOutput(build, MillFlags.KeepGoing)("alpha.test", "broken.test", "beta.test")
 
         brokenTestShouldAbortWhileAlphaAndBetaRun(build, result, json, "broken.test.compile")
       }
@@ -169,7 +169,7 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
         withSeveralModules { build =>
           Given(s"the build also has the JVM test module broken.test, which tests with com.edc::scalatest at the release under test and $cause")
           addBrokenTest(build)(testModuleMember)
-          val (result, json) = runWithNoFlagsParsingJsonOutput(build)("alpha.test", "broken.test", "beta.test")
+          val (result, json) = whenTheTestCommandIsInvokedWithNoFlagsParsingJsonOutput(build)("alpha.test", "broken.test", "beta.test")
 
           brokenTestShouldAbortWhileAlphaAndBetaRun(build, result, json, failureText)
         }
@@ -209,7 +209,7 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
       withSeveralModules { build =>
         Given("beta.test's testForkGrouping gives two fork groups, each holding only samples.Beta1")
         addToTestModule(build, "beta", """def testForkGrouping = Task { Seq(Seq("samples.Beta1"), Seq("samples.Beta1")) }""")
-        val (result, json) = runWithNoFlagsParsingJsonOutput(build)("alpha.test", "beta.test")
+        val (result, json) = whenTheTestCommandIsInvokedWithNoFlagsParsingJsonOutput(build)("alpha.test", "beta.test")
 
         withClue(result.debugString) {
           Then("the files Alpha1.fast and Alpha1.slow exist in <markers>, and neither Beta1.fast nor Beta1.slow does")
@@ -242,7 +242,7 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
     Scenario("late.test compiles only after a test of alpha.test has run") {
       withSeveralModules { build =>
         addLateTestCompilingAfterAlpha1Fast(build)
-        val (result, _) = runWithNoFlagsParsingJsonOutput(build)("alpha.test", "late.test")
+        val (result, _) = whenTheTestCommandIsInvokedWithNoFlagsParsingJsonOutput(build)("alpha.test", "late.test")
 
         Then("the files Alpha1.fast and Late1.fast exist in <markers>")
         withClue(result.debugString) {
@@ -260,7 +260,7 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
         failAlpha1Slow(build)
         And("the build also has the JVM test module broken.test, which tests with com.edc::scalatest at the release under test and whose sources do not compile")
         addBrokenTestThatDoesNotCompile(build)
-        val (result, _) = runWithNoFlagsParsingJsonOutput(build)("alpha.test", "broken.test", "beta.test")
+        val (result, _) = whenTheTestCommandIsInvokedWithNoFlagsParsingJsonOutput(build)("alpha.test", "broken.test", "beta.test")
 
         Then("Mill reports that the test command failed, with the message The tests of alpha.test and broken.test failed")
         shouldFail(result)
