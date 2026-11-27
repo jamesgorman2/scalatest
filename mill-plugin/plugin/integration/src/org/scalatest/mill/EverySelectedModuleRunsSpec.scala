@@ -4,11 +4,11 @@ import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
 
-private enum MillFlags(val flags: Seq[String]) {
-  case NoFlags extends MillFlags(Nil)
+private enum MillFlags(val arguments: Seq[String]) {
+  case Empty extends MillFlags(Nil)
   case KeepGoing extends MillFlags(Seq("--keep-going"))
 
-  def description: String = if (flags.isEmpty) "none" else flags.mkString(" ")
+  def description: String = if (arguments.isEmpty) "none" else arguments.mkString(" ")
 }
 
 final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with SeveralModulesFixture {
@@ -92,7 +92,7 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
         withSeveralModules { build =>
           Given("Alpha1's test slow fails")
           replaceInSuite(build, "alpha", "Alpha1")("""test("slow") {}""", """test("slow") { fail("fails as the scenario asks") }""")
-          val (result, _) = runParsingJsonOutput(build, millFlags.flags*)("alpha.test", "beta.test")
+          val (result, _) = runParsingJsonOutput(build, millFlags.arguments*)("alpha.test", "beta.test")
 
           Then("the files Beta1.fast and Beta1.slow exist in <markers>")
           withClue(result.debugString) {
@@ -110,7 +110,7 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
       Scenario(s"broken.test does not compile, flags ${millFlags.description}") {
         withSeveralModules { build =>
           addBrokenTestThatDoesNotCompile(build)
-          val (result, json) = runParsingJsonOutput(build, millFlags.flags*)("alpha.test", "broken.test", "beta.test")
+          val (result, json) = runParsingJsonOutput(build, millFlags.arguments*)("alpha.test", "broken.test", "beta.test")
 
           brokenTestShouldAbortWhileAlphaAndBetaRun(build, result, json, "broken.test.compile")
         }
