@@ -38,7 +38,7 @@ final class ModulesFailingTheTestCommandSpec extends AnyFeatureSpec with GivenWh
     }
 
     for (testEnding <- Vector("TestFailed", "TestCanceled")) {
-      Scenario(s"A run that completed and reports $testEnding fails the test command from its module") {
+      Scenario(s"A run that completed and reports $testEnding makes its module fail the test command") {
         val consolidation = startedWithOtherModuleCompleted()
 
         When(s"the module is given a run that ends completed and reports the test `adds` with $testEnding")
@@ -48,7 +48,7 @@ final class ModulesFailingTheTestCommandSpec extends AnyFeatureSpec with GivenWh
       }
     }
 
-    Scenario("A suite that aborts inside a completed run fails the test command from its module") {
+    Scenario("A suite that aborts inside a completed run makes its module fail the test command") {
       val consolidation = startedWithOtherModuleCompleted()
 
       When("the module is given a run that ends completed and whose suite aborts")
@@ -68,7 +68,7 @@ final class ModulesFailingTheTestCommandSpec extends AnyFeatureSpec with GivenWh
       shouldBeFailedByTheModuleAlone(consolidation)
     }
 
-    Scenario("A test not run inside a completed run fails the test command from its module once the run's event stream ends") {
+    Scenario("A test not run inside a completed run makes its module fail the test command once the run's event stream ends") {
       val consolidation = startedWithOtherModuleCompleted()
 
       When("the module is given a run that ends completed and holds the test `adds`, which sends no event")
@@ -78,7 +78,7 @@ final class ModulesFailingTheTestCommandSpec extends AnyFeatureSpec with GivenWh
     }
 
     for (outcome <- Vector("aborted", "stopped")) {
-      Scenario(s"A run whose runEnded event records it as $outcome fails the test command from its module") {
+      Scenario(s"A run whose runEnded event records it as $outcome makes its module fail the test command") {
         val consolidation = startedWithOtherModuleCompleted()
 
         When(s"the module is given a run whose runEnded event records it as $outcome")
@@ -88,7 +88,7 @@ final class ModulesFailingTheTestCommandSpec extends AnyFeatureSpec with GivenWh
       }
     }
 
-    Scenario("A run whose event stream ends without its runEnded event fails the test command from its module") {
+    Scenario("A run whose event stream ends without its runEnded event makes its module fail the test command") {
       val consolidation = startedWithOtherModuleCompleted()
 
       When("the module is given a run whose event stream ends after `run started`")
@@ -97,7 +97,7 @@ final class ModulesFailingTheTestCommandSpec extends AnyFeatureSpec with GivenWh
       shouldBeFailedByTheModuleAlone(consolidation)
     }
 
-    Scenario("A process of a module that ended before any run existed in it fails the test command from that module") {
+    Scenario("A process of a module that ended before any run existed in it makes that module fail the test command") {
       val consolidation = startedWithOtherModuleCompleted()
 
       When("a process of the module that ended before any run existed in it is added")
@@ -106,7 +106,7 @@ final class ModulesFailingTheTestCommandSpec extends AnyFeatureSpec with GivenWh
       shouldBeFailedByTheModuleAlone(consolidation)
     }
 
-    Scenario("A failure attached to a module fails the test command from that module") {
+    Scenario("A failure attached to a module makes that module fail the test command") {
       val consolidation = startedWithOtherModuleCompleted()
 
       When("a failure is attached to the module")
@@ -126,7 +126,7 @@ final class ModulesFailingTheTestCommandSpec extends AnyFeatureSpec with GivenWh
       consolidation.modulesFailingTheTestCommand shouldBe empty
     }
 
-    Scenario("A failure attached to the root fails the test command from no module") {
+    Scenario("A failure attached to the root fails the test command without any module failing it") {
       val consolidation = startedWithOtherModuleCompleted()
 
       When("a failure is attached to the root")
@@ -137,7 +137,7 @@ final class ModulesFailingTheTestCommandSpec extends AnyFeatureSpec with GivenWh
       consolidation.state shouldBe ConsolidationState.OpenFailed
     }
 
-    Scenario("The modules are ordered by name, by character code, and answer after the consolidation ends") {
+    Scenario("The modules are ordered by name, by character code, and are still returned after the consolidation ends") {
       Given("a consolidation")
       val consolidation = startedWithColour()
 

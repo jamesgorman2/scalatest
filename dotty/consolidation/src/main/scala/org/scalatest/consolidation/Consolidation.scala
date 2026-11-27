@@ -54,11 +54,14 @@ final class Consolidation private[consolidation] (
     }
 
   /**
-   * Each module, ordered by name, that holds a node failing the test command: a failure attached to the module, a
-   * process of the module that ended before any run existed in it, or a run of the module that has an outcome other
-   * than completed, reports a test as failed or canceled or a suite as aborted, or holds a node aborted or not run once
-   * its event stream ends. A failure attached to the root belongs to no module. Unlike [[state]], this takes the
-   * consolidation's lock, and it answers before and after the consolidation ends.
+   * Each module, ordered by name, that holds a node failing the test command. Such a module is one where:
+   *   - a failure is attached to the module;
+   *   - a process of the module ended before any run existed in it; or
+   *   - a run of the module has an outcome other than completed, reports a test as failed or canceled or a suite as
+   *     aborted, or holds a node aborted or not run once its event stream ends.
+   *
+   * A failure attached to the root belongs to no module. Unlike [[state]], this takes the consolidation's lock, and it
+   * answers before and after the consolidation ends.
    */
   def modulesFailingTheTestCommand: Vector[ModuleName] =
     synchronized {

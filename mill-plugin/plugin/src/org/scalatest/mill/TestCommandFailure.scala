@@ -56,7 +56,7 @@ private[mill] enum TestCommandFailure extends Exception with NoStackTrace {
       case ModulesFailed(modules) =>
         s"The tests of ${EnglishList.of(modules.map(_.value))} failed"
       case FailedOutsideSelectedModules =>
-        "The test command failed outside the tests of every selected module"
+        "The test command failed, though the tests of no selected module failed"
     }
   }
 }

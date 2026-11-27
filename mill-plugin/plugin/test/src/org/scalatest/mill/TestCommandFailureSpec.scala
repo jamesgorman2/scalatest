@@ -116,19 +116,19 @@ final class TestCommandFailureSpec extends AnyWordSpec with should.Matchers {
     }
 
     "the test command failed and no selected module did" should {
-      "say the failure is outside the tests of every selected module" in {
-        TestCommandFailure.FailedOutsideSelectedModules.message shouldBe "The test command failed outside the tests of every selected module"
+      "say the test command failed, though the tests of no selected module failed" in {
+        TestCommandFailure.FailedOutsideSelectedModules.message shouldBe "The test command failed, though the tests of no selected module failed"
       }
     }
 
     "built from the modules that failed" should {
-      "name those modules where any failed" in {
+      "name those modules where there are any" in {
         TestCommandFailure.fromFailedModules(Seq(ModuleName("alpha.test"), ModuleName("broken.test"))).message shouldBe
           "The tests of alpha.test and broken.test failed"
       }
 
-      "say the failure is outside the tests of every selected module where none failed" in {
-        TestCommandFailure.fromFailedModules(Seq.empty).message shouldBe "The test command failed outside the tests of every selected module"
+      "say the test command failed, though the tests of no selected module failed, where there are none" in {
+        TestCommandFailure.fromFailedModules(Seq.empty).message shouldBe "The test command failed, though the tests of no selected module failed"
       }
     }
 
