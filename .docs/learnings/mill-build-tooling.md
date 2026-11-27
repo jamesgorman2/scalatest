@@ -290,7 +290,9 @@ The root dependency is the module's own Coursier project, so the result also hol
 <learning>
 date: 2026-11-27
 ---
-Under Mill's `testForked` with `testParallelism`, splitting the longest test class into several cuts wall clock far less than a model with a fixed cost per test predicts when the machine is oversubscribed. More classes keep every forked worker busy for longer, so CPU contention rises and most other classes slow down; the critical path moves to another class rather than shrinking. With 16 workers on 8 cores, splitting the two longest integration test classes into ten cut a 2388 s run by 170 s, against a predicted 550 s, and the next-longest class slowed from 1628 s to 2188 s to become the critical path.
+Under Mill's `testForked` with `testParallelism`, when forked workers outnumber cores, splitting the longest test classes shortens the run far less than per-test times predict. More classes keep every worker busy for longer, so CPU contention rises and most other classes slow down. The critical path moves to another class rather than shrinking.
 
-Before splitting test classes to shorten a run, compare the worker count with the cores. Where workers exceed cores, expect a small gain, and measure the run before and after rather than predicting from per-test times taken on a less loaded run.
+For example, with 16 workers on 8 cores, splitting the two longest integration test classes into ten cut a 2388 s run by 170 s, not the predicted 550 s. The next-longest class slowed from 1628 s to 2188 s and became the critical path.
+
+Before splitting test classes to shorten a run, compare the worker count with the core count. Where workers outnumber cores, expect a small gain. Measure the run before and after; do not predict from per-test times taken on a less loaded run.
 </learning>
