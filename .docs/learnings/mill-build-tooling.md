@@ -1,6 +1,6 @@
 ---
 kind: mill-build-tooling
-description: How Mill 1.x, its bootstrap scripts, testkit, BSP server and plugin API misbehave or constrain a build, and how to read a meta-build's classpath. Read before running Mill from GitBash on Windows, writing a Mill plugin or its integration tests, driving Mill's BSP server, or inspecting a meta-build's classpath.
+description: How Mill 1.x, its bootstrap scripts, testkit, test runners, BSP server and plugin API misbehave or constrain a build. Read before running Mill from GitBash on Windows, writing a Mill plugin or its integration tests, tuning a parallel test run, driving Mill's BSP server, or inspecting a meta-build's classpath.
 ---
 
 <learning>
@@ -285,4 +285,12 @@ date: 2026-11-27
 To read which version of a library a Mill module's dependencies resolve to, without downloading jars, read `retainedVersions` on the `coursier.core.Resolution` that `millResolver().resolution` returns for the module's `coursierDependencyTask()`. It is a `Map[coursier.core.Module, coursier.version.Version]` (Coursier 2.1.26). Compare `module.organization.value`, `module.name.value` (the artifact name with its Scala suffix, such as `_3`) and `version.repr`.
 
 The root dependency is the module's own Coursier project, so the result also holds the libraries the module gets through its `moduleDeps`, served from Mill's internal repositories. You need not walk `moduleDeps` yourself.
+</learning>
+
+<learning>
+date: 2026-11-27
+---
+Under Mill's `testForked` with `testParallelism`, splitting the longest test class into several cuts wall clock far less than a model with a fixed cost per test predicts when the machine is oversubscribed. More classes keep every forked worker busy for longer, so CPU contention rises and most other classes slow down; the critical path moves to another class rather than shrinking. With 16 workers on 8 cores, splitting the two longest integration test classes into ten cut a 2388 s run by 170 s, against a predicted 550 s, and the next-longest class slowed from 1628 s to 2188 s to become the critical path.
+
+Before splitting test classes to shorten a run, compare the worker count with the cores. Where workers exceed cores, expect a small gain, and measure the run before and after rather than predicting from per-test times taken on a less loaded run.
 </learning>
