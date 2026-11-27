@@ -6,7 +6,7 @@ import org.scalatest.matchers.should
 
 import scala.util.matching.Regex
 
-final class TestCommandOutputArgumentsSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with TestCommandArgumentsFixture {
+final class TestCommandOutputArgumentsSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with SingleModuleFixture {
 
   private val calculatorSuiteOutput: Seq[String] = Seq(
     "[core.test]",

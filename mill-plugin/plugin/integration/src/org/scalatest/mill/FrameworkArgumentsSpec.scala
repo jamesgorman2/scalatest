@@ -4,7 +4,7 @@ import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
 
-final class FrameworkArgumentsSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with TestCommandArgumentsFixture {
+final class FrameworkArgumentsSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with SingleModuleFixture {
 
   private def shouldFailBeforeAnyTestStartsWritingNoOutput(build: FixtureBuild, result: TestCommandResult, message: String): Unit = {
     Then("Mill reports that the test command failed before any test started, with a message naming the argument")

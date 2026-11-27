@@ -4,7 +4,7 @@ import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
 
-final class ClassGlobsSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with TestCommandArgumentsFixture {
+final class ClassGlobsSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with SingleModuleFixture {
 
   private def noTestMatchedFailuresOfModule(json: JsonNode): Seq[String] =
     moduleNode(json).failureMessages.filter(_.startsWith("Test selector does not match any test"))

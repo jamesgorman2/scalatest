@@ -4,7 +4,7 @@ import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
 
-final class ModulesOwnScalaTestArgumentsSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with TestCommandArgumentsFixture {
+final class ModulesOwnScalaTestArgumentsSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with SingleModuleFixture {
 
   Feature("The module's own ScalaTest arguments") {
 

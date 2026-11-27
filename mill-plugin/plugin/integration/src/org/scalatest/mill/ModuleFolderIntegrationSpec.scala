@@ -8,7 +8,7 @@ import org.xml.sax.helpers.DefaultHandler
 import javax.xml.parsers.DocumentBuilderFactory
 import scala.util.Try
 
-final class ModuleFolderIntegrationSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with TestCommandArgumentsFixture {
+final class ModuleFolderIntegrationSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with SingleModuleFixture {
 
   private def makeAlpha1FastCreateFileInWorkingDirectory(build: FixtureBuild, fileName: String): Unit =
     build.replaceInSample(s"${SampleSuite.Alpha1}.scala", SampleTest.Fast.withEmptyBody, SampleTest.Fast.creatingFileInWorkingDirectory(fileName))

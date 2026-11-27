@@ -24,7 +24,7 @@ enum SampleTest(declaration: String) {
   def failing: String = withBody("""fail("fails as the scenario asks")""")
 }
 
-trait TestCommandArgumentsFixture extends FixtureBuilds { this: should.Matchers =>
+trait SingleModuleFixture extends FixtureBuilds { this: should.Matchers =>
 
   protected def withSuites[A](moduleArguments: String*)(suites: String*)(test: FixtureBuild => A): A =
     withFixtureBuild(FixtureName.arguments) { build =>

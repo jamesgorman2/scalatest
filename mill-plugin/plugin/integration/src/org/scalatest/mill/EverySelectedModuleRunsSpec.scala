@@ -79,8 +79,9 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
 
   Feature("Every selected module runs, whatever happens to the others") {
 
-    for (millFlags <- Seq(Nil, Seq("--keep-going"))) {
-      val flagsDescription = if (millFlags.isEmpty) "none" else millFlags.mkString(" ")
+    val millFlagsAndDescriptions = Seq(Nil, Seq("--keep-going")).map(millFlags => (millFlags, if (millFlags.isEmpty) "none" else millFlags.mkString(" ")))
+
+    for ((millFlags, flagsDescription) <- millFlagsAndDescriptions) {
 
       Scenario(s"A test of alpha.test fails, flags $flagsDescription") {
         withSeveralModules { build =>
@@ -99,8 +100,7 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
       }
     }
 
-    for (millFlags <- Seq(Nil, Seq("--keep-going"))) {
-      val flagsDescription = if (millFlags.isEmpty) "none" else millFlags.mkString(" ")
+    for ((millFlags, flagsDescription) <- millFlagsAndDescriptions) {
 
       Scenario(s"broken.test does not compile, flags $flagsDescription") {
         withSeveralModules { build =>
