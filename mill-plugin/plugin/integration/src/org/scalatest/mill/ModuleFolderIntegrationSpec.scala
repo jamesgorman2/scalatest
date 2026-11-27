@@ -12,8 +12,7 @@ final class ModuleFolderIntegrationSpec
     extends AnyFeatureSpec
     with GivenWhenThen
     with should.Matchers
-    with SingleModuleFixture
-    with SharedSandboxes {
+    with SingleModuleFixture {
 
   private def makeAlpha1FastCreateFileInWorkingDirectory(build: FixtureBuild, fileName: String): Unit =
     build.replaceInSample(s"${SampleSuite.Alpha1}.scala", SampleTest.Fast.withEmptyBody, SampleTest.Fast.creatingFileInWorkingDirectory(fileName))
@@ -24,10 +23,7 @@ final class ModuleFolderIntegrationSpec
 
     val leftover = "leftover.txt"
 
-    val leftoverBuild = sharedSandbox(FixtureName.classGlobsAndFrameworkArguments, SandboxReset.noModuleFolders) { build =>
-      os.makeDir.all(build.markersFolder)
-      makeAlpha1FastCreateFileInWorkingDirectory(build, leftover)
-    }
+    val sharedLeftoverBuild = sharedMarkingSuites(makeAlpha1FastCreateFileInWorkingDirectory(_, leftover))
 
     def givenAnEarlierTestCommandLeftTheLeftoverInTheModuleFolder(build: FixtureBuild): Unit = {
       Given(s"Alpha1's test fast creates the file $leftover in its working directory when it runs")
@@ -57,9 +53,8 @@ final class ModuleFolderIntegrationSpec
       "None" -> Seq("--", "*", "--", "-l", "samples.Fast")
     )
 
-    val buildByReportSetting = reportSettingsAndArguments.map(_._1).distinct.map { setting =>
-      setting -> sharedSandbox(FixtureName.classGlobsAndFrameworkArguments, SandboxReset.noModuleFolders) { build =>
-        os.makeDir.all(build.markersFolder)
+    val sharedBuildByReportSetting = reportSettingsAndArguments.map(_._1).distinct.map { setting =>
+      setting -> sharedMarkingSuites { build =>
         build.addToTestModule(s"def testReportXml: T[Option[String]] = Task { $setting }")
         build.replaceInSample(s"${SampleSuite.Beta1}.scala", SampleTest.Slow.withEmptyBody, SampleTest.Slow.failing)
       }
@@ -70,7 +65,7 @@ final class ModuleFolderIntegrationSpec
         Given(s"the module's testReportXml is $setting")
         And("Beta1's test slow fails")
         When(s"the test command runs core.test, writing JSON output, with ${describe(arguments)}")
-        buildByReportSetting(setting).use { build =>
+        sharedBuildByReportSetting(setting).use { build =>
           val result = runWritingJsonOutput(build, arguments*)
 
           Then("no file in the module folder or in any folder inside it is an XML document whose root element is testsuites or testsuite")
@@ -83,7 +78,7 @@ final class ModuleFolderIntegrationSpec
     }
 
     Scenario("A test command whose class globs match no test class deletes the file an earlier test command left in the module folder") {
-      leftoverBuild.use { build =>
+      sharedLeftoverBuild.use { build =>
         givenAnEarlierTestCommandLeftTheLeftoverInTheModuleFolder(build)
         When("the test command runs core.test, writing JSON output, with -- samples.Gamma*")
         val result = runWritingJsonOutput(build, "--", "samples.Gamma*")
@@ -96,7 +91,7 @@ final class ModuleFolderIntegrationSpec
     }
 
     Scenario("A test command that fails on a framework argument leaves the file an earlier test command left in the module folder") {
-      leftoverBuild.use { build =>
+      sharedLeftoverBuild.use { build =>
         def filesAndContents: Map[os.Path, Seq[Byte]] = filesIn(build.moduleFolder).map(file => file -> os.read.bytes(file).toSeq).toMap
         givenAnEarlierTestCommandLeftTheLeftoverInTheModuleFolder(build)
         val earlierFilesAndContents = filesAndContents

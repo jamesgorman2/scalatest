@@ -8,8 +8,7 @@ final class JsonOutputRootSpec extends AnyFeatureSpec with GivenWhenThen with sh
 
   private val eventLogItems: Set[String] = Set("runStarted", "structure", "event", "runEnded")
 
-  // Scenarios that read the same run share one test command.
-  private lazy val calculatorSuiteRun: (JsonNode, Seq[Seq[String]]) =
+  private lazy val sharedCalculatorSuiteRun: (JsonNode, Seq[Seq[String]]) =
     withJsonOutputFixture("CalculatorSuite") { build =>
       (build.jsonOutputOfTestCommand(), build.eventLogFiles.map(os.read.lines(_)))
     }
@@ -19,7 +18,7 @@ final class JsonOutputRootSpec extends AnyFeatureSpec with GivenWhenThen with sh
     Scenario("One run of one suite is written as the root, module, run, suite and test, each with its times") {
       Given("CalculatorSuite, whose one test, `adds two numbers`, registered at line 5, prints dividing now and succeeds")
       When("the test command is invoked as mill scalatest/test core.test -fJ <report>")
-      val (json, _) = calculatorSuiteRun
+      val (json, _) = sharedCalculatorSuiteRun
 
       Then("the JSON output is the root, holding this fork's release, Mill and the module selector, then the module, its run and the run's suite and test, each with its times")
       shouldMatch(
@@ -74,7 +73,7 @@ final class JsonOutputRootSpec extends AnyFeatureSpec with GivenWhenThen with sh
     Scenario("The root's times enclose the module's, the module's enclose the run's, and no test event log records the root's or the module's times") {
       Given("CalculatorSuite, whose test adds two numbers succeeds")
       When("the test command is invoked as mill scalatest/test core.test -fJ <report>")
-      val (json, eventLogs) = calculatorSuiteRun
+      val (json, eventLogs) = sharedCalculatorSuiteRun
       val module = json.node(NodeKind.Module)
       val run = json.node(NodeKind.Run)
 

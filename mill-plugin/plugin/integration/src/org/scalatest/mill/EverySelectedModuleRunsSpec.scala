@@ -45,17 +45,17 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
       s"object broken extends SampleModule {\n  object test extends SampleTests {\n${testModuleMembers.map("    " + _).mkString("\n")}\n  }\n}"
     )
 
-  private val severalModulesWithAlpha1SlowFailing: SharedSandbox =
+  private val sharedSeveralModulesWithAlpha1SlowFailing: SharedSandbox =
     sharedSeveralModules(build => replaceInSuite(build, "alpha", "Alpha1")("""test("slow") {}""", """test("slow") { fail("fails as the scenario asks") }"""))
 
-  private val severalModulesWithBrokenTestThatDoesNotCompile: SharedSandbox =
+  private val sharedSeveralModulesWithBrokenTestThatDoesNotCompile: SharedSandbox =
     sharedSeveralModules { build =>
       addBrokenTest(build)()
       replaceInSuite(build, "broken", "Broken1")("""test("fast") {}""", """test("fast") { notDefinedAnywhere }""")
     }
 
-  private def inSeveralModulesWithBrokenTestThatDoesNotCompile[A](test: FixtureBuild => A): A =
-    inSeveralModules(severalModulesWithBrokenTestThatDoesNotCompile) { build =>
+  private def inSharedSeveralModulesWithBrokenTestThatDoesNotCompile[A](test: FixtureBuild => A): A =
+    inSharedSeveralModules(sharedSeveralModulesWithBrokenTestThatDoesNotCompile) { build =>
       Given("the build also has the JVM test module broken.test, which tests with com.edc::scalatest at the release under test and whose sources do not compile")
       test(build)
     }
@@ -98,7 +98,7 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
     for (millFlags <- MillFlags.values) {
 
       Scenario(s"A test of alpha.test fails, flags ${millFlags.description}") {
-        inSeveralModules(severalModulesWithAlpha1SlowFailing) { build =>
+        inSharedSeveralModules(sharedSeveralModulesWithAlpha1SlowFailing) { build =>
           Given("Alpha1's test slow fails")
           val (result, _) = runParsingJsonOutput(build, millFlags.arguments*)("alpha.test", "beta.test")
 
@@ -114,7 +114,7 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
     }
 
     Scenario(s"broken.test does not compile, flags ${MillFlags.KeepGoing.description}") {
-      inSeveralModulesWithBrokenTestThatDoesNotCompile { build =>
+      inSharedSeveralModulesWithBrokenTestThatDoesNotCompile { build =>
         val (result, json) = runParsingJsonOutput(build, MillFlags.KeepGoing.arguments*)("alpha.test", "broken.test", "beta.test")
 
         brokenTestShouldAbortWhileAlphaAndBetaRun(build, result, json, "broken.test.compile")
@@ -147,7 +147,7 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
     }
 
     Scenario("broken.test's failure in the human-readable output") {
-      inSeveralModulesWithBrokenTestThatDoesNotCompile { build =>
+      inSharedSeveralModulesWithBrokenTestThatDoesNotCompile { build =>
         When("mill -j 2 scalatest/test alpha.test broken.test beta.test -oH is invoked")
         val result = runTestCommand(build)("alpha.test", "broken.test", "beta.test", "-oH")
         val lines = result.treeLines

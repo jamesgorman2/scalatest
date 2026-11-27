@@ -16,7 +16,7 @@ trait SeveralModulesFixture extends JsonOutputFixture with SharedSandboxes { thi
   protected def sharedSeveralModules(setUp: FixtureBuild => Unit): SharedSandbox =
     sharedSandbox(FixtureName.severalModules, SandboxReset.emptyMarkersFolder.and(SandboxReset.noJsonOutputFile))(setUp)
 
-  protected def inSeveralModules[A](sandbox: SharedSandbox)(test: FixtureBuild => A): A = {
+  protected def inSharedSeveralModules[A](sandbox: SharedSandbox)(test: FixtureBuild => A): A = {
     givenTheSeveralModules()
     sandbox.use(test)
   }

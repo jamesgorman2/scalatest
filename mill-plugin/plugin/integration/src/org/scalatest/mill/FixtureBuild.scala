@@ -14,7 +14,11 @@ final class FixtureBuild(tester: IntegrationTester) {
 
   def fixtureSource: os.Path = tester.workspaceSourcePath
 
-  def isAsInTheFixture(path: os.SubPath): Boolean = FixtureBuild.contents(workspace / path) == FixtureBuild.contents(fixtureSource / path)
+  def filesDifferingFromTheFixture(path: os.SubPath): Seq[os.SubPath] = {
+    val inWorkspace = FixtureBuild.contents(workspace / path)
+    val inFixture = FixtureBuild.contents(fixtureSource / path)
+    (inWorkspace.keySet ++ inFixture.keySet).filter(file => inWorkspace.get(file) != inFixture.get(file)).toSeq.map(path / _).sortBy(_.toString)
+  }
 
   def testSources: os.Path = workspace / "core" / "test" / "src"
 

@@ -6,7 +6,7 @@ import org.scalatest.matchers.should
 
 final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with SharedSandboxes {
 
-  private val resultBuild: SharedSandbox =
+  private val sharedResultBuild: SharedSandbox =
     sharedSandbox(FixtureName.result, SandboxReset.fixtureFiles(os.sub / "core" / "test" / "src" / "samples"))(_ => ())
 
   private def withResultFixture[A](source: String, className: String)(test: FixtureBuild => A): A =
@@ -15,8 +15,8 @@ final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with
       test(build)
     }
 
-  private def runInResultBuild(source: String, className: String): TestCommandResult =
-    resultBuild.use { build =>
+  private def runInSharedResultBuild(source: String, className: String): TestCommandResult =
+    sharedResultBuild.use { build =>
       build.addSuiteFile(build.workspace / "suites" / source, s"$className.scala")
       build.runTestCommand("core.test")
     }
@@ -58,7 +58,7 @@ final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with
     Scenario("A test calling System.exit(0) fails the test command") {
       Given("ExitSuite, whose test \"exits\" calls System.exit(0)")
       When("the test command runs core.test")
-      val result = runInResultBuild("ExitSuite.scala", "ExitSuite")
+      val result = runInSharedResultBuild("ExitSuite.scala", "ExitSuite")
       Then("the test command fails")
       shouldFailTheModulesTests(result)
     }
@@ -80,7 +80,7 @@ final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with
     Scenario("A failed test is not named outside the human-readable output") {
       Given("StackFlatSpec, whose test \"have size 0\" fails")
       When("the test command runs core.test")
-      val result = runInResultBuild("StackFlatSpec.scala", "StackFlatSpec")
+      val result = runInSharedResultBuild("StackFlatSpec.scala", "StackFlatSpec")
 
       Then("the test command fails")
       shouldFailTheModulesTests(result)

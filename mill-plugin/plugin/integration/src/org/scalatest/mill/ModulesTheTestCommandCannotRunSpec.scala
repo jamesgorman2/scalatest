@@ -8,38 +8,24 @@ final class ModulesTheTestCommandCannotRunSpec extends AnyFeatureSpec with Given
 
   private val cannotRunModulesHeader: String = "The test command cannot run these selected test modules:"
 
-  private val earlierReport: os.SubPath = os.sub / "earlier-report.json"
+  private val sharedModulesTheTestCommandCannotRun: SharedSandbox =
+    sharedSandboxWithReportFromAnEarlierTestCommand(FixtureName.modulesTheTestCommandCannotRun)(invokeTestCommandOnAlpha)
 
-  private val modulesTheTestCommandCannotRun: SharedSandbox =
-    sharedSandbox(
-      FixtureName.modulesTheTestCommandCannotRun,
-      SandboxReset.emptyMarkersFolder.and(SandboxReset.jsonOutputFileAsSavedIn(earlierReport))
-    ) { build =>
-      writeReportFromAnEarlierTestCommand(build)
-      os.copy(build.jsonOutputFile, build.workspace / earlierReport)
-    }
-
-  private def inModulesTheTestCommandCannotRun[A](test: FixtureBuild => A): A = {
+  private def inSharedModulesTheTestCommandCannotRun[A](test: FixtureBuild => A): A = {
     givenTheBuild()
-    modulesTheTestCommandCannotRun.use(test)
+    sharedModulesTheTestCommandCannotRun.use(test)
   }
 
   private def withModulesTheTestCommandCannotRun[A](test: FixtureBuild => A): A =
     withFixtureBuild(FixtureName.modulesTheTestCommandCannotRun) { build =>
       givenTheBuild()
-      writeReportFromAnEarlierTestCommand(build)
+      writeReportFromAnEarlierTestCommand(build)(invokeTestCommandOnAlpha)
       os.remove.all(build.markersFolder)
       os.makeDir.all(build.markersFolder)
       test(build)
     }
 
-  private def writeReportFromAnEarlierTestCommand(build: FixtureBuild): Unit = {
-    os.makeDir.all(build.markersFolder)
-    val earlier = invokeTestCommand(build, Seq("alpha.test"))
-    withClue(earlier.debugString) {
-      os.exists(build.jsonOutputFile) shouldBe true
-    }
-  }
+  private def invokeTestCommandOnAlpha(build: FixtureBuild): TestCommandResult = invokeTestCommand(build, Seq("alpha.test"))
 
   private def givenTheBuild(): Unit = {
     Given("a Mill 1.3.1 build that adds the Mill plugin, at the release of this fork under test, as the entry com.edc::scalatest-mill of its build.mill header's mvnDeps")
@@ -95,7 +81,7 @@ final class ModulesTheTestCommandCannotRunSpec extends AnyFeatureSpec with Given
   Feature("Modules the test command cannot run") {
 
     Scenario("Module selectors alpha.test and other.test") {
-      inModulesTheTestCommandCannotRun { build =>
+      inSharedModulesTheTestCommandCannotRun { build =>
         val result = runTestCommand(build, "alpha.test", "other.test")
 
         Then("Mill reports that the test command failed, with a message naming other.test")
@@ -107,7 +93,7 @@ final class ModulesTheTestCommandCannotRunSpec extends AnyFeatureSpec with Given
     }
 
     Scenario("A module selector that resolves to every test module") {
-      inModulesTheTestCommandCannotRun { build =>
+      inSharedModulesTheTestCommandCannotRun { build =>
         val result = runTestCommand(build, "__.test")
 
         Then("Mill reports that the test command failed, with a message naming each of munit.test, utest.test, upstream.test, other.test, js.test and native.test")

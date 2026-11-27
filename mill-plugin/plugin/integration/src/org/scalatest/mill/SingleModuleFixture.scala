@@ -1,8 +1,9 @@
 package org.scalatest.mill
 
+import org.scalatest.Suite
 import org.scalatest.matchers.should
 
-trait SingleModuleFixture extends FixtureBuilds { this: should.Matchers =>
+trait SingleModuleFixture extends SharedSandboxes { this: Suite & should.Matchers =>
 
   protected def withSuites[A](moduleArguments: String*)(suites: String*)(test: FixtureBuild => A): A =
     withFixtureBuild(FixtureName.arguments) { build =>
@@ -19,6 +20,12 @@ trait SingleModuleFixture extends FixtureBuilds { this: should.Matchers =>
     withFixtureBuild(FixtureName.classGlobsAndFrameworkArguments, daemonMode) { build =>
       os.makeDir.all(build.markersFolder)
       test(build)
+    }
+
+  protected def sharedMarkingSuites(setUp: FixtureBuild => Unit): SharedSandbox =
+    sharedSandbox(FixtureName.classGlobsAndFrameworkArguments, SandboxReset.noModuleFolders) { build =>
+      os.makeDir.all(build.markersFolder)
+      setUp(build)
     }
 
   protected def moduleNode(json: JsonNode): JsonNode = json.node(NodeKind.Module, "core.test")

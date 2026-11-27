@@ -6,7 +6,7 @@ import org.scalatest.matchers.should
 
 final class ModuleSelectorSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with SharedSandboxes {
 
-  private val moduleSelectors: SharedSandbox = sharedSandbox(FixtureName.moduleSelectors, SandboxReset.noModuleFolders)(_ => ())
+  private val sharedModuleSelectorsBuild: SharedSandbox = sharedSandbox(FixtureName.moduleSelectors, SandboxReset.noModuleFolders)(_ => ())
 
   Feature("The test command fails before any test starts unless given module selectors that each resolve to JVM test modules") {
 
@@ -25,7 +25,7 @@ final class ModuleSelectorSpec extends AnyFeatureSpec with GivenWhenThen with sh
 
     for ((what, arguments, rejection) <- selectorsThatFail) {
       Scenario(s"The test command given ${arguments.mkString(" ")}, $what, fails before any test starts") {
-        moduleSelectors.use { build =>
+        sharedModuleSelectorsBuild.use { build =>
           Given("the JVM module core, which is not a test module, and its JVM test module core.test, holding AddSuite")
           When(s"the test command is given ${arguments.mkString(" ")}")
           val result = build.runTestCommand(arguments*)

@@ -11,8 +11,7 @@ final class TestCommandOutputSpec extends AnyFeatureSpec with GivenWhenThen with
     "  - sqrt of a square is the root"
   )
 
-  // Criteria that read the same run share one test command.
-  private lazy val brokenConstructorRun: TestCommandResult =
+  private lazy val sharedBrokenConstructorRun: TestCommandResult =
     withFixtureBuild(FixtureName.brokenConstructor) { build =>
       build.runTestCommandWithColour("core.test")
     }
@@ -24,7 +23,7 @@ final class TestCommandOutputSpec extends AnyFeatureSpec with GivenWhenThen with
       And("suite SqrtPropSpec, an AnyPropSpec whose one property, sqrt of a square is the root, succeeds")
       And("Mill colours its console output")
       When("the test command runs core.test")
-      val result = brokenConstructorRun
+      val result = sharedBrokenConstructorRun
 
       Then("the lines for BrokenCtorSpec begin with BrokenCtorSpec: and samples.BrokenCtorSpec *** ABORTED ***")
       val brokenLines = result.subtreeOf("BrokenCtorSpec:")
@@ -45,7 +44,7 @@ final class TestCommandOutputSpec extends AnyFeatureSpec with GivenWhenThen with
     Scenario("Neither ScalaTest's end-of-run summary nor Mill's list of failed tests reaches the console") {
       Given("core.test holds BrokenCtorSpec, which aborts, and SqrtPropSpec")
       When("the test command runs core.test")
-      val result = brokenConstructorRun
+      val result = sharedBrokenConstructorRun
 
       Then("no line on the console holds ScalaTest's summary or Mill's list of failed tests")
       val console = result.consoleText

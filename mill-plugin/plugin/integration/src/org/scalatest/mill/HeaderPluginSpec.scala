@@ -25,7 +25,7 @@ final class HeaderPluginSpec extends AnyFreeSpec with should.Matchers with Share
     for (scala <- Seq("3.3", "3.9")) {
       s"with a test module on Scala $scala" - {
         val fixture = FixtureName.onScala(scala)
-        val sandbox = sharedSandbox(fixture, SandboxReset.fixtureFiles(os.sub / "build.mill", os.sub / "core"))(_ => ())
+        val sharedFixtureBuild = sharedSandbox(fixture, SandboxReset.fixtureFiles(os.sub / "core"))(_ => ())
 
         "has that line, naming the plugin's own version, as its whole header" in {
           val header = os.read.lines(IntegrationEnvironment.fixture(fixture) / "build.mill").takeWhile(_.startsWith("//|"))
@@ -33,7 +33,7 @@ final class HeaderPluginSpec extends AnyFreeSpec with should.Matchers with Share
         }
 
         "loads with the plugin, scalatest-core and the consolidation library on its meta-build's classpath" in {
-          sandbox.use { build =>
+          sharedFixtureBuild.use { build =>
             val entries = classpath(build.eval(Seq("--meta-level", "1", "show", "compileClasspath")))
             entries.exists(publishedArtifact("com.edc", "scalatest-mill_mill1_3")) shouldBe true
             entries.exists(publishedArtifact("com.edc", "scalatest-core_3")) shouldBe true
@@ -42,7 +42,7 @@ final class HeaderPluginSpec extends AnyFreeSpec with should.Matchers with Share
         }
 
         "resolves core.test's scalatest and scalactic from the fork" in {
-          sandbox.use { build =>
+          sharedFixtureBuild.use { build =>
             val entries = classpath(build.eval(Seq("show", "core.test.compileClasspath")))
             val scalatestJars = entries.filter(entry => entry.last.startsWith("scalatest") || entry.last.startsWith("scalactic"))
             entries.exists(publishedArtifact("com.edc", "scalatest_3")) shouldBe true
@@ -51,7 +51,7 @@ final class HeaderPluginSpec extends AnyFreeSpec with should.Matchers with Share
         }
 
         "passes core.test.testForked" in {
-          sandbox.use { build =>
+          sharedFixtureBuild.use { build =>
             val result = build.eval(Seq("core.test.testForked"))
             withClue(result.debugString) {
               result.isSuccess shouldBe true

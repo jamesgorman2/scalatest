@@ -8,14 +8,12 @@ final class ModulesOwnScalaTestArgumentsSpec
     extends AnyFeatureSpec
     with GivenWhenThen
     with should.Matchers
-    with SingleModuleFixture
-    with SharedSandboxes {
+    with SingleModuleFixture {
 
-  private val calculatorAndOtherSuiteBuild: SharedSandbox =
-    sharedSandbox(FixtureName.arguments, SandboxReset.fixtureFiles(os.sub / "build.mill"))(_.addSuites("CalculatorSuite", "OtherSuite"))
+  private val sharedCalculatorAndOtherSuiteBuild: SharedSandbox =
+    sharedSandbox(FixtureName.arguments, SandboxReset.nothingBeyondTheBuildFile)(_.addSuites("CalculatorSuite", "OtherSuite"))
 
-  // Scenarios that compare against the run with no module arguments share that run.
-  private lazy val runWithoutModuleArguments: TestCommandResult = calculatorAndOtherSuiteBuild.use(_.runTestCommand("core.test"))
+  private lazy val sharedRunWithoutModuleArguments: TestCommandResult = sharedCalculatorAndOtherSuiteBuild.use(_.runTestCommand("core.test"))
 
   Feature("The module's own ScalaTest arguments") {
 
@@ -38,8 +36,8 @@ final class ModulesOwnScalaTestArgumentsSpec
         Given(s"CalculatorSuite and OtherSuite, in a module whose own ScalaTest arguments are ${moduleArguments.mkString(" ")}")
         And("the module's testParallelism is false")
         When("the test command runs core.test, and also runs it with the module's own arguments removed")
-        val withoutArguments = runWithoutModuleArguments
-        val result = calculatorAndOtherSuiteBuild.use { build =>
+        val withoutArguments = sharedRunWithoutModuleArguments
+        val result = sharedCalculatorAndOtherSuiteBuild.use { build =>
           build.setModuleArguments(moduleArguments)
           build.runTestCommand("core.test")
         }
