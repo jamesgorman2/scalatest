@@ -4,7 +4,7 @@ Scale: feature.
 
 ## Summary
 
-This feature has the test command take several module selectors and run the tests of every test module they select in one test command, with one consolidated output. Each selected module's tests wait for every selected module's dependencies to resolve, but not for any other selected module to compile. Each selected module's tests run whatever happens to the other selected modules.
+This feature has the test command take several module selectors. One test command runs the tests of every test module they select, with one consolidated output. Each selected module's tests wait for every selected module's dependencies to resolve, but not for any other selected module to compile. Each selected module's tests run whatever happens to the other selected modules.
 
 ## Plan
 
