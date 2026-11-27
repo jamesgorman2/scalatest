@@ -156,7 +156,7 @@ Feature: Every selected module runs, whatever happens to the others
 
     Scenario Outline: AC-005 A test of alpha.test fails, flags <flags>
       Given `Alpha1`'s test `slow` fails
-      And `beta.test`'s compile depends on a task that ends once the file `Alpha1.slow.failed` exists in `<markers>`, and fails if that file does not exist within 120 seconds
+      And `beta.test`'s compile depends on a task that ends once the file `Alpha1.slow.failed` exists in `<markers>`, and fails if that file does not exist within 600 seconds
       When the test command is invoked with the flags <flags> and the module selectors `alpha.test beta.test`
       Then the files `Beta1.fast` and `Beta1.slow` exist in `<markers>`
       And the test command fails
@@ -222,7 +222,7 @@ Feature: Every selected module runs, whatever happens to the others
     Scenario: AC-007 late.test compiles only after a test of alpha.test has run
       Given the build also has the JVM test module `late.test`, which tests with `com.edc::scalatest` at the release under test and holds the suite `Late1`, whose class is `samples.Late1`
       And `Late1` is an `AnyFunSuite` whose test `fast` creates the file `Late1.fast` in `<markers>`
-      And `late.test`'s compile depends on a task that ends once the file `Alpha1.fast` exists in `<markers>`, and fails if that file does not exist within 120 seconds
+      And `late.test`'s compile depends on a task that ends once the file `Alpha1.fast` exists in `<markers>`, and fails if that file does not exist within 600 seconds
       When the test command is invoked with no flags and the module selectors `alpha.test late.test`
       Then the files `Alpha1.fast` and `Late1.fast` exist in `<markers>`
       And the test command succeeds

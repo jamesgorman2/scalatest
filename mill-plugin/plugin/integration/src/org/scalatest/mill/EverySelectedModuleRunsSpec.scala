@@ -30,17 +30,22 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
     andTheJsonOutputIsParsedFromTheReport()
   }
 
+  // The wait has no upstream task, so Mill starts it as soon as the build's tasks start, before the waited-for module has
+  // resolved its dependencies or compiled. On a new build, under a full parallel run, that work alone can take more than
+  // two minutes, so the wait allows several times that.
+  private val markerWaitSeconds: Int = 600
+
   // Mill evaluates a task's upstream tasks before its body, so the wait is upstream of `allSourceFiles` rather than in
   // `compile`'s body. The compiler then starts only once the marker exists. The wait is a `Task.Input`, which Mill
   // evaluates on every run, so a scenario on a shared build waits even where the compile itself is cached.
   private def compileAfterMarker(marker: String): String =
     s"""def awaitMarker: T[Unit] = Task.Input {
        |  val marker = BuildCtx.workspaceRoot / "markers" / "$marker"
-       |  val deadline = System.nanoTime() + 120L * 1000000000L
+       |  val deadline = System.nanoTime() + ${markerWaitSeconds}L * 1000000000L
        |  while (!os.exists(marker) && System.nanoTime() < deadline) {
        |    Thread.sleep(100)
        |  }
-       |  if (os.exists(marker)) mill.api.Result.Success(()) else mill.api.Result.Failure(s"$$marker does not exist after 120 seconds")
+       |  if (os.exists(marker)) mill.api.Result.Success(()) else mill.api.Result.Failure(s"$$marker does not exist after $markerWaitSeconds seconds")
        |}
        |
        |def allSourceFiles: T[Seq[PathRef]] = Task {
@@ -51,7 +56,7 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
   private def addLateTestCompilingAfterAlpha1Fast(build: FixtureBuild): Unit = {
     Given("the build also has the JVM test module late.test, which tests with com.edc::scalatest at the release under test and holds the suite Late1, whose class is samples.Late1")
     And("Late1 is an AnyFunSuite whose test fast creates the file Late1.fast in <markers>")
-    And("late.test's compile depends on a task that ends once the file Alpha1.fast exists in <markers>, and fails if that file does not exist within 120 seconds")
+    And(s"late.test's compile depends on a task that ends once the file Alpha1.fast exists in <markers>, and fails if that file does not exist within $markerWaitSeconds seconds")
     // The wait is upstream of late's compile, which late.test's compile depends on. The scenario therefore also fails
     // where the check before any test starts compiles a module that late.test depends on through moduleDeps.
     build.appendToBuild(
@@ -129,7 +134,7 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
       Scenario(s"A test of alpha.test fails, flags ${millFlags.description}", CoreTag.when(millFlags == MillFlags.Empty)*) {
         inSharedBuild(sharedSeveralModulesWithBetaTestCompilingAfterAlpha1SlowFails) { build =>
           Given("Alpha1's test slow fails")
-          And("beta.test's compile depends on a task that ends once the file Alpha1.slow.failed exists in <markers>, and fails if that file does not exist within 120 seconds")
+          And(s"beta.test's compile depends on a task that ends once the file Alpha1.slow.failed exists in <markers>, and fails if that file does not exist within $markerWaitSeconds seconds")
           val (result, _) = whenTheTestCommandIsInvokedWithFlagsParsingJsonOutput(build, millFlags)("alpha.test", "beta.test")
 
           Then("the files Beta1.fast and Beta1.slow exist in <markers>")
