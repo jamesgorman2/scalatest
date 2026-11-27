@@ -1,6 +1,6 @@
 # Where the Mill plugin's integration test time goes, and how to cut it
 
-Why `plugin.test.testForked + plugin.integration.testForked` in `mill-plugin/` took 2388 s, and which changes to the integration tests would shorten the run without weakening them (issue #260). Scope: the run of 2026-11-27 07:55–08:34 (local time) on the development machine, the suites and fixtures in `mill-plugin/plugin/integration/`, the lower-layer tests that cover them, `test-all.sh`, `test-all.ps1` and `.github/workflows/ci.yml`. No test, build or script was changed, and no run was made for this note: every number comes from the run's files on disk.
+Why `plugin.test.testForked + plugin.integration.testForked` in `mill-plugin/` took 2388 s, and which changes to the integration tests would shorten the run without weakening them, and how a build task could run only the integration tests for the area it changes (issue #260). Scope: the run of 2026-11-27 07:55–08:34 (local time) on the development machine, the suites and fixtures in `mill-plugin/plugin/integration/`, the lower-layer tests that cover them, the plugin's code in `mill-plugin/plugin/src/` and its history, `test-all.sh`, `test-all.ps1` and `.github/workflows/ci.yml`. No test, build or script was changed, and no run was made for this note: every number comes from the run's files on disk.
 
 ## Short answer
 
@@ -9,7 +9,8 @@ Why `plugin.test.testForked + plugin.integration.testForked` in `mill-plugin/` t
 - **The machine is oversubscribed, so parallelism buys little.** Each of the 16 workers launches its own nested Mill JVMs on 8 cores. The same build.mill compile took a median 5.7 s with one worker active and 31.7 s with 16 active. The 16 workers deliver about 2.9 times the throughput of one; the run as a whole was about 1.85 times faster than running every scenario alone, one after another (§ 1.3).
 - **The repeated work is a cold build per scenario.** Each of the 216 sandboxes starts from a copy of its fixture, so each pays a cold Mill JVM, a build.mill compile and a test-module compile. Uncontended, a fresh scenario costs 10–15 s, of which 5.7 s is compiling build.mill. The same command in a sandbox already compiled costs 3–5 s (§ 1.4). The 229 scenarios need only about 108 distinct (build.mill, sources) states (§ 1.5).
 - **Other tests already cover 104 of the 229 scenarios.** The consolidation library's behaviour tests, the unit tests and other integration scenarios assert every claim of 100 scenarios, and part of 4 more, while each integration path keeps an end-to-end proof. Removing or simplifying them takes away 44 % of the solo work. One acceptance criterion, AC-010, would lose its proving scenario, though AC-011 asserts the same claims (P5).
-- **Recommended:** split the two longest suites by Feature, remove or simplify the covered scenarios, then share one sandbox among the remaining scenarios whose build and sources are identical, and one eval among those that run the same command. The model in § 4 predicts about 900–930 s for the integration suites instead of 2364 s, so a full run of about 930–950 s, 60 % less; a more cautious count gives about 1130–1150 s, 52 % less (§ 3). Sharding the suites by tag across CI jobs is the further lever for CI (P6).
+- **Recommended:** split the two longest suites by Feature, remove or simplify the covered scenarios, then share one sandbox among the remaining scenarios whose build and sources are identical, and one eval among those that run the same command. The model in § 4 predicts about 900–930 s for the integration suites instead of 2364 s, so a full run of about 930–950 s, 60 % less; a more cautious count gives about 1130–1150 s, 52 % less (§ 3).
+- **Then, separately, tag the suites by area.** Seven area tags, following the test command's stages, and a core set of eight scenarios (about 169 solo-seconds) let a build task run the integration tests for the area it changes rather than all of them. Tagging adds no saving to the full run. It follows P1, P5, P2 and P4, because P1 turns most tags into whole classes and P5 removes the scenarios that would otherwise need tagging. The same tags can also shard the full run across parallel CI jobs (P6).
 
 ## Sources
 
@@ -23,6 +24,9 @@ Why `plugin.test.testForked + plugin.integration.testForked` in `mill-plugin/` t
 | `[testkit]` | `mill-testkit_3-1.3.1-sources.jar` in the Coursier cache: `mill/testkit/IntegrationTester.scala`, `mill/testkit/IntegrationTesterBase.scala`. |
 | `[this]` | This repo at `22ba3665c`. Suites and helpers are in `mill-plugin/plugin/integration/src/org/scalatest/mill/`. |
 | `[coverage]` | [`integration-test-coverage.md`](integration-test-coverage.md): the per-scenario classification behind P5, made against this repo at `2552d698b`, the plugin's unit tests in `mill-plugin/plugin/test/src/org/scalatest/mill/`, the consolidation library's tests in `dotty/consolidation/src/test/scala/`, and the emitter's tests in `dotty/scalatest-test/src/test/scala/`. |
+| `[mill]` | `mill-libs-javalib_3-1.3.1-sources.jar` in the Coursier cache: `mill/javalib/TestModule.scala`. |
+| `[mainargs]` | `mainargs_3-0.7.8-sources.jar` in the Coursier cache: `Macros.scala`. |
+| `[history]` | `git log -- mill-plugin/plugin/src` in this repo at `40a43a338`. |
 | `[machine]` | Intel i9-11900KF, 8 cores and 16 logical processors, 32 GB RAM, Windows 11, Defender real-time protection on (exclusions not readable without admin rights). |
 
 The files under `mill-plugin/out/` are build output and will be overwritten by the next run. The scripts that derived the numbers were throwaway and are not kept.
@@ -280,15 +284,110 @@ Two further risks:
 
 **Touches.** Twelve suites: `TestCommandArgumentsIntegrationSpec.scala`, `SeveralModulesSpec.scala`, `EveryWorkerSpec.scala`, `JsonOutputArgumentSpec.scala`, `JsonOutputNodesSpec.scala`, `ModulesTheTestCommandCannotRunSpec.scala`, `CapturedOutputSpec.scala`, `TestCommandResultSpec.scala`, `JsonOutputRootSpec.scala`, `TestCommandOutputSpec.scala`, `JsonOutputTreeSpec.scala` and `ModuleSelectorSpec.scala`. Fixture files that only removed scenarios use can go as well.
 
-### P6. Shard the integration suites by tag, and run the shards as parallel CI jobs
+### P6. Tag the integration suites by area, so a build task runs only the tests for the area it changes
 
-**What.** Tag each suite with one shard tag: a Java runtime-retained annotation per shard (`edc-bestpractice/scala/scalatest.md`, "Tagging"). Run shard *k* with `plugin.integration.testForked -n <tag k>`. Run the last shard with `-l <tag 1> … -l <tag k-1>`, so a suite with no tag still runs. `testForked`'s arguments reach the test framework (`.docs/learnings/mill-build-tooling.md`, 2026-11-20). In `.github/workflows/ci.yml`, turn `test-mill-plugin` into a matrix over the shards; each job repeats checkout and `publishLocal`, or downloads the fork's local repository from one publishing job. `test-all.sh` and `test-all.ps1` keep running every suite in one command; they need no change unless a shard option is wanted for local use.
+**What.** Give every integration scenario an area tag, so that a build task runs the core set below plus the tags for the code it changes, rather than all the integration suites. The areas follow the test command's stages (parse the arguments; select and check the modules; lay out the workers; capture their output; write the output) plus one for coexisting with Mill. They do not follow the epic's features.
 
-**Saving.** None on the development machine: shards on one machine compete for the same cores (§ 1.3). On CI, N runners do N times the work in the same time, so the CI integration time falls to about 1/N plus each job's setup. With the recommended set the solo work is about 2060 s, so two or three shards of about 700–1000 solo-seconds each balance well. This is the main lever for CI, and the only perceived-time lever found. A developer can also run just the shard that covers their change.
+Costs are solo-seconds, recomputed per scenario from `[report]` and `[claim]` by the method of § 1.3. They total 4449 today, about 2.6 % above § 1.5's 4337, and 2503 after P5, counting the simplified scenarios as removed. # is the scenario's number in `integration-test-coverage.md`.
 
-**Risk.** Low for testing: every suite still runs in exactly one shard, and the `-l` remainder shard catches untagged suites. The cost is CI minutes (N jobs each paying setup) and keeping the shards balanced as suites grow. Splitting `plugin.integration` into separate Mill modules would do the same, but would need the helpers and resources moved into a shared module; tags need only an annotation per suite.
+| Tag | Members | Run it when these change | Solo s, today → after P5 |
+|---|---|---|---|
+| Arguments | `TestCommandArgumentsIntegrationSpec`'s Class globs, Framework arguments, output-argument and module's-own-ScalaTest-argument Features; `SeveralModulesSpec` #23–#27; `JsonOutputArgumentSpec` #1–#3, #5, #9–#18 | `TestCommandArguments`, `AllowedFlag`, `FrameworkArguments`, `ClassGlob`, `StdoutContent`, `RunArguments`, `ModuleScalaTestArguments`, `ModuleSelectorArgument`; `ScalaTestArgument` in `dotty/consolidation` | 1027 → 322 |
+| Modules | `ModuleSelectorSpec`; `ModulesTheTestCommandCannotRunSpec`; `SeveralModulesSpec` Features 1–3 except #11; `TestCommandResultSpec` Feature 5; `JsonOutputRootSpec` #5–#6; `JsonOutputArgumentSpec` #5 | `ModuleSelection`, `SelectedTestModule`, `ModuleCheck`, `ModuleCheckTask`, `CannotRunReason`, `ResolvedDependency`, `Organization`, `ArtifactName`, `LibraryVersion`, `FailFastOffEvaluator`, `EvaluatedTasks`, `FailedTask`, `FirstFailure`, `TaskName` | 914 → 474 |
+| Workers | `EveryWorkerSpec` Features 1 and 4–6; `TestCommandArgumentsIntegrationSpec`'s worker-environment and module-folder Features; `TestCommandResultSpec` Feature 3 (a worker dies); `CapturedOutputSpec` #8; `SeveralModulesSpec` #11 | `JvmTestModuleInputs`, `WorkerLayout`, `ForkGroupLabel`, `PaddedIndex`, `PathUnderModule`, `WorkerRun`, `WorkerProcess`, `ProcessExit`, `DelegatingTaskCtx`, `ModuleFolder`, `ModuleFolderTaskCtx` | 540 → 433 |
+| Capture | `CapturedOutputSpec` except #8; `EveryWorkerSpec` Features 2–3; `SeveralModulesSpec` #28–#30; `TestCommandOutputSpec` Feature 3 | `OutputCapture`, `LineSplitter`, `StreamLines`, `EventLogReader`, `EventLogFile`, `EventLogLines`, `WorkerTaskCtx` | 469 → 401 |
+| HumanReadable | `TestCommandOutputSpec` Features 1–2; `TestCommandResultSpec` Features 1, 2 and 4; `CompatibilityFixtureSpec`; `LibraryWithoutMillSpec` Feature 1 | the `HumanReadable*` code and the consolidation state in `dotty/consolidation` | 333 → 126 |
+| Json | `JsonOutputRootSpec` #1–#4; `JsonOutputTreeSpec`; `JsonOutputNodesSpec`; `JsonOutputEncodingSpec`; `JsonOutputArgumentSpec` #4, #6–#8 and Feature 3; `LibraryWithoutMillSpec` Feature 2 | `JsonOutputFile`; `JsonOutput*` and `JsonOutputWriter` in `dotty/consolidation`; the JSON schema | 717 → 278 |
+| MillCoexistence | `AddingThePluginSpec`, `HeaderPluginSpec`, `MillOwnTestTasksSpec`, `MillBspServerSpec`, each whole | `TestCommandModule`, the `plugin` section of `mill-plugin/build.mill` (dependencies, publishing, `Versions.mill`), the fixtures' plugin headers | 469 → 469 (about 409 with P4) |
 
-**Touches.** One annotation file per shard tag, an annotation on each suite, `.github/workflows/ci.yml`. Optionally `test-all.sh` and `test-all.ps1`.
+Two tags split further, along lines where their files do not overlap:
+
+- **Modules:** selection (`ModuleSelectorSpec`, `SeveralModulesSpec` Feature 1, `ModulesTheTestCommandCannotRunSpec` #10), 416 → 229; checks (`ModulesTheTestCommandCannotRunSpec` #1–#9, `TestCommandResultSpec` Feature 5), 310 → 92; independence of the modules (`SeveralModulesSpec` Features 2–3), 187 → 153.
+- **Workers:** layout (`EveryWorkerSpec`, `TestCommandResultSpec` Feature 3); environment and module folder (`TestCommandArgumentsIntegrationSpec` Features 3–4, `CapturedOutputSpec` #8, `SeveralModulesSpec` #11).
+
+**Core set.** Every build task runs these eight scenarios, tagged Core, whatever it changes. All are kept by P5. Together they cost about 169 solo-seconds, an estimated 2–3 minutes of wall clock plus about 20 s of compiling; this was not measured.
+
+| Scenario | Proves | Solo s |
+|---|---|---|
+| `AddingThePluginSpec` #1 | the plugin header alone runs a module, on Scala 3.3 | 23.6 |
+| `JsonOutputRootSpec` #1 | the JSON output, end to end | 27.3 |
+| `SeveralModulesSpec` #5 | several module selectors run; a module selected twice runs once | 16.4 |
+| `SeveralModulesSpec` #12 | a failing test fails the test command, and the other module still runs | 19.6 |
+| `TestCommandArgumentsIntegrationSpec` #22 | an argument is rejected before any worker starts | 9.7 |
+| `CapturedOutputSpec` #9 | console output reaches the console only through the human-readable output | 30.7 |
+| `EveryWorkerSpec` #2 | the parallel queue | 21.6 |
+| `HeaderPluginSpec` #4 | Mill's own `testForked` still passes with the plugin | 20.4 |
+
+**Run everything** when any of these change: `TestCommand.scala` or `TestCommandModule.scala` as a whole; the versions in `mill-plugin/build.mill`; the shared test helpers `FixtureBuilds`, `FixtureBuild`, `TestCommandResult`, `JsonNode`, `JsonOutputFixture`, `IntegrationEnvironment` and `MillConsole`; the `Consolidation` API or the emitter's event-log format; the JSON output's keys or shape, because `EveryWorkerSpec`, `SeveralModulesSpec`, `ModulesTheTestCommandCannotRunSpec` and `TestCommandArgumentsIntegrationSpec` assert through `-fJ` output; and a wide change to how the console tree is rendered.
+
+**Hub files.** 24 of the 40 commits that touch `mill-plugin/plugin/src` changed `TestCommand.scala` (`[history]`), so selecting by file would run everything most of the time. Map the two hub files by method instead:
+
+| File | Method | Tags |
+|---|---|---|
+| `TestCommand.scala` | `run` | Arguments, Modules, Json |
+| | `checkAndRunTests` | Modules |
+| | `consolidateSelectedModules` | Json, HumanReadable, Capture |
+| | `moduleRunTask`, `clearedModuleFolder` | Workers |
+| `JvmTestModuleRun.scala` | worker layout and launchers | Workers |
+| | discovery, `startWorker` | Capture |
+| | `reportNoTestResultForClassGlobs` | Arguments |
+
+**Overlaps.** A scenario that belongs to two areas takes its second tag through `taggedAs`:
+
+- `TestCommandArgumentsIntegrationSpec` #7, #8 and #13: Arguments and Workers. #45 and #47: Arguments and Capture.
+- `SeveralModulesSpec` #19: Modules and Workers. #18 and #30: Modules or Capture, and HumanReadable.
+- `ModulesTheTestCommandCannotRunSpec` #9: Modules and Arguments.
+- `JsonOutputTreeSpec` #1: Json and HumanReadable. #2: Json and Arguments.
+- `JsonOutputArgumentSpec` #15: Json and Arguments.
+
+`JsonOutputArgumentSpec` #5 is listed under both Arguments and Modules in the table, so the rows sum to slightly more than 4449 today.
+
+**Splits.** With P1, `TestCommandArgumentsIntegrationSpec` and `SeveralModulesSpec` become one suite per Feature, so most tags become whole classes. Without it, a tag inside one class runs serially on one worker: Arguments would be about 237 solo-seconds in one class. Beyond P1:
+
+- `SeveralModulesSpec`'s "Class globs and framework arguments" scenarios #28–#30 into their own Capture suite.
+- `EveryWorkerSpec` Features 1 and 4–6 (Workers) apart from Features 2–3 (Capture). After P1 and P5, `EveryWorkerSpec` is the largest single unit, at about 266 solo-seconds.
+- Optionally, `TestCommandResultSpec` Feature 3 next to `EveryWorkerSpec`'s Workers part.
+
+Tag `MillOwnTestTasksSpec`, `MillBspServerSpec` and `TestCommandOutputSpec` whole, never per scenario: each shares a `lazy val` that puts all its cost on whichever scenario runs first.
+
+**Selection.** Each tag is a Java runtime-retained `@TagAnnotation` on the suite classes, plus a Scala `Tag` object of the same name for `taggedAs` (`edc-bestpractice/scala/scalatest.md`, "Tagging"), in a package such as `org.scalatest.mill.tags`. Mill compiles Java in a Scala test module, as the fixture `class-globs-across-modules/noisy/Noisy.java` shows. A build task then runs, for example:
+
+```
+cd mill-plugin && ./mill --no-daemon plugin.integration.testForked -n org.scalatest.mill.tags.Core -n org.scalatest.mill.tags.Workers
+```
+
+Several `-n` select their union. `-l` excludes a tag, and `-l` over every tag gives the untagged remainder. To narrow by class as well, use `plugin.integration.testOnly 'org.scalatest.mill.EveryWorker*' -- -n …`; `testOnly` splits its arguments at `--` (`[mill]` `TestModule.scala` lines 240–246).
+
+Why it should work:
+
+- `testForked(args: String*)` passes `testArgsDefault() ++ args` to ScalaTest (`[mill]` `TestModule.scala` lines 160–166), as `.docs/learnings/mill-build-tooling.md` (2026-11-20) also records. mainargs reads a `T*` parameter as the leftover arguments (`[mainargs]` `Macros.scala` line 127).
+- `-n samples.Fast` already selects by tag through Mill's runner, in the nested test command of `TestCommandArgumentsIntegrationSpec` #15 and `SeveralModulesSpec` #24.
+- Every fixture is built in a scenario's body or in a `lazy val` (`FixtureBuilds.scala` lines 8–19), so a scenario filtered out builds nothing.
+
+**Further use.** The same tags can shard the full run across parallel CI jobs: in `.github/workflows/ci.yml`, a matrix over groups of tags plus one `-l` remainder job brings the CI integration time to about 1/N plus each job's setup. It saves nothing on one machine, where shards compete for the same cores (§ 1.3).
+
+**Saving.** None on the full run: every scenario still runs in it, and `test-all.sh`, `test-all.ps1` and CI keep running all of them. The saving is in a build task's own runs: it runs the core set, about 169 solo-seconds, plus the tags its change selects, instead of about 2060 solo-seconds after P1, P5, P2 and P4.
+
+**Risk.**
+
+- A task whose change selects too few tags misses a fault until the full run. The core set, the run-everything list and the method map for the hub files bound this.
+- Every subset still pays `publishLocalTestRepo` and the compile.
+- The `-l` remainder must list every tag. A guard test that fails on any untagged scenario keeps it honest.
+- Tags drift as scenarios are added or moved; the guard test catches an untagged scenario but not a wrongly tagged one.
+- `testForked -n` was not run for this note. `./mill --no-daemon plugin.test.testForked -n NoSuchTag` should run zero tests, and is a cheap check.
+
+**Touches.** One Java annotation and one Scala `Tag` object per tag, an annotation on each suite, `taggedAs` on the overlapping scenarios, the guard test, and the splits above. Optionally `.github/workflows/ci.yml` for the shards.
+
+**Considered and not recommended.**
+
+| Alternative | Why not |
+|---|---|
+| One tag per epic feature | Coming features cross two or three stages: `--halt-on-failure` touches Arguments and Modules, and filtering the JSON output touches Arguments and Json. Maintenance edits belong to no feature. |
+| `testOnly` with class globs only | Class names do not line up with areas (Workers spans five suites), and a glob cannot pick single scenarios. Fine as a stopgap that needs no code. |
+| A Mill module per area | The shared helpers and resources would move into a common module; tags need only an annotation. |
+| One tag per production file | Too fine: most scenarios pass through five or more files. |
+| Selection driven by coverage | The plugin runs in nested Mill JVMs, which are hard to instrument, and every scenario loads `TestCommand`. |
+| Excluding only the slow suites | It cuts time but says nothing about which area a change needs. |
 
 ### P7. Cache the Mill and Coursier downloads on CI
 
@@ -322,13 +421,15 @@ Apply in this order. Each step is independently useful, and each is measured bef
 | 2 | P5, remove or simplify the 104 scenarios other tests cover | 1060–1080 | about 1260 |
 | 3 | P2, share sandboxes among the remaining identical build states | 940–970 | about 1380 |
 | 4 | P4, share the remaining same-command evals | 900–930 | about 1420 |
-| CI | P6 shards across CI jobs, and P7 the CI cache | development machine unchanged; CI integration time about 1/N | – |
+| 5 | P6, tag the suites by area | full run unchanged; a build task runs the core set plus the tags its change selects | none on the full run |
+| CI | P7 the CI cache; optionally P6's tags as parallel CI jobs | development machine unchanged; CI integration time about 1/N with N jobs | – |
 
 Steps 1–4 bring the full `plugin.test.testForked + plugin.integration.testForked` from 2388 s to **about 930–950 s (−60 %)**. Steps 1 and 2 alone bring it to about 1090–1100 s (−54 %). P3 is left out: after P5 it saves about 16 solo-seconds. Splitting every suite by Feature as well would save about 50–70 s more.
 
 - **Step 1 comes first** because it is cheap and low-risk, and because the critical path hides every other saving until it is fixed: P5 alone predicts 1290–1300 s, against 1060–1080 s with P1.
 - **P5 comes before P2** because it removes most of the groups P2 would need resets for, so P2 becomes a smaller and safer change. P5 can be done one suite at a time, and each suite's removals must keep the scenarios that the coverage file names as cover.
 - **P2–P4 without P5** predict 1290–1320 s after P1.
+- **P6 is a separate step after steps 1–4.** Its purpose is a build task's own runs, not the full run, to which it adds no saving. After P1 most tags are whole classes, so a tag no longer runs serially in one class; after P5 the scenarios that would otherwise need tagging are gone.
 - **Two counts bound the estimate.** In the model, the end point does not depend on the order of the steps. A second count assumes P2 first, so that a removed scenario then saves only a warm eval, about 4 s (`integration-test-coverage.md` § Summary). It puts the end point at 1100–1130 s instead of 900–930 s. The two figures bound the estimate (§ 4).
 
 ## 4. The model and its limits
@@ -347,3 +448,5 @@ Steps 1–4 bring the full `plugin.test.testForked + plugin.integration.testFork
 
 - How much of the slowdown at 16 workers is memory pressure or on-access scanning, rather than CPU? One run with Windows performance counters (paging, CPU queue length), or with the sandbox folder excluded from Defender, would answer it. An exclusion is a machine setting, not a test change.
 - How long does the CI job take today? No workflow run exists to read.
+- Does `plugin.integration.testForked -n <tag>` select by tag? The sources say it should (P6), but it was not run. `./mill --no-daemon plugin.test.testForked -n NoSuchTag`, which should run zero tests, would answer it.
+- How long does the core set take? The 2–3 minutes in P6 is an estimate from solo-seconds, not a measurement.
