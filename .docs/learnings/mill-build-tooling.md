@@ -301,11 +301,13 @@ Before splitting test classes to shorten a run, compare the worker count with th
 </learning>
 
 <learning>
-date: 2026-11-27
+date: 2026-11-28
 ---
 In Mill 1.3.1, a task evaluates every task its body calls, in parallel, before the body runs. An override such as `def compile: T[CompilationResult] = Task { awaitMarker(); super.compile() }` therefore does not delay the compile: `super.compile` runs while `awaitMarker` is still waiting, and only the override's own body waits.
 
 To make a build's work start only after a condition, such as a marker file another process writes, put the wait upstream of that work. For a compile, wait in a task that feeds the compiler, as in `def allSourceFiles: T[Seq[PathRef]] = Task { awaitMarker(); super.allSourceFiles() }`.
 
 Declare the wait as a `Task.Input`. Mill evaluates an input on every run, so the wait still happens where the downstream task is cached, such as on a test fixture build that several scenarios reuse.
+
+A `Task.Input` with no upstream task starts as soon as the build starts evaluating tasks, not when the task that depends on it is reached. A timeout inside the wait therefore also covers every other module's dependency resolution and cold compile running at the same time. In a full parallel integration run (16 workers on 8 cores), these took about 140 s, and a 120 s wait timed out before the waited-for test had started. Size the timeout for a cold build under a full parallel run, or start the clock from a later condition.
 </learning>
