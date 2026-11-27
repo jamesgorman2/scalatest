@@ -167,7 +167,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
 
   Feature("Each worker of a JVM module has its own event log, output and time") {
 
-    Scenario("Without test parallelism, the module is timed from its first worker's start to its last worker's end, and each fork group's worker writes its event log in the group's processFolder") {
+    Scenario("Without test parallelism, the module's time spans all of its runs, and each fork group's worker writes its event log in the group's processFolder") {
       withEveryWorkerBuild { build =>
         givenTheModuleHoldsTwoForkGroups()
         And("test parallelism is off")
@@ -325,7 +325,6 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
         result.consoleLinesOutsideHumanReadableOutput.filter(line => line.contains("out from B1") || line.contains("err from A1")) shouldBe empty
       }
     }
-
   }
 
   Feature("Runs in the human-readable output") {
@@ -352,7 +351,6 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
         }
       }
     }
-
   }
 
   Feature("A module with no test class") {
@@ -438,7 +436,6 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
       }
     }
   }
-
 }
 
 private final class EveryWorkerBuild(fixtureBuild: FixtureBuild) {
