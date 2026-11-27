@@ -228,7 +228,7 @@ It also fails when one of the cases below happens to a selected module. The cons
 - two of the module's fork groups would share a `processFolder`, as where each runs only the same test class or, on a case-insensitive filesystem, only classes whose names differ only in case. No test of the module runs;
 - two or more of the module's fork groups hold a test class to run, and the test command cannot tell whether the filesystem is case-insensitive. No test of the module runs.
 
-Unless the JSON output cannot be written, where the test command fails for any of these reasons, its failure names only the selected modules that failed, such as `The tests of alpha.test and broken.test failed`.
+Where the test command fails for any reason in these two lists other than the JSON output not being written, its failure names only the selected modules that failed, such as `The tests of alpha.test and broken.test failed`.
 
 Under the test command, ScalaTest prints no end-of-run summary of its own. Instead, the human-readable output ends with one summary line that counts the suites and tests of every run. Mill's own test tasks still print ScalaTest's summary.
 
