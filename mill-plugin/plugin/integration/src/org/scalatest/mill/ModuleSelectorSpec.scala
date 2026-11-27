@@ -3,7 +3,9 @@ package org.scalatest.mill
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
+import org.scalatest.mill.tags.Modules
 
+@Modules
 final class ModuleSelectorSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with SharedFixtureBuilds {
 
   private val sharedModuleSelectorsBuild: SharedFixtureBuild = sharedFixtureBuild(FixtureName.moduleSelectors, WorkspaceReset.noModuleFolders)(_ => ())

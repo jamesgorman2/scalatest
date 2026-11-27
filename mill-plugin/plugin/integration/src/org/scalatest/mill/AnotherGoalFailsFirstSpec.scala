@@ -3,7 +3,9 @@ package org.scalatest.mill
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
+import org.scalatest.mill.tags.Modules
 
+@Modules
 final class AnotherGoalFailsFirstSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with SeveralModulesFixture {
 
   private val sharedBuildWithBrokenModuleAndEarlierReport: SharedFixtureBuild =

@@ -17,6 +17,7 @@ import org.scalatest.consolidation.Worker
 import org.scalatest.consolidation.WorkerIndex
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
+import org.scalatest.mill.tags.AreaTag
 import scala.collection.mutable
 
 final class LibraryWithoutMillSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with JsonOutputFixture {
@@ -117,7 +118,7 @@ final class LibraryWithoutMillSpec extends AnyFeatureSpec with GivenWhenThen wit
 
   Feature("The library writes the same human-readable output without Mill as under the test command") {
 
-    Scenario("Outside Mill, the library writes the same human-readable output as the test command for the same run") {
+    Scenario("Outside Mill, the library writes the same human-readable output as the test command for the same run", AreaTag.HumanReadable) {
       withFixtureBuild(FixtureName.libraryWithoutMill) { build =>
         Given("the test command, invoked as mill scalatest/test core.test, has run core.test, a module holding CalculatorSuite")
         val testCommand = build.runTestCommandWithTicker("core.test")
@@ -143,7 +144,7 @@ final class LibraryWithoutMillSpec extends AnyFeatureSpec with GivenWhenThen wit
 
   Feature("The same JSON output with and without Mill") {
 
-    Scenario("Replaying the test command's run through the library writes the same JSON text") {
+    Scenario("Replaying the test command's run through the library writes the same JSON text", AreaTag.Json) {
       withJsonOutputFixture("CalculatorSuite") { build =>
         Given("the test command was invoked as mill scalatest/test core.test -fJ <report>, for a module holding CalculatorSuite, whose test prints dividing now")
         val json = build.jsonOutputOfTestCommand()

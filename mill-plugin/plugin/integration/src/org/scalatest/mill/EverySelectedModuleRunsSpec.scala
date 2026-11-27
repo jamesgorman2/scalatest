@@ -3,6 +3,9 @@ package org.scalatest.mill
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
+import org.scalatest.mill.tags.AreaTag
+import org.scalatest.mill.tags.CoreTag
+import org.scalatest.mill.tags.Modules
 
 private enum MillFlags(val arguments: Seq[String]) {
   case Empty extends MillFlags(Nil)
@@ -11,6 +14,7 @@ private enum MillFlags(val arguments: Seq[String]) {
   def description: String = if (arguments.isEmpty) "none" else arguments.mkString(" ")
 }
 
+@Modules
 final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with SeveralModulesFixture {
 
   private def addLateTestCompilingAfterAlpha1Fast(build: FixtureBuild): Unit = {
@@ -96,8 +100,9 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
   Feature("Every selected module runs, whatever happens to the others") {
 
     for (millFlags <- MillFlags.values) {
+      val coreTags = if (millFlags == MillFlags.Empty) Seq(CoreTag) else Nil
 
-      Scenario(s"A test of alpha.test fails, flags ${millFlags.description}") {
+      Scenario(s"A test of alpha.test fails, flags ${millFlags.description}", coreTags*) {
         inSharedSeveralModules(sharedSeveralModulesWithAlpha1SlowFailing) { build =>
           Given("Alpha1's test slow fails")
           val (result, _) = runParsingJsonOutput(build, millFlags.arguments*)("alpha.test", "beta.test")
@@ -146,7 +151,7 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
       }
     }
 
-    Scenario("broken.test's failure in the human-readable output") {
+    Scenario("broken.test's failure in the human-readable output", AreaTag.HumanReadable) {
       inSharedSeveralModulesWithBrokenTestThatDoesNotCompile { build =>
         When("mill -j 2 scalatest/test alpha.test broken.test beta.test -oH is invoked")
         val result = runTestCommand(build)("alpha.test", "broken.test", "beta.test", "-oH")
@@ -175,7 +180,7 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
       }
     }
 
-    Scenario("Two of beta.test's fork groups each hold only samples.Beta1") {
+    Scenario("Two of beta.test's fork groups each hold only samples.Beta1", AreaTag.Workers) {
       withSeveralModules { build =>
         Given("beta.test's testForkGrouping gives two fork groups, each holding only samples.Beta1")
         setForkGroupingOfBetaTest(build, """Seq(Seq("samples.Beta1"), Seq("samples.Beta1"))""")

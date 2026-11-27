@@ -49,6 +49,8 @@ Pass `--compat` to either script to also run the Dotty compatibility test suites
 
 This should be run in the foreground.
 
+A task that changes one area of the Mill plugin runs that area's integration tests and the core set instead: see `mill-plugin/README.md` § Running one area's integration tests.
+
 ## BDD Gherkins
 
 `GherkinSpec` is not currently available for this repo, so use `AnyFeatureSpec` with `GivenWhenThen` instead.

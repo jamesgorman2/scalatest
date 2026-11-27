@@ -3,9 +3,12 @@ package org.scalatest.mill
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
+import org.scalatest.mill.tags.AreaTag
+import org.scalatest.mill.tags.Arguments
 
 import scala.util.matching.Regex
 
+@Arguments
 final class TestCommandOutputArgumentsSpec
     extends AnyFeatureSpec
     with GivenWhenThen
@@ -35,7 +38,7 @@ final class TestCommandOutputArgumentsSpec
 
   Feature("The test command's output arguments") {
 
-    Scenario("With no -o, stdout holds the human-readable output and nothing else the test command writes") {
+    Scenario("With no -o, stdout holds the human-readable output and nothing else the test command writes", AreaTag.Capture) {
       Given("CalculatorSuite, whose test adds two numbers writes dividing now to stdout")
       And("Mill colours its console output")
       When("the test command runs core.test with no -o, with Mill's ticker on")
@@ -62,7 +65,7 @@ final class TestCommandOutputArgumentsSpec
       workerStarted shouldBe true
     }
 
-    Scenario("With a bare -o, the console holds no consolidated output and none of the run's lines") {
+    Scenario("With a bare -o, the console holds no consolidated output and none of the run's lines", AreaTag.Capture) {
       Given("CalculatorSuite, whose test adds two numbers writes dividing now to stdout")
       When("the test command runs core.test with -o")
       val result = sharedCalculatorSuiteBuild.use { build =>

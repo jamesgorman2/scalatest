@@ -3,7 +3,10 @@ package org.scalatest.mill
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
+import org.scalatest.mill.tags.AreaTag
+import org.scalatest.mill.tags.Json
 
+@Json
 final class JsonOutputTreeSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with JsonOutputFixture {
 
   private val outcomeMarkers: Map[String, String] =
@@ -40,7 +43,7 @@ final class JsonOutputTreeSpec extends AnyFeatureSpec with GivenWhenThen with sh
 
   Feature("The JSON output and the human-readable output hold one node tree") {
 
-    Scenario("Both outputs hold the same suites, scopes and tests in the same order") {
+    Scenario("Both outputs hold the same suites, scopes and tests in the same order", AreaTag.HumanReadable) {
       Given("suites holding a nested suite, scopes nested in scopes, a pending scope, and tests of every outcome except aborted")
       And("a suite wrapped with ConfigMapWrapperSuite, holding a scope whose tests two instances of the suite register")
       When("the test command is invoked as mill scalatest/test core.test -fJ <report>")

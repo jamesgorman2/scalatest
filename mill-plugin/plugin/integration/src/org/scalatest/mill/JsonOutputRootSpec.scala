@@ -3,7 +3,10 @@ package org.scalatest.mill
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
+import org.scalatest.mill.tags.CoreTag
+import org.scalatest.mill.tags.Json
 
+@Json
 final class JsonOutputRootSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with JsonOutputFixture {
 
   private val eventLogItems: Set[String] = Set("runStarted", "structure", "event", "runEnded")
@@ -15,7 +18,7 @@ final class JsonOutputRootSpec extends AnyFeatureSpec with GivenWhenThen with sh
 
   Feature("The root, the module and the run in the JSON output") {
 
-    Scenario("One run of one suite is written as the root, module, run, suite and test, each with its times") {
+    Scenario("One run of one suite is written as the root, module, run, suite and test, each with its times", CoreTag) {
       Given("CalculatorSuite, whose one test, `adds two numbers`, registered at line 5, prints dividing now and succeeds")
       When("the test command is invoked as mill scalatest/test core.test -fJ <report>")
       val (json, _) = sharedCalculatorSuiteRun

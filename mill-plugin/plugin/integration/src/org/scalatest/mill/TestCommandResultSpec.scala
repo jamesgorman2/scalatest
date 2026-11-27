@@ -3,6 +3,7 @@ package org.scalatest.mill
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
+import org.scalatest.mill.tags.AreaTag
 
 final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with SharedFixtureBuilds {
 
@@ -28,7 +29,7 @@ final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with
 
   Feature("A registered test for which the run sends no event, and which is neither attributed nor marked ignored, fails the test command") {
 
-    Scenario("A test ConfigMapWrapperSuite registers only under an empty config map is shown as not run, and fails the test command") {
+    Scenario("A test ConfigMapWrapperSuite registers only under an empty config map is shown as not run, and fails the test command", AreaTag.HumanReadable) {
       val result = withResultFixture("ConfigSpec.scala", "ConfigSpec") { build =>
         Given("ConfigSpec, run through ConfigMapWrapperSuite, whose scope \"A config\" holds \"remote\" where its config map holds db, and \"local\" where it does not")
         And("the module's own ScalaTest arguments are -Ddb=on")
@@ -55,7 +56,7 @@ final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with
 
   Feature("A worker that dies fails the test command, whether or not a run existed in it") {
 
-    Scenario("A test calling System.exit(0) fails the test command") {
+    Scenario("A test calling System.exit(0) fails the test command", AreaTag.Workers) {
       Given("ExitSuite, whose test \"exits\" calls System.exit(0)")
       When("the test command runs core.test")
       val result = runInSharedResultBuild("ExitSuite.scala", "ExitSuite")
@@ -63,7 +64,7 @@ final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with
       shouldFailTheModulesTests(result)
     }
 
-    Scenario("A worker JVM that exits before any run exists in it fails the test command") {
+    Scenario("A worker JVM that exits before any run exists in it fails the test command", AreaTag.Workers) {
       val result = withResultFixture("AddSuite.scala", "AddSuite") { build =>
         Given("AddSuite, and forkArgs holding -XX:+NoSuchOption")
         build.addToTestModule("""def forkArgs = Seq("-XX:+NoSuchOption")""")
@@ -77,7 +78,7 @@ final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with
 
   Feature("The test command's failure lists no test") {
 
-    Scenario("A failed test is not named outside the human-readable output") {
+    Scenario("A failed test is not named outside the human-readable output", AreaTag.HumanReadable) {
       Given("StackFlatSpec, whose test \"have size 0\" fails")
       When("the test command runs core.test")
       val result = runInSharedResultBuild("StackFlatSpec.scala", "StackFlatSpec")

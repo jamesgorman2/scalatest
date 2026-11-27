@@ -4,7 +4,10 @@ import mill.api.PathRef
 import mill.testkit.IntegrationTester
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should
+import org.scalatest.mill.tags.CoreTag
+import org.scalatest.mill.tags.MillCoexistence
 
+@MillCoexistence
 final class HeaderPluginSpec extends AnyFreeSpec with should.Matchers with SharedFixtureBuilds {
 
   private def classpath(result: IntegrationTester.EvalResult): Seq[Seq[String]] = {
@@ -26,6 +29,7 @@ final class HeaderPluginSpec extends AnyFreeSpec with should.Matchers with Share
       s"with a test module on Scala $scala" - {
         val fixture = FixtureName.onScala(scala)
         val sharedBuild = sharedFixtureBuild(fixture, WorkspaceReset.fixtureFiles(os.sub / "core"))(_ => ())
+        val coreTags = if (scala == "3.3") Seq(CoreTag) else Nil
 
         "has that line, naming the plugin's own version, as its whole header" in {
           val header = os.read.lines(IntegrationEnvironment.fixture(fixture) / "build.mill").takeWhile(_.startsWith("//|"))
@@ -50,7 +54,7 @@ final class HeaderPluginSpec extends AnyFreeSpec with should.Matchers with Share
           }
         }
 
-        "passes core.test.testForked" in {
+        registerTest("passes core.test.testForked", coreTags*) {
           sharedBuild.use { build =>
             val result = build.eval(Seq("core.test.testForked"))
             withClue(result.debugString) {

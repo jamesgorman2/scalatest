@@ -6,7 +6,9 @@ import java.nio.charset.StandardCharsets
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
+import org.scalatest.mill.tags.Json
 
+@Json
 final class JsonOutputEncodingSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with JsonOutputFixture {
 
   private val escapedMessage: String = "tab\t quote\" slash\\ bell\u0007 é 😀 lone\uD800 end"

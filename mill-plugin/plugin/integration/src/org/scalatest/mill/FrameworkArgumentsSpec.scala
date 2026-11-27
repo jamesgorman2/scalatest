@@ -3,7 +3,10 @@ package org.scalatest.mill
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
+import org.scalatest.mill.tags.Arguments
+import org.scalatest.mill.tags.CoreTag
 
+@Arguments
 final class FrameworkArgumentsSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with SingleModuleFixture {
 
   Feature("Framework arguments") {
@@ -30,7 +33,7 @@ final class FrameworkArgumentsSpec extends AnyFeatureSpec with GivenWhenThen wit
       }
     }
 
-    Scenario("The framework argument -oD fails the test command, naming -oD") {
+    Scenario("The framework argument -oD fails the test command, naming -oD", CoreTag) {
       Given("Alpha1, Alpha2 and Beta1, each of whose tests creates a file in the markers folder as it runs")
       When("the test command runs core.test, writing JSON output, with -- -- -oD")
       withMarkingSuites { build =>

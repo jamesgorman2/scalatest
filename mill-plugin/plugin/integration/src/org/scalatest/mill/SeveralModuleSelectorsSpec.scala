@@ -3,6 +3,8 @@ package org.scalatest.mill
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
+import org.scalatest.mill.tags.AreaTag
+import org.scalatest.mill.tags.CoreTag
 
 final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with SeveralModulesFixture {
 
@@ -52,7 +54,7 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
 
   Feature("Several module selectors") {
 
-    Scenario("Module selectors on either side of an output argument") {
+    Scenario("Module selectors on either side of an output argument", AreaTag.Modules) {
       inSharedSeveralModules(sharedUnchangedSeveralModules) { build =>
         When("mill -j 2 scalatest/test alpha.test -fJ <report> beta.test is invoked")
         val result = runTestCommand(build)("alpha.test", "-fJ", build.jsonOutputFile.toString, "beta.test")
@@ -71,7 +73,7 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
       }
     }
 
-    Scenario("Only an output argument fails the test command before any test starts") {
+    Scenario("Only an output argument fails the test command before any test starts", AreaTag.Modules) {
       inSharedSeveralModules(sharedUnchangedSeveralModules) { build =>
         When("mill -j 2 scalatest/test -fJ <report> is invoked")
         val result = runTestCommand(build)("-fJ", build.jsonOutputFile.toString)
@@ -94,7 +96,7 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
       }
     }
 
-    Scenario("Two module selectors that share a test module run each test module's tests once, under one module node each") {
+    Scenario("Two module selectors that share a test module run each test module's tests once, under one module node each", AreaTag.Modules, CoreTag) {
       val run = givenWhenSharedRunOnAlphaAndEveryTestModule()
 
       withClue(run.result.debugString) {
@@ -109,7 +111,7 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
       shouldSucceed(run.result)
     }
 
-    Scenario("A module selector that resolves to test modules and other modules selects only its test modules") {
+    Scenario("A module selector that resolves to test modules and other modules selects only its test modules", AreaTag.Modules) {
       inSharedSeveralModules(sharedUnchangedSeveralModules) { build =>
         Given("the build's modules alpha and beta, which hold alpha.test and beta.test, are JVM modules that are not test modules")
         val (result, json) = runParsingJsonOutput(build)("__")
@@ -127,7 +129,7 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
       }
     }
 
-    Scenario("Two module selectors that share a test module each record it") {
+    Scenario("Two module selectors that share a test module each record it", AreaTag.Modules) {
       val run = givenWhenSharedRunOnAlphaAndEveryTestModule()
 
       Then("the root's moduleSelectors holds alpha.test, resolved to alpha.test, then __.test, resolved to alpha.test and beta.test")
@@ -136,7 +138,7 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
       }
     }
 
-    Scenario("A module selector's test modules are ordered by name") {
+    Scenario("A module selector's test modules are ordered by name", AreaTag.Modules) {
       inSharedSeveralModulesWithModulesThatSortByCharacterCode { build =>
         val (result, json) = runParsingJsonOutput(build)("__.test")
 
@@ -147,7 +149,7 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
       }
     }
 
-    Scenario("Module nodes are ordered by name, whatever the order of the module selectors") {
+    Scenario("Module nodes are ordered by name, whatever the order of the module selectors", AreaTag.Modules) {
       inSharedSeveralModulesWithModulesThatSortByCharacterCode { build =>
         val (result, json) = runParsingJsonOutput(build)("b2.test", "beta.test", "b10.test", "alpha.test", "B1.test")
 
@@ -158,7 +160,7 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
       }
     }
 
-    Scenario("Each module's tests run in the folder sandbox of that module's own module folder") {
+    Scenario("Each module's tests run in the folder sandbox of that module's own module folder", AreaTag.Workers) {
       withSeveralModules { build =>
         Given("Alpha1's test fast and Beta1's test fast each send an info message holding the system property user.dir")
         val sendingWorkingDirectory = """test("fast") { info(System.getProperty("user.dir")) }"""

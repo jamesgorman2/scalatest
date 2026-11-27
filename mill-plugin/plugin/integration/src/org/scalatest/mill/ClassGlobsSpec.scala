@@ -3,7 +3,10 @@ package org.scalatest.mill
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
+import org.scalatest.mill.tags.AreaTag
+import org.scalatest.mill.tags.Arguments
 
+@Arguments
 final class ClassGlobsSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with SingleModuleFixture {
 
   private def noTestMatchedFailuresOfModule(json: JsonNode): Seq[String] =
@@ -30,7 +33,7 @@ final class ClassGlobsSpec extends AnyFeatureSpec with GivenWhenThen with should
 
   Feature("Class globs") {
 
-    Scenario("Class globs that select one fork group's classes start only that group's worker, testBatchFrameworkTasks true") {
+    Scenario("Class globs that select one fork group's classes start only that group's worker, testBatchFrameworkTasks true", AreaTag.Workers) {
       val forkGrouping = """Seq(Seq("samples.Beta1"), Seq("samples.Alpha1", "samples.Alpha2"))"""
       Given(s"the module's testForkGrouping is $forkGrouping and its testBatchFrameworkTasks is true")
       And("each test sends an info message holding the system property user.dir")
@@ -53,7 +56,7 @@ final class ClassGlobsSpec extends AnyFeatureSpec with GivenWhenThen with should
       }
     }
 
-    Scenario("Class globs that select one class under test parallelism run it in one worker, in the module folder") {
+    Scenario("Class globs that select one class under test parallelism run it in one worker, in the module folder", AreaTag.Workers) {
       Given("the module's testParallelism is on")
       And("Alpha1's test fast sends an info message holding the system property user.dir")
       When("the test command runs core.test, writing JSON output, with -- samples.Alpha1")
@@ -122,7 +125,7 @@ final class ClassGlobsSpec extends AnyFeatureSpec with GivenWhenThen with should
       }
     }
 
-    Scenario("The JVM running the only matched suite dying before its tests run is not reported as class globs that match no test") {
+    Scenario("The JVM running the only matched suite dying before its tests run is not reported as class globs that match no test", AreaTag.Workers) {
       Given("Halting1, whose beforeAll halts the JVM before its one test, fast, runs")
       When("the test command runs core.test, writing JSON output, with -- samples.Halting1")
       withMarkingSuites { build =>

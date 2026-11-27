@@ -3,7 +3,9 @@ package org.scalatest.mill
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
+import org.scalatest.mill.tags.Arguments
 
+@Arguments
 final class ModulesOwnScalaTestArgumentsSpec
     extends AnyFeatureSpec
     with GivenWhenThen

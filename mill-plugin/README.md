@@ -49,6 +49,59 @@ Publish the fork and the library first (§ Publishing, step 1). Then, in `mill-p
 
 `plugin.test` holds the unit tests. `plugin.integration` runs Mill 1.3.1 on each fixture build under `plugin/integration/resources/`. It publishes the plugin to its own test repository, so it needs no `plugin.publishLocal`.
 
+### Running one area's integration tests
+
+Every integration scenario carries the tag of each area of the plugin it tests. The tags are in `org.scalatest.mill.tags`: a Java annotation tags a whole suite, and `AreaTag` or `CoreTag` tags one scenario.
+
+A change to one area runs the core set and that area's tag. Each `-n` adds a tag's scenarios to the run:
+
+```
+./mill --no-daemon plugin.integration.testForked -n org.scalatest.mill.tags.Core -n org.scalatest.mill.tags.Workers
+```
+
+The core set alone:
+
+```
+./mill --no-daemon plugin.integration.testForked -n org.scalatest.mill.tags.Core
+```
+
+The core set holds one scenario for each stage of the test command, end to end, and `EveryScenarioHasAnAreaTagSpec`, which fails when a scenario carries no area tag. `test-all.sh`, `test-all.ps1` and CI run every scenario.
+
+Run a tag when these files change. Files without a path are in `plugin/src/org/scalatest/mill/`.
+
+| Tag | Files |
+|---|---|
+| `Arguments` | `TestCommandArguments`, `AllowedFlag`, `FrameworkArguments`, `ClassGlob`, `StdoutContent`, `RunArguments`, `ModuleScalaTestArguments`, `ModuleSelectorArgument`; `ScalaTestArgument` in `dotty/consolidation` |
+| `Modules` | `ModuleSelection`, `SelectedTestModule`, `ModuleCheck`, `ModuleCheckTask`, `CannotRunReason`, `ResolvedDependency`, `Organization`, `ArtifactName`, `LibraryVersion`, `FailFastOffEvaluator`, `EvaluatedTasks`, `FailedTask`, `FirstFailure`, `TaskName` |
+| `Workers` | `JvmTestModuleInputs`, `WorkerLayout`, `ForkGroupLabel`, `PaddedIndex`, `PathUnderModule`, `WorkerRun`, `WorkerProcess`, `ProcessExit`, `DelegatingTaskCtx`, `ModuleFolder`, `ModuleFolderTaskCtx` |
+| `Capture` | `OutputCapture`, `LineSplitter`, `StreamLines`, `EventLogReader`, `EventLogFile`, `EventLogLines`, `WorkerTaskCtx` |
+| `HumanReadable` | `HumanReadableOutput` and `ConsolidationState` in `dotty/consolidation` |
+| `Json` | `JsonOutputFile`; `JsonOutput` and `JsonOutputWriter` in `dotty/consolidation`; `consolidated.schema.json` |
+| `MillCoexistence` | `TestCommandModule`; the `plugin` module's dependencies and publishing settings in `build.mill`; the plugin header of each fixture build |
+| `Arguments`, `Modules`, `Json` | `TestCommandFailure` |
+
+`TestCommand.scala` and `JvmTestModuleRun.scala` change with most tasks, so they map by method:
+
+| File | Method | Tags |
+|---|---|---|
+| `TestCommand.scala` | `run` | `Arguments`, `Modules`, `Json` |
+| | `checkAndRunTests`, `addModuleFailures` | `Modules` |
+| | `consolidateSelectedModules` | `Json`, `HumanReadable`, `Capture` |
+| | `moduleRunTask`, `clearedModuleFolder` | `Workers` |
+| `JvmTestModuleRun.scala` | `execute`, `layOutWorkers`, `runWorkers`, `processEndedWith`, `resultLog`, `inModuleFolder`, `WorkerLauncher`, `QueueLauncher`, `BatchLauncher`, `filesystemIgnoresCase`, `launcherOrReportFailure`, `layOutForkGroups` | `Workers` |
+| | `discoveredTestClasses`, `attachingDiscoveryOutput`, `startWorker` | `Capture` |
+| | `reportNoTestResultForClassGlobs` | `Arguments` |
+
+Run every test (`plugin.test.testForked + plugin.integration.testForked`) when any of these change:
+
+- `TestCommand.scala` or `TestCommandModule.scala` as a whole, such as a method's signature that the others call;
+- `EnglishList`, or the alias in `plugin/src/scalatest/package.scala`;
+- the versions in `build.mill`;
+- the shared integration test helpers: `FixtureBuilds`, `FixtureBuild`, `SharedFixtureBuilds`, `WorkspaceReset`, `TestCommandResult`, `JsonNode`, `JsonOutputFixture`, `IntegrationEnvironment` and `MillConsole`;
+- the `Consolidation` API in `dotty/consolidation`, or the emitter's event-log format;
+- the JSON output's keys or shape, because scenarios of every area read the `-fJ` output;
+- how the console tree is rendered, beyond one kind of line.
+
 ## Adding the plugin to a build
 
 The build runs Mill 1.3.1. Add the plugin to the header of its `build.mill`:

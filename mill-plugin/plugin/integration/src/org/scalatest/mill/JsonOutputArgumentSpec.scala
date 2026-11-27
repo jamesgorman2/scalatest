@@ -3,7 +3,10 @@ package org.scalatest.mill
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
+import org.scalatest.mill.tags.AreaTag
+import org.scalatest.mill.tags.Json
 
+@Json
 final class JsonOutputArgumentSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with JsonOutputFixture with SharedFixtureBuilds {
 
   private val leftOver: String = "left over"
@@ -70,7 +73,7 @@ final class JsonOutputArgumentSpec extends AnyFeatureSpec with GivenWhenThen wit
 
   Feature("Output arguments the test command rejects") {
 
-    Scenario("core.test -fJ <report> -fJ <other> fails the test command, naming -fJ, and leaves every file untouched") {
+    Scenario("core.test -fJ <report> -fJ <other> fails the test command, naming -fJ, and leaves every file untouched", AreaTag.Arguments) {
       sharedCalculatorSuiteBuild.use { build =>
         Given("CalculatorSuite, and the file at <report> holding the text left over")
         os.write(build.jsonOutputFile, leftOver)

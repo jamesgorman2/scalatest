@@ -3,11 +3,13 @@ package org.scalatest.mill
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
+import org.scalatest.mill.tags.Workers
 import org.xml.sax.helpers.DefaultHandler
 
 import javax.xml.parsers.DocumentBuilderFactory
 import scala.util.Try
 
+@Workers
 final class ModuleFolderIntegrationSpec
     extends AnyFeatureSpec
     with GivenWhenThen
