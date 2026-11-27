@@ -54,6 +54,7 @@ final class HeaderPluginSpec extends AnyFreeSpec with should.Matchers with Share
           }
         }
 
+        // `taggedAs` needs one tag, and `CoreTag.when` may give none, so the suite's own tag is repeated.
         "passes core.test.testForked".taggedAs(AreaTag.MillCoexistence, CoreTag.when(scala == "3.3")*) in {
           sharedBuild.use { build =>
             val result = build.eval(Seq("core.test.testForked"))

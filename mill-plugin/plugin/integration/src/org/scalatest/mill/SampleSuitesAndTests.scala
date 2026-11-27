@@ -10,11 +10,7 @@ enum SampleTag {
   case Fast
 }
 
-trait SampleTestSource {
-
-  def name: String
-
-  protected def tag: Option[SampleTag]
+final case class SampleTestSource(name: String, tag: Option[SampleTag]) {
 
   private def declaration: String = s"""test("$name"${tag.map(", " + _).getOrElse("")}) """
 
@@ -28,24 +24,21 @@ trait SampleTestSource {
     withBody(s"""java.nio.file.Files.write(java.nio.file.Paths.get("$fileName"), Array.emptyByteArray)""")
 
   def failing: String = withBody("""fail("fails as the scenario asks")""")
-}
-
-enum SampleTest(val name: String, protected val tag: Option[SampleTag]) extends SampleTestSource {
-  case Fast extends SampleTest("fast", Some(SampleTag.Fast))
-  case Slow extends SampleTest("slow", None)
 
   // The several-modules fixture's suites tag none of their tests.
-  def untagged: SampleTestSource = UntaggedSampleTest(name)
+  def untagged: SampleTestSource = copy(tag = None)
+}
+
+enum SampleTest(val source: SampleTestSource) {
+  case Fast extends SampleTest(SampleTestSource("fast", Some(SampleTag.Fast)))
+  case Slow extends SampleTest(SampleTestSource("slow", None))
+
+  def name: String = source.name
 }
 
 object SampleTest {
 
   val bodySendingWorkingDirectory: String = """info(System.getProperty("user.dir"))"""
-}
-
-private final case class UntaggedSampleTest(name: String) extends SampleTestSource {
-
-  protected def tag: Option[SampleTag] = None
 }
 
 final case class SampleMarker(suite: SampleSuite, test: SampleTest) {

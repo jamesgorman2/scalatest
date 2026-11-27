@@ -75,13 +75,13 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
     build.appendToBuild(moduleWithTestModuleHolding("broken", testModuleMembers*))
 
   private def failAlpha1Slow(build: FixtureBuild): Unit = {
-    val slow = SampleTest.Slow.untagged
+    val slow = SampleTest.Slow.source.untagged
     replaceInSuite(build, "alpha", "Alpha1")(slow.withEmptyBody, slow.failing)
   }
 
   private def addBrokenTestThatDoesNotCompile(build: FixtureBuild): Unit = {
     addBrokenTest(build)()
-    val fast = SampleTest.Fast.untagged
+    val fast = SampleTest.Fast.source.untagged
     replaceInSuite(build, "broken", "Broken1")(fast.withEmptyBody, fast.withBody("notDefinedAnywhere"))
   }
 

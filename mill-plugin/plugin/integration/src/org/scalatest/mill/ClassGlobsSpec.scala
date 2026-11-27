@@ -13,7 +13,7 @@ final class ClassGlobsSpec extends AnyFeatureSpec with GivenWhenThen with should
     moduleNode(json).failureMessages.filter(_.startsWith(noTestMatchedMessageStart))
 
   private def makeTestsSendWorkingDirectory(build: FixtureBuild, suite: SampleSuite, tests: SampleTest*): Unit =
-    tests.foreach(test => build.replaceInSample(s"$suite.scala", test.withEmptyBody, test.sendingWorkingDirectory))
+    tests.foreach(test => build.replaceInSample(s"$suite.scala", test.source.withEmptyBody, test.source.sendingWorkingDirectory))
 
   private def runWithClassGlobsReadingJsonOutput(build: FixtureBuild, classGlobs: String*): (TestCommandResult, JsonNode) =
     runReadingJsonOutput(build, ("--" +: classGlobs)*)

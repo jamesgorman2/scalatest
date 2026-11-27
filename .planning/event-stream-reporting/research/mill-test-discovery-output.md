@@ -102,7 +102,7 @@ So, for a class that the scan keeps, that passes the class globs and that `-w` a
 
 - The initializer runs whether or not ScalaTest then discovers the class.
 - An initializer that throws raises `ExceptionInInitializerError`. That is not an `Exception`, so `loadSuiteClass`'s `catch` does not catch it.
-  - `getTestTasks` calls `runner.done()` and rethrows it, and `Jvm.withClassLoader` rethrows every throwable as a `Result.SerializedException`, which extends `Throwable` (`TR/TestRunnerUtils.scala` `getTestTasks`; JVM `withClassLoader`; `[mill]` `core/api/daemon/src/mill/api/daemon/Result.scala`).
+  - `getTestTasks` calls `runner.done()` and rethrows it, and `Jvm.withClassLoader` rethrows it. `withClassLoader` first replaces it with a `Result.SerializedException`, which extends `Throwable`, only where the discovery class loader defined its class or replaced its cause (`TR/TestRunnerUtils.scala` `getTestTasks`; JVM `withClassLoader`; `[mill]` `core/api/daemon/src/mill/api/daemon/Result.scala` `partialFrom`).
   - With `javaHome`, the subprocess's `MillRpcServer.onAsk` returns every throwable but `InterruptedException` to Mill's process, and `MillRpcClient` throws it there as a `Result.SerializedException` (`RPC/MillRpcServer.scala` `onAsk`; `RPC/MillRpcClient.scala`).
   - `GroupExecution` turns each throwable from a task body that `mill.api.daemon.internal.NonFatal` matches into `ExecResult.Exception` (GE). That `NonFatal` matches what Scala's `NonFatal` matches and every `LinkageError` (`[mill]` `core/api/daemon/src/mill/api/daemon/internal/NonFatal.scala`).
 

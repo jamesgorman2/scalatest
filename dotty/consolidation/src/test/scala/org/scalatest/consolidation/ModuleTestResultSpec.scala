@@ -1,6 +1,5 @@
 package org.scalatest.consolidation
 
-import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.Promise
 import scala.util.Success
 import org.scalatest.GivenWhenThen
@@ -180,12 +179,12 @@ final class ModuleTestResultSpec extends AnyFeatureSpec with GivenWhenThen with 
 
     Scenario("A read waits while another thread holds the consolidation's lock, and answers after the consolidation ends") {
       Given("a run of the module that reports a test as succeeded")
-      val whileWritingJsonOutput = new AtomicReference[() => Unit](() => ())
-      val consolidation = Consolidation.start(new OutputSink, coloured = false, jsonOutput = Some(_ => whileWritingJsonOutput.get()()))
+      var whileWritingJsonOutput: () => Unit = () => ()
+      val consolidation = Consolidation.start(new OutputSink, coloured = false, jsonOutput = Some(_ => whileWritingJsonOutput()))
       consolidation.addRunOf(runWithSucceededTest)
       val read = Promise[Boolean]()
       val reader = new Thread(() => { read.success(consolidation.hasTestResult(module)); () })
-      whileWritingJsonOutput.set { () =>
+      whileWritingJsonOutput = { () =>
         When("another thread reads whether the module has a test result while the consolidation writes its JSON output")
         reader.start()
 

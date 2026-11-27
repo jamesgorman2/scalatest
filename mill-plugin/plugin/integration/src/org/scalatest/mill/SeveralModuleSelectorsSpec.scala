@@ -177,7 +177,7 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
     Scenario("The working directory of each module's tests", AreaTag.Workers) {
       withSeveralModules { build =>
         Given("Alpha1's test fast and Beta1's test fast each send an info message holding the system property user.dir")
-        val fast = SampleTest.Fast.untagged
+        val fast = SampleTest.Fast.source.untagged
         replaceInSuite(build, "alpha", "Alpha1")(fast.withEmptyBody, fast.sendingWorkingDirectory)
         replaceInSuite(build, "beta", "Beta1")(fast.withEmptyBody, fast.sendingWorkingDirectory)
         val (result, json) = whenTheTestCommandIsInvokedWithTwoJobsParsingJsonOutput(build)("alpha.test", "beta.test")

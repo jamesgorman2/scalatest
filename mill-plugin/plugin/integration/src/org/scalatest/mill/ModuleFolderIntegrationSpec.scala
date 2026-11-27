@@ -17,7 +17,7 @@ final class ModuleFolderIntegrationSpec
     with SingleModuleFixture {
 
   private def makeAlpha1FastCreateFileInWorkingDirectory(build: FixtureBuild, fileName: String): Unit =
-    build.replaceInSample(s"${SampleSuite.Alpha1}.scala", SampleTest.Fast.withEmptyBody, SampleTest.Fast.creatingFileInWorkingDirectory(fileName))
+    build.replaceInSample(s"${SampleSuite.Alpha1}.scala", SampleTest.Fast.source.withEmptyBody, SampleTest.Fast.source.creatingFileInWorkingDirectory(fileName))
 
   Feature("The module folder") {
 
@@ -66,7 +66,7 @@ final class ModuleFolderIntegrationSpec
     val sharedBuildByReportSetting = reportSettingsAndArguments.map(_.setting).distinct.map { setting =>
       setting -> sharedMarkingSuites { build =>
         build.addToTestModule(s"def testReportXml: T[Option[String]] = Task { $setting }")
-        build.replaceInSample(s"${SampleSuite.Beta1}.scala", SampleTest.Slow.withEmptyBody, SampleTest.Slow.failing)
+        build.replaceInSample(s"${SampleSuite.Beta1}.scala", SampleTest.Slow.source.withEmptyBody, SampleTest.Slow.source.failing)
       }
     }.toMap
 

@@ -18,7 +18,7 @@ This design checks every selected JVM test module before any test starts, then r
   - the human-readable writer writes a module's output lines and its `*** MODULE ABORTED ***` block after the module's runs, built as it builds the root's (AC-023, AC-026);
   - attaching a failure fails the consolidation state (`../SPECIFICATION.md` R-137).
 - **Add a process that ended before any run existed in it**: `addProcessEndedBeforeAnyRun`, which takes the process's module.
-- **Read whether a module has failed**: `hasFailed`, which the module run's no-match check reads in place of the consolidation state (`../SPECIFICATION.md` R-053a, R-098e).
+- **Read whether a module has failed**: `hasEndedAbnormally`, which the module run's no-match check reads in place of the consolidation state (`../SPECIFICATION.md` R-053a, R-098e).
 - **Read the modules that failed the test command**: `modulesFailingTheTestCommand`, which the test command reads after **End** to name the modules in its failure (AC-027; § A module whose tests cannot start).
 - **Read the version the library was built at**: `Consolidation.scalaTestVersion`, which the check before any test starts compares with each module's resolved `com.edc:scalatest-core_3` (§ The check before any test starts).
 
@@ -82,11 +82,15 @@ This design checks every selected JVM test module before any test starts, then r
 - Where a task upstream of a module's anonymous task fails, Mill marks the anonymous task `Skipped` and never runs its body. The module run therefore never adds such a module to the consolidation.
 - After the second `execute` returns and before **End**, the test command reads each module's anonymous task's result from the evaluation's results:
   - For a module whose anonymous task is `Skipped`, the test command calls **Add a module whose tests did not start** (`../ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library) with one failure (AC-006, AC-015). That failure's message holds one line for each failed task upstream of the anonymous task, in order of task name, naming the task and its error. The evaluation's results hold each failed upstream task's failure under that task's name.
-  - For a module whose anonymous task ends in `Failure` or `Exception`, the test command attaches a failure naming the error to that module with **Attach output or a failure to a module** (`../SPECIFICATION.md` R-072b, R-137).
+  - For a module whose anonymous task ends in `Failure` or `Exception`, the test command attaches a failure naming the error to that module with **Attach output or a failure to a module** (`../SPECIFICATION.md` R-072b, R-137; AC-029).
   - A `ZincOp.GetTestTasks` that throws ends the anonymous task in `Exception`, with or without `javaHome`, even where the throwable is a static initializer's `ExceptionInInitializerError` (`../research/mill-test-discovery-output.md` § 3). The module run therefore catches nothing around discovery.
 - For a module whose check task did not succeed, the test command calls **Add a module whose tests did not start** after **Start**, with one failure. That failure's message is built as for a `Skipped` anonymous task, from each failed task among the check task and the tasks upstream of the check task (AC-015).
   - The check task itself fails where the module's resolution fails, since the check task resolves the module's dependencies in its own body.
   - The check task has no task name, so the line for the check task's own failure names no task. That line is the resolution's error, as Coursier reports it.
+- In each failure attached to a module whose tests did not start or whose anonymous task failed, a failed task's error is:
+  - for `Failure`, its message;
+  - for `Exception`, the exception's message, or its class name where it has none, then each cause by class name and message, outermost first. A static initializer's `ExceptionInInitializerError` has no message, so its cause carries what was thrown.
+  - Mill can replace an exception with a `Result.SerializedException`, as it does for one returned over RPC from a `javaHome` subprocess. Its message is the original's, but only its `info` holds the original's class name, so the error takes the class name from there.
 - Each such module marks the consolidation state failed, so the test command takes its result from that state after **End**, not from either `execute`'s result (`../decisions/architecture-library-and-modules.md` "The consolidation library, not the Mill plugin, decides whether the test command has failed.").
 - Where that state is failed, unless the JSON output cannot be written, the test command's failure names the modules that **Read the modules that failed the test command** returns (AC-027). The test command attaches no failure to the root, so that read returns at least one module.
-- Where the JSON output cannot be written, the failure says so and names no module.
+- Where the JSON output cannot be written, the failure says so and names no module (AC-030).

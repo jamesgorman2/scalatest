@@ -189,7 +189,7 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
       }
     }
 
-    "class globs are given, only another module has failed, the JVM of a worker of the module ended without writing its result after its run completed, and no run of the module reported a test result" should {
+    "class globs are given, only another module has ended abnormally, the JVM of a worker of the module ended without writing its result after its run completed, and no run of the module reported a test result" should {
       "attach to the module the failure Mill's testOnly fails with" in {
         val consolidationUnderTest = consolidationEndedAfterReportingNoTestResult(
           consolidation => {

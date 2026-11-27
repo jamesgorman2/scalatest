@@ -23,11 +23,11 @@ final class DiscoveryOutputAcrossModulesSpec extends AnyFeatureSpec with GivenWh
 
   Feature("Class globs and framework arguments across modules") {
 
-    final case class JavaHome(description: String, path: Option[String])
+    final case class JavaHome(description: String, path: Option[os.Path])
 
     val javaHomes = Seq(
       JavaHome("left unset", None),
-      JavaHome("set to the path of a JDK of Java 17 or later", Some(sys.props("java.home")))
+      JavaHome("set to the path of a JDK of Java 17 or later", Some(os.Path(sys.props("java.home"))))
     )
 
     for (javaHome <- javaHomes) {

@@ -1,6 +1,5 @@
 package org.scalatest.consolidation
 
-import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.Promise
 import scala.util.Success
 import org.scalatest.GivenWhenThen
@@ -117,12 +116,12 @@ final class ModuleEndedAbnormallySpec extends AnyFeatureSpec with GivenWhenThen 
 
     Scenario("A read waits while another thread holds the consolidation's lock, and answers after the consolidation ends") {
       Given("a failure attached to the module")
-      val whileWritingJsonOutput = new AtomicReference[() => Unit](() => ())
-      val consolidation = Consolidation.start(new OutputSink, coloured = false, jsonOutput = Some(_ => whileWritingJsonOutput.get()()))
+      var whileWritingJsonOutput: () => Unit = () => ()
+      val consolidation = Consolidation.start(new OutputSink, coloured = false, jsonOutput = Some(_ => whileWritingJsonOutput()))
       consolidation.addModuleFailure(module, "the module's tests did not start")
       val read = Promise[Boolean]()
       val reader = new Thread(() => { read.success(consolidation.hasEndedAbnormally(module)); () })
-      whileWritingJsonOutput.set { () =>
+      whileWritingJsonOutput = { () =>
         When("another thread reads whether the module has ended abnormally while the consolidation writes its JSON output")
         reader.start()
 

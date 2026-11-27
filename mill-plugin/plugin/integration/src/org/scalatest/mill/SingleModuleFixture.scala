@@ -35,13 +35,13 @@ trait SingleModuleFixture extends SharedFixtureBuilds { this: Suite & should.Mat
   protected def makeAlpha1FastSendInfo(build: FixtureBuild, messageExpression: String): Unit =
     build.replaceInSample(
       s"${SampleSuite.Alpha1}.scala",
-      SampleTest.Fast.withEmptyBody,
+      SampleTest.Fast.source.withEmptyBody,
       s"""override def withFixture(test: NoArgTest): org.scalatest.Outcome = {
          |    if (test.name == "fast") info($messageExpression)
          |    super.withFixture(test)
          |  }
          |
-         |  ${SampleTest.Fast.withEmptyBody}""".stripMargin
+         |  ${SampleTest.Fast.source.withEmptyBody}""".stripMargin
     )
 
   protected def runWritingJsonOutput(build: FixtureBuild, arguments: String*): TestCommandResult =
