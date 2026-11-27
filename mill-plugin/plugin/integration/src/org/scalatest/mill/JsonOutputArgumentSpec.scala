@@ -4,14 +4,14 @@ import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
 
-final class JsonOutputArgumentSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with JsonOutputFixture with SharedSandboxes {
+final class JsonOutputArgumentSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with JsonOutputFixture with SharedFixtureBuilds {
 
   private val leftOver: String = "left over"
 
-  private val sharedCalculatorSuiteBuild: SharedSandbox =
-    sharedSandbox(
+  private val sharedCalculatorSuiteBuild: SharedFixtureBuild =
+    sharedFixtureBuild(
       FixtureName.jsonOutput,
-      SandboxReset.nothingAt(os.sub / "report.json", os.sub / "other.json", os.sub / "blocker").and(SandboxReset.noModuleFolders)
+      WorkspaceReset.nothingAt(os.sub / "report.json", os.sub / "other.json", os.sub / "blocker").and(WorkspaceReset.noModuleFolders)
     )(_.addSuites("CalculatorSuite"))
 
   private def other(build: FixtureBuild): os.Path = build.workspace / "other.json"

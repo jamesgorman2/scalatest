@@ -4,9 +4,9 @@ import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
 
-final class ModuleSelectorSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with SharedSandboxes {
+final class ModuleSelectorSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with SharedFixtureBuilds {
 
-  private val sharedModuleSelectorsBuild: SharedSandbox = sharedSandbox(FixtureName.moduleSelectors, SandboxReset.noModuleFolders)(_ => ())
+  private val sharedModuleSelectorsBuild: SharedFixtureBuild = sharedFixtureBuild(FixtureName.moduleSelectors, WorkspaceReset.noModuleFolders)(_ => ())
 
   Feature("The test command fails before any test starts unless given module selectors that each resolve to JVM test modules") {
 

@@ -3,7 +3,7 @@ package org.scalatest.mill
 import org.scalatest.Suite
 import org.scalatest.matchers.should
 
-trait SingleModuleFixture extends SharedSandboxes { this: Suite & should.Matchers =>
+trait SingleModuleFixture extends SharedFixtureBuilds { this: Suite & should.Matchers =>
 
   protected def withSuites[A](moduleArguments: String*)(suites: String*)(test: FixtureBuild => A): A =
     withFixtureBuild(FixtureName.arguments) { build =>
@@ -22,8 +22,8 @@ trait SingleModuleFixture extends SharedSandboxes { this: Suite & should.Matcher
       test(build)
     }
 
-  protected def sharedMarkingSuites(setUp: FixtureBuild => Unit): SharedSandbox =
-    sharedSandbox(FixtureName.classGlobsAndFrameworkArguments, SandboxReset.noModuleFolders) { build =>
+  protected def sharedMarkingSuites(setUp: FixtureBuild => Unit): SharedFixtureBuild =
+    sharedFixtureBuild(FixtureName.classGlobsAndFrameworkArguments, WorkspaceReset.noModuleFolders) { build =>
       os.makeDir.all(build.markersFolder)
       setUp(build)
     }

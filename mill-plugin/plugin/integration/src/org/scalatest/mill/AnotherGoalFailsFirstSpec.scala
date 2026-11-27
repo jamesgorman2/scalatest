@@ -6,12 +6,12 @@ import org.scalatest.matchers.should
 
 final class AnotherGoalFailsFirstSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with SeveralModulesFixture {
 
-  private val sharedSeveralModulesWithBrokenThatDoesNotCompileAndReportFromAnEarlierTestCommand: SharedSandbox =
-    sharedSandboxWithReportFromAnEarlierTestCommand(FixtureName.severalModules, addBrokenThatDoesNotCompile) { build =>
+  private val sharedBuildWithBrokenModuleAndEarlierReport: SharedFixtureBuild =
+    sharedFixtureBuildWithEarlierReport(FixtureName.severalModules, addBrokenModuleThatDoesNotCompile) { build =>
       runTestCommand(build)("alpha.test", "beta.test", "-fJ", build.jsonOutputFile.toString)
     }
 
-  private def addBrokenThatDoesNotCompile(build: FixtureBuild): Unit = {
+  private def addBrokenModuleThatDoesNotCompile(build: FixtureBuild): Unit = {
     build.appendToBuild("object broken extends SampleModule")
     os.write(build.workspace / "broken" / "src" / "Broken.scala", "object Broken {\n  val value: Int = notDefinedAnywhere\n}\n", createFolders = true)
   }
@@ -21,15 +21,15 @@ final class AnotherGoalFailsFirstSpec extends AnyFeatureSpec with GivenWhenThen 
 
   Feature("Another goal fails first") {
 
-    def inSharedSeveralModulesWithBrokenThatDoesNotCompileAndReportFromAnEarlierTestCommand[A](test: FixtureBuild => A): A =
-      inSharedSeveralModules(sharedSeveralModulesWithBrokenThatDoesNotCompileAndReportFromAnEarlierTestCommand) { build =>
+    def inSharedBuildWithBrokenModuleAndEarlierReport[A](test: FixtureBuild => A): A =
+      inSharedSeveralModules(sharedBuildWithBrokenModuleAndEarlierReport) { build =>
         Given("the build's module broken does not compile")
         And("<report> is an absolute path at which a file exists that an earlier test command wrote")
         test(build)
       }
 
     Scenario("broken.compile before the test command") {
-      inSharedSeveralModulesWithBrokenThatDoesNotCompileAndReportFromAnEarlierTestCommand { build =>
+      inSharedBuildWithBrokenModuleAndEarlierReport { build =>
         val reportBefore = os.read(build.jsonOutputFile)
         val reportModifiedBefore = os.mtime(build.jsonOutputFile)
         When("mill -j 2 broken.compile + scalatest/test alpha.test -fJ <report> is invoked")
@@ -55,7 +55,7 @@ final class AnotherGoalFailsFirstSpec extends AnyFeatureSpec with GivenWhenThen 
     }
 
     Scenario("broken.compile before the test command, with --keep-going") {
-      inSharedSeveralModulesWithBrokenThatDoesNotCompileAndReportFromAnEarlierTestCommand { build =>
+      inSharedBuildWithBrokenModuleAndEarlierReport { build =>
         When("mill -j 2 --keep-going broken.compile + scalatest/test alpha.test -fJ <report> is invoked")
         val result =
           runMillCommandLine(build, "--keep-going", "broken.compile", "+", "scalatest/test", "alpha.test", "-fJ", build.jsonOutputFile.toString)

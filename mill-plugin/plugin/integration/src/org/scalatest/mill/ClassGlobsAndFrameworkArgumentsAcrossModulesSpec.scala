@@ -7,16 +7,16 @@ import org.scalatest.matchers.should
 
 final class ClassGlobsAndFrameworkArgumentsAcrossModulesSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with SeveralModulesFixture {
 
-  private def sharedClassGlobsAcrossModules(setUp: FixtureBuild => Unit): SharedSandbox =
-    sharedSandbox(FixtureName.classGlobsAcrossModules, SandboxReset.emptyMarkersFolder.and(SandboxReset.noJsonOutputFile))(setUp)
+  private def sharedClassGlobsAcrossModules(setUp: FixtureBuild => Unit): SharedFixtureBuild =
+    sharedFixtureBuild(FixtureName.classGlobsAcrossModules, WorkspaceReset.emptyMarkersFolder.and(WorkspaceReset.noJsonOutputFile))(setUp)
 
-  private val sharedUnchangedClassGlobsAcrossModules: SharedSandbox = sharedClassGlobsAcrossModules(_ => ())
+  private val sharedUnchangedClassGlobsAcrossModules: SharedFixtureBuild = sharedClassGlobsAcrossModules(_ => ())
 
-  private val sharedClassGlobsAcrossModulesWithNoisy: SharedSandbox = sharedClassGlobsAcrossModules(addNoisyToBetaTest)
+  private val sharedClassGlobsAcrossModulesWithNoisy: SharedFixtureBuild = sharedClassGlobsAcrossModules(addNoisyToBetaTest)
 
-  private def inSharedClassGlobsAcrossModules[A](sandbox: SharedSandbox)(test: FixtureBuild => A): A = {
+  private def inSharedClassGlobsAcrossModules[A](sharedBuild: SharedFixtureBuild)(test: FixtureBuild => A): A = {
     givenTheClassGlobsAcrossModules()
-    sandbox.use(test)
+    sharedBuild.use(test)
   }
 
   private def givenTheClassGlobsAcrossModules(): Unit = {
@@ -131,7 +131,7 @@ final class ClassGlobsAndFrameworkArgumentsAcrossModulesSpec extends AnyFeatureS
     )
 
     for ((javaHomeDescription, javaHome) <- javaHomes) {
-      val sharedSandboxForTheJavaHome = javaHome.fold(sharedClassGlobsAcrossModulesWithNoisy) { path =>
+      val sharedBuildForTheJavaHome = javaHome.fold(sharedClassGlobsAcrossModulesWithNoisy) { path =>
         sharedClassGlobsAcrossModules { build =>
           addNoisyToBetaTest(build)
           addToBetaTest(build, s"def javaHome = Task { Some(PathRef(os.Path(\"\"\"$path\"\"\"))) }")
@@ -139,7 +139,7 @@ final class ClassGlobsAndFrameworkArgumentsAcrossModulesSpec extends AnyFeatureS
       }
 
       Scenario(s"beta.test's discovery output in the JSON output, with javaHome $javaHomeDescription") {
-        inSharedClassGlobsAcrossModules(sharedSandboxForTheJavaHome) { build =>
+        inSharedClassGlobsAcrossModules(sharedBuildForTheJavaHome) { build =>
           givenNoisyInBetaTest()
           And(s"beta.test's javaHome is $javaHomeDescription")
           val (result, json) = runOnBothModulesParsingJsonOutput(build, "--", "samples.*", "--", "-z", "nothing-matches")

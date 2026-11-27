@@ -45,10 +45,10 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
       s"object broken extends SampleModule {\n  object test extends SampleTests {\n${testModuleMembers.map("    " + _).mkString("\n")}\n  }\n}"
     )
 
-  private val sharedSeveralModulesWithAlpha1SlowFailing: SharedSandbox =
+  private val sharedSeveralModulesWithAlpha1SlowFailing: SharedFixtureBuild =
     sharedSeveralModules(build => replaceInSuite(build, "alpha", "Alpha1")("""test("slow") {}""", """test("slow") { fail("fails as the scenario asks") }"""))
 
-  private val sharedSeveralModulesWithBrokenTestThatDoesNotCompile: SharedSandbox =
+  private val sharedSeveralModulesWithBrokenTestThatDoesNotCompile: SharedFixtureBuild =
     sharedSeveralModules { build =>
       addBrokenTest(build)()
       replaceInSuite(build, "broken", "Broken1")("""test("fast") {}""", """test("fast") { notDefinedAnywhere }""")

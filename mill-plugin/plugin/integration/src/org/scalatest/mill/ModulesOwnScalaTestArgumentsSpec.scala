@@ -10,8 +10,8 @@ final class ModulesOwnScalaTestArgumentsSpec
     with should.Matchers
     with SingleModuleFixture {
 
-  private val sharedCalculatorAndOtherSuiteBuild: SharedSandbox =
-    sharedSandbox(FixtureName.arguments, SandboxReset.nothingBeyondTheBuildFile)(_.addSuites("CalculatorSuite", "OtherSuite"))
+  private val sharedCalculatorAndOtherSuiteBuild: SharedFixtureBuild =
+    sharedFixtureBuild(FixtureName.arguments, WorkspaceReset.onlyTheBuildFile)(_.addSuites("CalculatorSuite", "OtherSuite"))
 
   private lazy val sharedRunWithoutModuleArguments: TestCommandResult = sharedCalculatorAndOtherSuiteBuild.use(_.runTestCommand("core.test"))
 
@@ -35,7 +35,7 @@ final class ModulesOwnScalaTestArgumentsSpec
       Scenario(s"The module's own ${moduleArguments.mkString(" ")} leaves the human-readable output unchanged") {
         Given(s"CalculatorSuite and OtherSuite, in a module whose own ScalaTest arguments are ${moduleArguments.mkString(" ")}")
         And("the module's testParallelism is false")
-        When("the test command runs core.test, and also runs it with the module's own arguments removed")
+        When("the test command runs core.test, and also runs it without the module's own arguments")
         val withoutArguments = sharedRunWithoutModuleArguments
         val result = sharedCalculatorAndOtherSuiteBuild.use { build =>
           build.setModuleArguments(moduleArguments)

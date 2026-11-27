@@ -4,7 +4,7 @@ import org.scalatest.GivenWhenThen
 import org.scalatest.Suite
 import org.scalatest.matchers.should
 
-trait SeveralModulesFixture extends JsonOutputFixture with SharedSandboxes { this: Suite & should.Matchers & GivenWhenThen =>
+trait SeveralModulesFixture extends JsonOutputFixture with SharedFixtureBuilds { this: Suite & should.Matchers & GivenWhenThen =>
 
   protected def withSeveralModules[A](test: FixtureBuild => A): A =
     withFixtureBuild(FixtureName.severalModules) { build =>
@@ -13,12 +13,12 @@ trait SeveralModulesFixture extends JsonOutputFixture with SharedSandboxes { thi
       test(build)
     }
 
-  protected def sharedSeveralModules(setUp: FixtureBuild => Unit): SharedSandbox =
-    sharedSandbox(FixtureName.severalModules, SandboxReset.emptyMarkersFolder.and(SandboxReset.noJsonOutputFile))(setUp)
+  protected def sharedSeveralModules(setUp: FixtureBuild => Unit): SharedFixtureBuild =
+    sharedFixtureBuild(FixtureName.severalModules, WorkspaceReset.emptyMarkersFolder.and(WorkspaceReset.noJsonOutputFile))(setUp)
 
-  protected def inSharedSeveralModules[A](sandbox: SharedSandbox)(test: FixtureBuild => A): A = {
+  protected def inSharedSeveralModules[A](sharedBuild: SharedFixtureBuild)(test: FixtureBuild => A): A = {
     givenTheSeveralModules()
-    sandbox.use(test)
+    sharedBuild.use(test)
   }
 
   protected def givenTheSeveralModules(): Unit = {

@@ -4,12 +4,12 @@ import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
 
-final class ModulesTheTestCommandCannotRunSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with SharedSandboxes {
+final class ModulesTheTestCommandCannotRunSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with SharedFixtureBuilds {
 
   private val cannotRunModulesHeader: String = "The test command cannot run these selected test modules:"
 
-  private val sharedModulesTheTestCommandCannotRun: SharedSandbox =
-    sharedSandboxWithReportFromAnEarlierTestCommand(FixtureName.modulesTheTestCommandCannotRun, _ => ())(invokeTestCommandOnAlpha)
+  private val sharedModulesTheTestCommandCannotRun: SharedFixtureBuild =
+    sharedFixtureBuildWithEarlierReport(FixtureName.modulesTheTestCommandCannotRun, _ => ())(invokeTestCommandOnAlpha)
 
   private def inSharedModulesTheTestCommandCannotRun[A](test: FixtureBuild => A): A = {
     givenTheBuild()
@@ -19,7 +19,7 @@ final class ModulesTheTestCommandCannotRunSpec extends AnyFeatureSpec with Given
   private def withModulesTheTestCommandCannotRun[A](test: FixtureBuild => A): A =
     withFixtureBuild(FixtureName.modulesTheTestCommandCannotRun) { build =>
       givenTheBuild()
-      writeReportFromAnEarlierTestCommand(build)(invokeTestCommandOnAlpha)
+      writeEarlierReport(build)(invokeTestCommandOnAlpha)
       os.remove.all(build.markersFolder)
       os.makeDir.all(build.markersFolder)
       test(build)

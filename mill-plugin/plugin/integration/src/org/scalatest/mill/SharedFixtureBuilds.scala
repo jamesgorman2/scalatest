@@ -7,15 +7,15 @@ import org.scalatest.matchers.should
 
 import scala.collection.mutable
 
-trait SharedSandboxes extends FixtureBuilds with BeforeAndAfterAll { this: Suite & should.Matchers =>
+trait SharedFixtureBuilds extends FixtureBuilds with BeforeAndAfterAll { this: Suite & should.Matchers =>
 
   private val openTesters: mutable.Buffer[IntegrationTester] = mutable.Buffer.empty
 
   private val savedEarlierReport: os.SubPath = os.sub / "earlier-report.json"
 
-  // A shared sandbox always runs Mill without a daemon. A daemon would keep the environment it started in, and its
-  // caches, from one scenario to the next, and scenarios test the difference between running with and without one.
-  protected final class SharedSandbox(fixture: FixtureName, reset: SandboxReset, setUp: FixtureBuild => Unit) {
+  // A shared build runs Mill without a daemon. A daemon would carry its environment and caches from one
+  // scenario to the next, and some scenarios check how a run differs with and without one.
+  protected final class SharedFixtureBuild(fixture: FixtureName, reset: WorkspaceReset, setUp: FixtureBuild => Unit) {
 
     private lazy val build: FixtureBuild = {
       val tester = integrationTester(fixture, daemonMode = false)
@@ -26,7 +26,7 @@ trait SharedSandboxes extends FixtureBuilds with BeforeAndAfterAll { this: Suite
     }
 
     // Every scenario reads the build file, so every reset restores it.
-    private lazy val resetToTheSetUp: SandboxReset = reset.and(SandboxReset.buildFileHolding(build.buildText))
+    private lazy val resetToTheSetUp: WorkspaceReset = reset.and(WorkspaceReset.buildFileHolding(build.buildText))
 
     def use[A](test: FixtureBuild => A): A = {
       resetToTheSetUp.restore(build)
@@ -34,19 +34,19 @@ trait SharedSandboxes extends FixtureBuilds with BeforeAndAfterAll { this: Suite
     }
   }
 
-  protected def sharedSandbox(fixture: FixtureName, reset: SandboxReset)(setUp: FixtureBuild => Unit): SharedSandbox =
-    new SharedSandbox(fixture, reset, setUp)
+  protected def sharedFixtureBuild(fixture: FixtureName, reset: WorkspaceReset)(setUp: FixtureBuild => Unit): SharedFixtureBuild =
+    new SharedFixtureBuild(fixture, reset, setUp)
 
-  protected def sharedSandboxWithReportFromAnEarlierTestCommand(fixture: FixtureName, setUp: FixtureBuild => Unit)(
+  protected def sharedFixtureBuildWithEarlierReport(fixture: FixtureName, setUp: FixtureBuild => Unit)(
       earlierTestCommand: FixtureBuild => TestCommandResult
-  ): SharedSandbox =
-    sharedSandbox(fixture, SandboxReset.emptyMarkersFolder.and(SandboxReset.jsonOutputFileAsSavedIn(savedEarlierReport))) { build =>
+  ): SharedFixtureBuild =
+    sharedFixtureBuild(fixture, WorkspaceReset.emptyMarkersFolder.and(WorkspaceReset.jsonOutputFileAsSavedIn(savedEarlierReport))) { build =>
       setUp(build)
-      writeReportFromAnEarlierTestCommand(build)(earlierTestCommand)
+      writeEarlierReport(build)(earlierTestCommand)
       os.copy(build.jsonOutputFile, build.workspace / savedEarlierReport)
     }
 
-  protected def writeReportFromAnEarlierTestCommand(build: FixtureBuild)(earlierTestCommand: FixtureBuild => TestCommandResult): Unit = {
+  protected def writeEarlierReport(build: FixtureBuild)(earlierTestCommand: FixtureBuild => TestCommandResult): Unit = {
     os.makeDir.all(build.markersFolder)
     val earlier = earlierTestCommand(build)
     withClue(earlier.debugString) {

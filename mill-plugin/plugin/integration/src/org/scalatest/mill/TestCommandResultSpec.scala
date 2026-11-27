@@ -4,10 +4,10 @@ import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
 
-final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with SharedSandboxes {
+final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with SharedFixtureBuilds {
 
-  private val sharedResultBuild: SharedSandbox =
-    sharedSandbox(FixtureName.result, SandboxReset.fixtureFiles(os.sub / "core" / "test" / "src" / "samples"))(_ => ())
+  private val sharedResultBuild: SharedFixtureBuild =
+    sharedFixtureBuild(FixtureName.result, WorkspaceReset.fixtureFiles(os.sub / "core" / "test" / "src" / "samples"))(_ => ())
 
   private def withResultFixture[A](source: String, className: String)(test: FixtureBuild => A): A =
     withFixtureBuild(FixtureName.result) { build =>

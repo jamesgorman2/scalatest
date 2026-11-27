@@ -12,8 +12,8 @@ final class TestCommandOutputArgumentsSpec
     with should.Matchers
     with SingleModuleFixture {
 
-  private val sharedCalculatorSuiteBuild: SharedSandbox =
-    sharedSandbox(FixtureName.arguments, SandboxReset.noModuleFolders)(_.addSuites("CalculatorSuite"))
+  private val sharedCalculatorSuiteBuild: SharedFixtureBuild =
+    sharedFixtureBuild(FixtureName.arguments, WorkspaceReset.noModuleFolders)(_.addSuites("CalculatorSuite"))
 
   private val calculatorSuiteOutput: Seq[String] = Seq(
     "[core.test]",

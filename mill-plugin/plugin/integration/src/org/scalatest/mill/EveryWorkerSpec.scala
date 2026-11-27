@@ -4,24 +4,24 @@ import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
 
-final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with JsonOutputFixture with SharedSandboxes {
+final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with JsonOutputFixture with SharedFixtureBuilds {
 
   private def withEveryWorkerBuild[A](test: EveryWorkerBuild => A): A =
     withFixtureBuild(FixtureName.everyWorker)(build => test(new EveryWorkerBuild(build)))
 
-  private def sharedEveryWorkerBuild(setUp: EveryWorkerBuild => Unit): SharedSandbox =
-    sharedSandbox(
+  private def sharedEveryWorkerBuild(setUp: EveryWorkerBuild => Unit): SharedFixtureBuild =
+    sharedFixtureBuild(
       FixtureName.everyWorker,
-      SandboxReset.fixtureFiles(os.sub / "core" / "test" / "src" / "samples").and(SandboxReset.noMarkersFolder).and(SandboxReset.noModuleFolders)
+      WorkspaceReset.fixtureFiles(os.sub / "core" / "test" / "src" / "samples").and(WorkspaceReset.noMarkersFolder).and(WorkspaceReset.noModuleFolders)
     )(build => setUp(new EveryWorkerBuild(build)))
 
-  private val sharedUnchangedEveryWorkerBuild: SharedSandbox = sharedEveryWorkerBuild(_ => ())
+  private val sharedUnchangedEveryWorkerBuild: SharedFixtureBuild = sharedEveryWorkerBuild(_ => ())
 
-  private val sharedEveryWorkerBuildWithTestParallelism: SharedSandbox = sharedEveryWorkerBuild(_.turnOnTestParallelism())
+  private val sharedEveryWorkerBuildWithTestParallelism: SharedFixtureBuild = sharedEveryWorkerBuild(_.turnOnTestParallelism())
 
-  private val sharedEveryWorkerBuildWithBatchFrameworkTasks: SharedSandbox = sharedEveryWorkerBuild(_.turnOnBatchFrameworkTasks())
+  private val sharedEveryWorkerBuildWithBatchFrameworkTasks: SharedFixtureBuild = sharedEveryWorkerBuild(_.turnOnBatchFrameworkTasks())
 
-  private def inSharedEveryWorkerBuild[A](sandbox: SharedSandbox)(test: EveryWorkerBuild => A): A = sandbox.use(build => test(new EveryWorkerBuild(build)))
+  private def inSharedEveryWorkerBuild[A](sharedBuild: SharedFixtureBuild)(test: EveryWorkerBuild => A): A = sharedBuild.use(build => test(new EveryWorkerBuild(build)))
 
   private def runs(json: JsonNode): Seq[JsonNode] = json.node(NodeKind.Module, "core.test").contents
 

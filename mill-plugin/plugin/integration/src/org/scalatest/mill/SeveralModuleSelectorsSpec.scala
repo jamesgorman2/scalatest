@@ -6,9 +6,9 @@ import org.scalatest.matchers.should
 
 final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with SeveralModulesFixture {
 
-  private val sharedUnchangedSeveralModules: SharedSandbox = sharedSeveralModules(_ => ())
+  private val sharedUnchangedSeveralModules: SharedFixtureBuild = sharedSeveralModules(_ => ())
 
-  private val sharedSeveralModulesWithModulesThatSortByCharacterCode: SharedSandbox =
+  private val sharedSeveralModulesWithModulesThatSortByCharacterCode: SharedFixtureBuild =
     sharedSeveralModules { build =>
       Seq("B1", "b10", "b2").foreach(module => build.appendToBuild(s"object $module extends SampleModule {\n  object test extends SampleTests\n}"))
     }
@@ -21,15 +21,15 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
 
   private val alphaAndEveryTestModule: Seq[String] = Seq("alpha.test", "__.test")
 
-  private final case class RunWithMarkers(result: TestCommandResult, json: JsonNode, markerLineCounts: Seq[(SampleMarker, Int)])
+  private final case class RunAndMarkerLineCounts(result: TestCommandResult, json: JsonNode, markerLineCounts: Seq[(SampleMarker, Int)])
 
-  private lazy val sharedRunOnAlphaAndEveryTestModule: RunWithMarkers =
+  private lazy val sharedRunOnAlphaAndEveryTestModule: RunAndMarkerLineCounts =
     sharedUnchangedSeveralModules.use { build =>
       val (result, json) = resultAndJsonOutputOfTestCommand(build)(alphaAndEveryTestModule*)
-      RunWithMarkers(result, json, SampleMarker.all.map(marker => marker -> markerLines(build, marker).size))
+      RunAndMarkerLineCounts(result, json, SampleMarker.all.map(marker => marker -> markerLines(build, marker).size))
     }
 
-  private def givenAndWhenOfTheSharedRunOnAlphaAndEveryTestModule(): RunWithMarkers = {
+  private def givenWhenSharedRunOnAlphaAndEveryTestModule(): RunAndMarkerLineCounts = {
     givenTheSeveralModules()
     whenTheTestCommandIsInvokedWritingJsonOutput()(alphaAndEveryTestModule*)
     sharedRunOnAlphaAndEveryTestModule
@@ -95,7 +95,7 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
     }
 
     Scenario("Two module selectors that share a test module run each test module's tests once, under one module node each") {
-      val run = givenAndWhenOfTheSharedRunOnAlphaAndEveryTestModule()
+      val run = givenWhenSharedRunOnAlphaAndEveryTestModule()
 
       withClue(run.result.debugString) {
         Then("the JSON output's root holds exactly the module nodes alpha.test and beta.test, in that order")
@@ -128,7 +128,7 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
     }
 
     Scenario("Two module selectors that share a test module each record it") {
-      val run = givenAndWhenOfTheSharedRunOnAlphaAndEveryTestModule()
+      val run = givenWhenSharedRunOnAlphaAndEveryTestModule()
 
       Then("the root's moduleSelectors holds alpha.test, resolved to alpha.test, then __.test, resolved to alpha.test and beta.test")
       withClue(run.result.debugString) {
