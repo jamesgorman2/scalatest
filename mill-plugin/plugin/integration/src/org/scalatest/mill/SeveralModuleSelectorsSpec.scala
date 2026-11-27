@@ -72,7 +72,7 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
       }
     }
 
-    Scenario("Module selectors alpha.test __.test run each test module's tests once, under one module node each") {
+    Scenario("Two module selectors that share a test module run each test module's tests once, under one module node each") {
       withSeveralModules { build =>
         val (result, json) = runParsingJsonOutput(build)("alpha.test", "__.test")
 

@@ -24,7 +24,7 @@ final class ModuleSelectorSpec extends AnyFeatureSpec with GivenWhenThen with sh
     for ((what, arguments, rejection) <- selectorsThatFail) {
       Scenario(s"The test command given ${arguments.mkString(" ")}, $what, fails before any test starts") {
         withFixtureBuild(FixtureName.moduleSelectors) { build =>
-          Given("the JVM test module core.test, holding AddSuite")
+          Given("the JVM module core, which is not a test module, and its JVM test module core.test, holding AddSuite")
           When(s"the test command is given ${arguments.mkString(" ")}")
           val result = build.runTestCommand(arguments*)
 

@@ -37,7 +37,7 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
 
   Feature("A run's line holds what its worker wrote to stdout and stderr") {
 
-    Scenario("A test's stdout line is shown under Run 1:, under Mill's daemon") {
+    Scenario("A test's stdout line is shown under Run 1:, with Mill's daemon") {
       val result = withSuitesUnderMillsDaemon("CalculatorSuite") { build =>
         Given("CalculatorSuite, whose one test writes dividing now to stdout and succeeds, at Mill's default testLogLevel")
         And("Mill colours its console output")
@@ -51,7 +51,7 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
       }
     }
 
-    Scenario("Each stream's lines keep their order, under Mill's daemon") {
+    Scenario("Each stream's lines keep their order, with Mill's daemon") {
       val result = withSuitesUnderMillsDaemon("ChattySuite") { build =>
         Given("ChattySuite, whose one test writes out 1 to out 2000 to stdout and err 1 to err 2000 to stderr, alternating")
         And("Mill colours its console output")

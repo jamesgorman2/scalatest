@@ -167,7 +167,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
 
   Feature("Each worker of a JVM module has its own event log, output and time") {
 
-    Scenario("Without test parallelism, the module's time spans all of its runs, and each fork group's worker writes its event log in the group's processFolder") {
+    Scenario("Without test parallelism, the module's time spans its runs, and each fork group's worker writes its event log in the group's processFolder") {
       withEveryWorkerBuild { build =>
         givenTheModuleHoldsTwoForkGroups()
         And("test parallelism is off")
@@ -186,7 +186,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
       }
     }
 
-    Scenario("Under test parallelism, with test sandboxing off, each fork group runs its suites in one or two workers of its own, and each worker writes its event log in its own processFolder") {
+    Scenario("Under test parallelism with test sandboxing off, each fork group runs its suites in one or two workers of its own, each worker writing its event log in its own processFolder") {
       withEveryWorkerBuild { build =>
         givenTheModuleHoldsTwoForkGroups()
         And("test parallelism is on and test sandboxing is off")
@@ -219,7 +219,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
       }
     }
 
-    Scenario("Under testBatchFrameworkTasks, test parallelism still gives each fork group one worker, which writes its event log in the group's processFolder, and no queue is laid out") {
+    Scenario("Under testBatchFrameworkTasks with test parallelism on, each fork group still runs its suites in one worker, which writes its event log in the group's processFolder, and no processFolder holds a test queue or a claim folder") {
       withEveryWorkerBuild { build =>
         givenTheModuleHoldsTwoForkGroups()
         And("testBatchFrameworkTasks and test parallelism are both on")
