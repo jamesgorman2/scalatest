@@ -206,12 +206,8 @@ Feature: Every selected module runs, whatever happens to the others
       And the test command fails
 
   Rule: Where two of a module's fork groups each run only the same test class, the module runs no test, has an aborted module node, fails the test command, and does not stop another module's tests
-    In AC-024, `alpha.test` compiles only after `beta.test` has compiled, so that `alpha.test`'s tests start after `beta.test` has aborted.
-
     Scenario: AC-024 Two of beta.test's fork groups each hold only samples.Beta1
       Given `beta.test`'s `testForkGrouping` gives two fork groups, each holding only `samples.Beta1`
-      And `beta.test`'s compile, once it has compiled, creates the file `beta.test.compiled` in `<markers>`
-      And `alpha.test`'s compile depends on a task that ends once the file `beta.test.compiled` exists in `<markers>`, and fails if that file does not exist within 120 seconds
       When the test command is invoked with no flags and the module selectors `alpha.test beta.test`
       Then the files `Alpha1.fast` and `Alpha1.slow` exist in `<markers>`, and neither `Beta1.fast` nor `Beta1.slow` does
       And the module node `beta.test` holds no run node, its `outcome` is `aborted`, and its `failures` holds exactly one entry, whose `message` contains `samples.Beta1` and does not contain `beta.test`

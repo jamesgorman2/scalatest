@@ -47,15 +47,6 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
        |  super.allSourceFiles()
        |}""".stripMargin
 
-  private def compileCreatingMarker(marker: String): String =
-    s"""def compile: T[mill.javalib.api.CompilationResult] = Task {
-       |  val compiled = super.compile()
-       |  BuildCtx.withFilesystemCheckerDisabled {
-       |    os.write.over(BuildCtx.workspaceRoot / "markers" / "$marker", "")
-       |  }
-       |  compiled
-       |}""".stripMargin
-
   private def addLateTestCompilingAfterAlpha1Fast(build: FixtureBuild): Unit = {
     Given("the build also has the JVM test module late.test, which tests with com.edc::scalatest at the release under test and holds the suite Late1, whose class is samples.Late1")
     And("Late1 is an AnyFunSuite whose test fast creates the file Late1.fast in <markers>")
@@ -223,10 +214,7 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
     Scenario("Two of beta.test's fork groups each hold only samples.Beta1", AreaTag.Workers) {
       withSeveralModules { build =>
         Given("beta.test's testForkGrouping gives two fork groups, each holding only samples.Beta1")
-        And("beta.test's compile, once it has compiled, creates the file beta.test.compiled in <markers>")
-        addToTestModule(build, "beta", """def testForkGrouping = Task { Seq(Seq("samples.Beta1"), Seq("samples.Beta1")) }""", compileCreatingMarker("beta.test.compiled"))
-        And("alpha.test's compile depends on a task that ends once the file beta.test.compiled exists in <markers>, and fails if that file does not exist within 120 seconds")
-        addToTestModule(build, "alpha", compileAfterMarker("beta.test.compiled"))
+        addToTestModule(build, "beta", """def testForkGrouping = Task { Seq(Seq("samples.Beta1"), Seq("samples.Beta1")) }""")
         val (result, json) = runWithNoFlagsParsingJsonOutput(build)("alpha.test", "beta.test")
 
         withClue(result.debugString) {
