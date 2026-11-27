@@ -21,6 +21,12 @@ trait FixtureBuilds { this: should.Matchers =>
       millExecutable = IntegrationEnvironment.millExecutable
     )
 
+  protected def theModuleSelectors(selectors: Seq[String]): String =
+    selectors match {
+      case Seq(selector) => s"the module selector $selector"
+      case _ => s"the module selectors ${selectors.mkString(" ")}"
+    }
+
   protected def shouldSucceed(result: TestCommandResult): Unit =
     withClue(result.debugString) {
       result.succeeded shouldBe true

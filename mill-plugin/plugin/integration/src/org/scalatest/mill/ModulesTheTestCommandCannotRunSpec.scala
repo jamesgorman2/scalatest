@@ -57,7 +57,7 @@ final class ModulesTheTestCommandCannotRunSpec extends AnyFeatureSpec with Given
     build.runTestCommandWithMillArguments(FixtureBuild.jobsArguments(2))((selectors :+ "-fJ" :+ build.jsonOutputFile.toString)*)
 
   private def runTestCommand(build: FixtureBuild, selectors: String*): TestCommandResult = {
-    When(s"the test command is invoked with the module selector${if (selectors.size == 1) "" else "s"} ${selectors.mkString(" ")}")
+    When(s"the test command is invoked with ${theModuleSelectors(selectors)}")
     invokeTestCommand(build, selectors)
   }
 

@@ -42,16 +42,16 @@ trait SeveralModulesFixture extends JsonOutputFixture with SharedFixtureBuilds {
     And("the JSON output is the JSON value parsed from the file at <report> once the test command has ended")
 
   protected def addToTestModule(build: FixtureBuild, module: String, members: String*): Unit =
-    build.replaceInBuild(
-      Seq(
-        s"object $module extends SampleModule {",
-        "  object test extends SampleTests",
-        "}"
-      ).mkString("\n"),
-      testModuleHolding(module, members*)
-    )
+    build.replaceInBuild(moduleWithEmptyTestModule(module), moduleWithTestModuleHolding(module, members*))
 
-  protected def testModuleHolding(module: String, members: String*): String =
+  protected def moduleWithEmptyTestModule(module: String): String =
+    Seq(
+      s"object $module extends SampleModule {",
+      "  object test extends SampleTests",
+      "}"
+    ).mkString("\n")
+
+  protected def moduleWithTestModuleHolding(module: String, members: String*): String =
     Seq(
       s"object $module extends SampleModule {",
       "  object test extends SampleTests {",
@@ -71,12 +71,6 @@ trait SeveralModulesFixture extends JsonOutputFixture with SharedFixtureBuilds {
 
   protected def whenTheTestCommandIsInvokedWith(arguments: String): Unit =
     When(s"the test command is invoked with $arguments")
-
-  protected def theModuleSelectors(selectors: Seq[String]): String =
-    selectors match {
-      case Seq(selector) => s"the module selector $selector"
-      case _ => s"the module selectors ${selectors.mkString(" ")}"
-    }
 
   protected def resultAndJsonOutputOfTestCommand(build: FixtureBuild, millFlags: String*)(selectors: String*): (TestCommandResult, JsonNode) =
     build.resultAndJsonOutput(runTestCommand(build, millFlags*)((selectors :+ "-fJ" :+ build.jsonOutputFile.toString)*))

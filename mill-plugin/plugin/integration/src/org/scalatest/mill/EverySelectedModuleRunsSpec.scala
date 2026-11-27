@@ -65,7 +65,7 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
   }
 
   private def addBrokenTest(build: FixtureBuild)(testModuleMembers: String*): Unit =
-    build.appendToBuild(testModuleHolding("broken", testModuleMembers*))
+    build.appendToBuild(moduleWithTestModuleHolding("broken", testModuleMembers*))
 
   private def failAlpha1Slow(build: FixtureBuild): Unit =
     replaceInSuite(build, "alpha", "Alpha1")("""test("slow") {}""", """test("slow") { fail("fails as the scenario asks") }""")

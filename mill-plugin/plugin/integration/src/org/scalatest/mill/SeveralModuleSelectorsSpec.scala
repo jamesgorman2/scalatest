@@ -25,7 +25,7 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
 
   private val sharedSeveralModulesWithModulesThatSortByCharacterCode: SharedFixtureBuild =
     sharedSeveralModules { build =>
-      Seq("B1", "b10", "b2").foreach(module => build.appendToBuild(s"object $module extends SampleModule {\n  object test extends SampleTests\n}"))
+      Seq("B1", "b10", "b2").foreach(module => build.appendToBuild(moduleWithEmptyTestModule(module)))
     }
 
   private def inSharedSeveralModulesWithModulesThatSortByCharacterCode[A](test: FixtureBuild => A): A =
