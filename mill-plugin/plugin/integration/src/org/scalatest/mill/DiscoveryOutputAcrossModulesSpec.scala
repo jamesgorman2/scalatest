@@ -23,13 +23,16 @@ final class DiscoveryOutputAcrossModulesSpec extends AnyFeatureSpec with GivenWh
 
   Feature("Class globs and framework arguments across modules") {
 
+    final case class JavaHome(description: String, path: Option[String])
+
     val javaHomes = Seq(
-      "left unset" -> None,
-      "set to the path of a JDK of Java 17 or later" -> Some(sys.props("java.home"))
+      JavaHome("left unset", None),
+      JavaHome("set to the path of a JDK of Java 17 or later", Some(sys.props("java.home")))
     )
 
-    for ((javaHomeDescription, javaHome) <- javaHomes) {
-      val sharedBuildForTheJavaHome = javaHome.fold(sharedClassGlobsAcrossModulesWithNoisy) { path =>
+    for (javaHome <- javaHomes) {
+      val javaHomeDescription = javaHome.description
+      val sharedBuildForTheJavaHome = javaHome.path.fold(sharedClassGlobsAcrossModulesWithNoisy) { path =>
         sharedClassGlobsAcrossModules { build =>
           addNoisyToBetaTest(build)
           addToTestModule(build, "beta", s"def javaHome = Task { Some(PathRef(os.Path(\"\"\"$path\"\"\"))) }")

@@ -69,11 +69,16 @@ trait FixtureBuilds { this: should.Matchers =>
       result.consoleText should include(text)
     }
 
+  protected val noTestMatchedMessageStart: String = "Test selector does not match any test"
+
   protected def noTestMatchedMessageNaming(classGlobs: String): String =
-    s"Test selector does not match any test: $classGlobs\nRun discoveredTestClasses to see available tests"
+    s"$noTestMatchedMessageStart: $classGlobs\nRun discoveredTestClasses to see available tests"
 }
 
 trait FixtureBuildSteps extends FixtureBuilds { this: should.Matchers & GivenWhenThen =>
+
+  protected def givenABuildThatAddsTheMillPlugin(): Unit =
+    Given("a Mill 1.3.1 build that adds the Mill plugin, at the release of this fork under test, as the entry com.edc::scalatest-mill of its build.mill header's mvnDeps")
 
   protected def andAnEarlierTestCommandWroteTheReport(): Unit =
     And("<report> is an absolute path at which a file exists that an earlier test command wrote")

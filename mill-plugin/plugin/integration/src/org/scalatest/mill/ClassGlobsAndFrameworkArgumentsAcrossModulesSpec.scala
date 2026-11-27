@@ -12,20 +12,22 @@ final class ClassGlobsAndFrameworkArgumentsAcrossModulesSpec extends AnyFeatureS
 
   Feature("Class globs and framework arguments across modules") {
 
+    final case class ArgumentsAndMarkers(arguments: Seq[String], markers: Seq[String])
+
     val argumentsAndMarkers = Seq(
-      Seq("--", "samples.Alpha1", "samples.Beta1") -> Seq("Alpha1.fast", "Alpha1.slow", "Beta1.fast", "Beta1.slow"),
-      Seq("--", "--", "-n", "samples.Fast") -> Seq("Alpha1.fast", "Alpha2.fast", "Beta1.fast"),
-      Seq("--", "*1", "--", "-z", "slow") -> Seq("Alpha1.slow", "Beta1.slow")
+      ArgumentsAndMarkers(Seq("--", "samples.Alpha1", "samples.Beta1"), Seq("Alpha1.fast", "Alpha1.slow", "Beta1.fast", "Beta1.slow")),
+      ArgumentsAndMarkers(Seq("--", "--", "-n", "samples.Fast"), Seq("Alpha1.fast", "Alpha2.fast", "Beta1.fast")),
+      ArgumentsAndMarkers(Seq("--", "*1", "--", "-z", "slow"), Seq("Alpha1.slow", "Beta1.slow"))
     )
 
-    for ((arguments, markers) <- argumentsAndMarkers) {
-      Scenario(s"Arguments ${arguments.mkString(" ")}") {
+    for (row <- argumentsAndMarkers) {
+      Scenario(s"Arguments ${row.arguments.mkString(" ")}") {
         inSharedBuild(sharedUnchangedClassGlobsAcrossModules) { build =>
-          val (result, _) = whenTheTestCommandIsInvokedOnBothModulesParsingJsonOutput(build, arguments*)
+          val (result, _) = whenTheTestCommandIsInvokedOnBothModulesParsingJsonOutput(build, row.arguments*)
 
-          Then(s"the files in <markers> are exactly ${EnglishList.of(markers)}")
+          Then(s"the files in <markers> are exactly ${EnglishList.of(row.markers)}")
           withClue(result.debugString) {
-            build.markers shouldBe markers
+            build.markers shouldBe row.markers
           }
 
           And("the test command succeeds")

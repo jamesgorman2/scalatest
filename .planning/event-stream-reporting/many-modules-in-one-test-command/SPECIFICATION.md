@@ -28,7 +28,8 @@ Bare `AC-nnn` IDs are this document's. The epic's requirements are cited as `../
   - each module's tests run whatever happens to the other selected modules.
 - Each failure the test command can attribute to one selected test module, shown on that module's node in the JSON and human-readable outputs. Such failures include:
   - the module's class globs matching no test;
-  - the module's tests not starting, where the module fails to compile, its dependencies fail to resolve, or another task its tests depend on fails.
+  - the module's tests not starting, where the module fails to compile, its dependencies fail to resolve, or another task its tests depend on fails;
+  - the module's test discovery throwing.
 - Once the tests have run, the test command's failure naming exactly the selected test modules that failed, unless its JSON output cannot be written.
 - Where the test command cannot run a selected test module, its failure also naming each other selected test module whose tests are known, before any test starts, not to start, such as one whose dependencies fail to resolve. The failure gives each such module's own failure.
 - What Mill's test discovery writes for a selected test module, shown on that module's node in the JSON and human-readable outputs.
@@ -178,7 +179,7 @@ Feature: Every selected module runs, whatever happens to the others
       When the test command is invoked with the flags `--keep-going` and the module selectors `alpha.test broken.test beta.test`
       Then the files `Alpha1.fast`, `Alpha1.slow`, `Beta1.fast` and `Beta1.slow` exist in `<markers>`
       And the JSON output's root holds exactly the module nodes `alpha.test`, `beta.test` and `broken.test`, in that order
-      And the module node `broken.test` holds no run node, its `outcome` is `aborted`, and its `failures` holds exactly one entry, whose `message` contains `broken.test.compile`
+      And the module node `broken.test` holds no run node, its `outcome` is `aborted`, and its `failures` holds exactly one entry, whose `message` contains `broken.test.compile Compilation failed`
       And the module nodes `alpha.test` and `beta.test` have no `outcome` and no `failures`
       And the JSON output's root has no `outcome` and no `failures`
       And the test command fails
@@ -188,15 +189,15 @@ Feature: Every selected module runs, whatever happens to the others
       When the test command is invoked with no flags and the module selectors `alpha.test broken.test beta.test`
       Then the files `Alpha1.fast`, `Alpha1.slow`, `Beta1.fast` and `Beta1.slow` exist in `<markers>`
       And the JSON output's root holds exactly the module nodes `alpha.test`, `beta.test` and `broken.test`, in that order
-      And the module node `broken.test` holds no run node, its `outcome` is `aborted`, and its `failures` holds exactly one entry, whose `message` contains <named>
+      And the module node `broken.test` holds no run node, its `outcome` is `aborted`, and its `failures` holds exactly one entry, whose `message` contains <text>
       And the module nodes `alpha.test` and `beta.test` have no `outcome` and no `failures`
       And the JSON output's root has no `outcome` and no `failures`
       And the test command fails
 
       Examples:
-        | cause                                                                                       | named                          |
-        | whose `mvnDeps` holds `com.example::absent:0.0.1`, which no repository the build uses holds | `com.example:absent_3:0.0.1`   |
-        | whose `generatedSources` task throws an exception                                           | `broken.test.generatedSources` |
+        | cause                                                                                                            | text                                                                        |
+        | whose `mvnDeps` holds `com.example::absent:0.0.1`, which no repository the build uses holds                      | `com.example:absent_3:0.0.1`                                                |
+        | whose `generatedSources` task throws an exception whose message is `generatedSources throws as the scenario asks` | `broken.test.generatedSources generatedSources throws as the scenario asks` |
 
     Scenario: AC-023 broken.test's failure in the human-readable output
       Given the build also has the JVM test module `broken.test`, which tests with `com.edc::scalatest` at the release under test and whose sources do not compile
@@ -235,6 +236,26 @@ Feature: Every selected module runs, whatever happens to the others
       And the build also has the JVM test module `broken.test`, which tests with `com.edc::scalatest` at the release under test and whose sources do not compile
       When the test command is invoked with no flags and the module selectors `alpha.test broken.test beta.test`
       Then Mill reports that the test command failed, with the message `The tests of alpha.test and broken.test failed`
+
+  Rule: A module whose test discovery throws has an aborted module node whose one failure names what was thrown, keeps what discovery wrote, fails the test command, and does not stop another module's tests
+    Scenario: AC-029 A static initializer of a beta.test class throws during discovery
+      Given `beta.test` also holds the class `samples.Throwing`, a public Java class that extends `org.scalatest.funsuite.AnyFunSuite` and holds no test
+      And `samples.Throwing`'s only public constructor takes no argument
+      And `samples.Throwing`'s static initializer writes the line `loading samples.Throwing` to stdout, then throws an `IllegalStateException` whose message is `samples.Throwing fails to load as the scenario asks`
+      When the test command is invoked with no flags and the module selectors `alpha.test beta.test`
+      Then the files `Alpha1.fast`, `Alpha1.slow`, `Alpha2.fast` and `Alpha2.slow` exist in `<markers>`
+      And the module node `beta.test` holds no run node, its `outcome` is `aborted`, and its `failures` holds exactly one entry, whose `message` contains `samples.Throwing fails to load as the scenario asks`
+      And the module node `beta.test` has an `output` that holds exactly one item, a `stdio` item whose `stream` is `stdout` and whose `text` is `loading samples.Throwing` followed by a line terminator
+      And the module node `alpha.test` has no `outcome` and no `failures`
+      And the test command fails
+
+  Rule: Where the JSON output cannot be written once the tests have run, the test command's failure says so and names no module, though a selected module failed
+    Scenario: AC-030 A test of alpha.test fails and the JSON output cannot be written
+      Given `Alpha1`'s test `slow` fails
+      And a regular file exists at `<blocker>`
+      When `mill -j 2 scalatest/test alpha.test beta.test -fJ <blocker>/report.json` is invoked
+      Then Mill reports that the test command failed, with a message naming `<blocker>/report.json`
+      And that message names neither `alpha.test` nor `beta.test`
 ```
 
 ```gherkin
@@ -386,11 +407,19 @@ Feature: Modules the test command cannot run
       And nothing exists at `<report>`
       And Mill's console shows no consolidated output
 
-  Rule: A module selector that resolves to no test module fails the test command, naming that module selector, before any module's tests start
+  Rule: A module selector that resolves to no test module fails the test command before any module's tests start, and the failure names every such module selector
     Scenario: AC-016 Module selectors alpha.test and util
       Given the build also has the JVM module `util`, which is not a test module and holds no module
       When the test command is invoked with the module selectors `alpha.test util`
       Then Mill reports that the test command failed, with a message naming the module selector `util`
+      And no file exists in `<markers>`
+      And nothing exists at `<report>`
+      And Mill's console shows no consolidated output
+
+    Scenario: AC-028 Module selectors alpha.test, util and tool
+      Given the build also has the JVM modules `util` and `tool`, neither of which is a test module or holds a module
+      When the test command is invoked with the module selectors `alpha.test util tool`
+      Then Mill reports that the test command failed, with a message naming the module selectors `util` and `tool`
       And no file exists in `<markers>`
       And nothing exists at `<report>`
       And Mill's console shows no consolidated output
@@ -428,26 +457,26 @@ Feature: Another goal fails first
 
 Each epic requirement this feature enables, with the criteria that test it:
 
-| Epic requirement             | Criteria                                               |
-|------------------------------|--------------------------------------------------------|
-| `../SPECIFICATION.md` R-028  | AC-002, AC-013, AC-014, AC-017                         |
-| `../SPECIFICATION.md` R-046c | AC-006, AC-015, AC-023, AC-024                         |
-| `../SPECIFICATION.md` R-053a | AC-008, AC-009, AC-022                                 |
-| `../SPECIFICATION.md` R-053b | AC-008                                                 |
-| `../SPECIFICATION.md` R-055  | AC-001, AC-003, AC-008, AC-017, AC-018                 |
-| `../SPECIFICATION.md` R-056a | AC-005, AC-006, AC-009, AC-015, AC-024                 |
-| `../SPECIFICATION.md` R-056b | AC-007                                                 |
-| `../SPECIFICATION.md` R-059  | AC-010, AC-011, AC-020                                 |
-| `../SPECIFICATION.md` R-061  | AC-006, AC-015                                         |
-| `../SPECIFICATION.md` R-062  | AC-012, AC-021                                         |
-| `../SPECIFICATION.md` R-072b | AC-006, AC-009, AC-015, AC-022, AC-024                 |
-| `../SPECIFICATION.md` R-077  | AC-010, AC-011, AC-016, AC-019                         |
-| `../SPECIFICATION.md` R-096a | AC-001, AC-002, AC-003, AC-006, AC-013                 |
-| `../SPECIFICATION.md` R-097b | AC-025, AC-026                                         |
-| `../SPECIFICATION.md` R-098e | AC-006, AC-009, AC-015, AC-022, AC-024                 |
-| `../SPECIFICATION.md` R-105  | AC-001, AC-003, AC-006                                 |
-| `../SPECIFICATION.md` R-106d | AC-023, AC-026                                         |
-| `../SPECIFICATION.md` R-106e | AC-026                                                 |
-| `../SPECIFICATION.md` R-110  | AC-004                                                 |
-| `../SPECIFICATION.md` R-137  | AC-005, AC-006, AC-009, AC-015, AC-022, AC-024, AC-027 |
-| `../SPECIFICATION.md` R-142  | AC-019                                                 |
+| Epic requirement             | Criteria                                                               |
+|------------------------------|------------------------------------------------------------------------|
+| `../SPECIFICATION.md` R-028  | AC-002, AC-013, AC-014, AC-017                                         |
+| `../SPECIFICATION.md` R-046c | AC-006, AC-015, AC-023, AC-024, AC-029                                 |
+| `../SPECIFICATION.md` R-053a | AC-008, AC-009, AC-022                                                 |
+| `../SPECIFICATION.md` R-053b | AC-008                                                                 |
+| `../SPECIFICATION.md` R-055  | AC-001, AC-003, AC-008, AC-017, AC-018                                 |
+| `../SPECIFICATION.md` R-056a | AC-005, AC-006, AC-009, AC-015, AC-024, AC-029                         |
+| `../SPECIFICATION.md` R-056b | AC-007                                                                 |
+| `../SPECIFICATION.md` R-059  | AC-010, AC-011, AC-020                                                 |
+| `../SPECIFICATION.md` R-061  | AC-006, AC-015                                                         |
+| `../SPECIFICATION.md` R-062  | AC-012, AC-021                                                         |
+| `../SPECIFICATION.md` R-072b | AC-006, AC-009, AC-015, AC-022, AC-024, AC-029                         |
+| `../SPECIFICATION.md` R-077  | AC-010, AC-011, AC-016, AC-019, AC-028                                 |
+| `../SPECIFICATION.md` R-096a | AC-001, AC-002, AC-003, AC-006, AC-013                                 |
+| `../SPECIFICATION.md` R-097b | AC-025, AC-026, AC-029                                                 |
+| `../SPECIFICATION.md` R-098e | AC-006, AC-009, AC-015, AC-022, AC-024, AC-029                         |
+| `../SPECIFICATION.md` R-105  | AC-001, AC-003, AC-006                                                 |
+| `../SPECIFICATION.md` R-106d | AC-023, AC-026                                                         |
+| `../SPECIFICATION.md` R-106e | AC-026                                                                 |
+| `../SPECIFICATION.md` R-110  | AC-004                                                                 |
+| `../SPECIFICATION.md` R-137  | AC-005, AC-006, AC-009, AC-015, AC-022, AC-024, AC-027, AC-029, AC-030 |
+| `../SPECIFICATION.md` R-142  | AC-019                                                                 |

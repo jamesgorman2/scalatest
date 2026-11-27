@@ -1,6 +1,7 @@
 package org.scalatest.mill
 
 import org.scalatest.GivenWhenThen
+import org.scalatest.consolidation.CapturedLine
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
 import org.scalatest.mill.tags.AreaTag
@@ -73,13 +74,40 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
   private def addBrokenTest(build: FixtureBuild)(testModuleMembers: String*): Unit =
     build.appendToBuild(moduleWithTestModuleHolding("broken", testModuleMembers*))
 
-  private def failAlpha1Slow(build: FixtureBuild): Unit =
-    replaceInSuite(build, "alpha", "Alpha1")("""test("slow") {}""", """test("slow") { fail("fails as the scenario asks") }""")
+  private def failAlpha1Slow(build: FixtureBuild): Unit = {
+    val slow = SampleTest.Slow.untagged
+    replaceInSuite(build, "alpha", "Alpha1")(slow.withEmptyBody, slow.failing)
+  }
 
   private def addBrokenTestThatDoesNotCompile(build: FixtureBuild): Unit = {
     addBrokenTest(build)()
-    replaceInSuite(build, "broken", "Broken1")("""test("fast") {}""", """test("fast") { notDefinedAnywhere }""")
+    val fast = SampleTest.Fast.untagged
+    replaceInSuite(build, "broken", "Broken1")(fast.withEmptyBody, fast.withBody("notDefinedAnywhere"))
   }
+
+  private def addThrowingToBetaTest(build: FixtureBuild): Unit =
+    os.write(
+      build.workspace / "beta" / "test" / "src" / "samples" / "Throwing.java",
+      Seq(
+        "package samples;",
+        "",
+        "import org.scalatest.funsuite.AnyFunSuite;",
+        "",
+        "public class Throwing extends AnyFunSuite {",
+        "",
+        "    static {",
+        "        System.out.println(\"loading samples.Throwing\");",
+        "        if (true) {",
+        "            throw new IllegalStateException(\"samples.Throwing fails to load as the scenario asks\");",
+        "        }",
+        "    }",
+        "",
+        "    public Throwing() {",
+        "    }",
+        "}",
+        ""
+      ).mkString("\n")
+    )
 
   private val sharedSeveralModulesWithBetaTestCompilingAfterAlpha1SlowFails: SharedFixtureBuild =
     sharedSeveralModules { build =>
@@ -152,31 +180,33 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
       inSharedSeveralModulesWithBrokenTestThatDoesNotCompile { build =>
         val (result, json) = whenTheTestCommandIsInvokedWithFlagsParsingJsonOutput(build, MillFlags.KeepGoing)("alpha.test", "broken.test", "beta.test")
 
-        brokenTestShouldAbortWhileAlphaAndBetaRun(build, result, json, "broken.test.compile")
+        brokenTestShouldAbortWhileAlphaAndBetaRun(build, result, json, "broken.test.compile Compilation failed")
       }
     }
 
-    val causesAndFailureTexts = Seq(
-      (
-        "whose mvnDeps holds com.example::absent:0.0.1, which no repository the build uses holds",
-        """def mvnDeps = Seq(mvn"com.edc::scalatest::3.2.20", mvn"com.example::absent:0.0.1")""",
-        "com.example:absent_3:0.0.1"
+    final case class CauseOfTestsNotStarting(cause: String, testModuleMember: String, failureText: String)
+
+    val causesOfTestsNotStarting = Seq(
+      CauseOfTestsNotStarting(
+        cause = "whose mvnDeps holds com.example::absent:0.0.1, which no repository the build uses holds",
+        testModuleMember = """def mvnDeps = Seq(mvn"com.edc::scalatest::3.2.20", mvn"com.example::absent:0.0.1")""",
+        failureText = "com.example:absent_3:0.0.1"
       ),
-      (
-        "whose generatedSources task throws an exception",
-        """def generatedSources: T[Seq[PathRef]] = Task { sys.error("generatedSources throws as the scenario asks") }""",
-        "broken.test.generatedSources"
+      CauseOfTestsNotStarting(
+        cause = "whose generatedSources task throws an exception whose message is generatedSources throws as the scenario asks",
+        testModuleMember = """def generatedSources: T[Seq[PathRef]] = Task { sys.error("generatedSources throws as the scenario asks") }""",
+        failureText = "broken.test.generatedSources generatedSources throws as the scenario asks"
       )
     )
 
-    for ((cause, testModuleMember, failureText) <- causesAndFailureTexts) {
-      Scenario(s"broken.test's tests cannot start: $cause") {
+    for (notStarting <- causesOfTestsNotStarting) {
+      Scenario(s"broken.test's tests cannot start: ${notStarting.cause}") {
         withSeveralModules { build =>
-          Given(s"the build also has the JVM test module broken.test, which tests with com.edc::scalatest at the release under test and $cause")
-          addBrokenTest(build)(testModuleMember)
+          Given(s"the build also has the JVM test module broken.test, which tests with com.edc::scalatest at the release under test and ${notStarting.cause}")
+          addBrokenTest(build)(notStarting.testModuleMember)
           val (result, json) = whenTheTestCommandIsInvokedWithNoFlagsParsingJsonOutput(build)("alpha.test", "broken.test", "beta.test")
 
-          brokenTestShouldAbortWhileAlphaAndBetaRun(build, result, json, failureText)
+          brokenTestShouldAbortWhileAlphaAndBetaRun(build, result, json, notStarting.failureText)
         }
       }
     }
@@ -185,21 +215,23 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
       inSharedSeveralModulesWithBrokenTestThatDoesNotCompile { build =>
         When("mill -j 2 scalatest/test alpha.test broken.test beta.test -oH is invoked")
         val result = runTestCommandWithTwoJobs(build)("alpha.test", "broken.test", "beta.test", "-oH")
-        val lines = result.treeLines
-        val colourMarkedLines = result.colourMarkedTreeLines
-        val moduleLine = lines.indexOf("[broken.test]")
+        val brokenSubtree = result.subtreeOf("[broken.test]")
+        val colourMarkedBrokenSubtree = result.colourMarkedSubtreeOf("[broken.test]")
 
         withClue(result.debugString) {
           Then("in the human-readable output on stdout, the line after the line [broken.test] is *** MODULE ABORTED ***, in red and indented one level more than [broken.test]")
-          moduleLine should be >= 0
-          colourMarkedLines.lift(moduleLine + 1) shouldBe Some("  {red}*** MODULE ABORTED ***{reset}")
+          brokenSubtree should not be empty
+          colourMarkedBrokenSubtree.lift(1) shouldBe Some("  {red}*** MODULE ABORTED ***{reset}")
 
           And("each line between *** MODULE ABORTED *** and the next line indented no more than *** MODULE ABORTED *** is in red and indented one level more than *** MODULE ABORTED ***")
-          val failureLines = lines.zip(colourMarkedLines).drop(moduleLine + 2).takeWhile { case (line, _) => TestCommandResult.indentationOf(line) > 2 }
-          failureLines.foreach { case (line, colourMarkedLine) =>
-            line shouldBe s"    ${line.trim}"
-            colourMarkedLine shouldBe s"    {red}${line.trim}{reset}"
-          }
+          val abortedLineIndentation = TestCommandResult.indentationOf(brokenSubtree(1))
+          val failureLines = brokenSubtree
+            .zip(colourMarkedBrokenSubtree)
+            .drop(2)
+            .takeWhile { case (line, _) => TestCommandResult.indentationOf(line) > abortedLineIndentation }
+          failureLines.filterNot { case (line, colourMarkedLine) =>
+            line == s"    ${line.trim}" && colourMarkedLine == s"    {red}${line.trim}{reset}"
+          } shouldBe empty
 
           And("there is at least one such line, and one of them contains broken.test.compile")
           failureLines.collect { case (line, _) if line.contains("broken.test.compile") => line } should not be empty
@@ -270,6 +302,73 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
         Then("Mill reports that the test command failed, with the message The tests of alpha.test and broken.test failed")
         shouldFail(result)
         shouldWriteToTheConsole(result, "The tests of alpha.test and broken.test failed")
+      }
+    }
+
+    Scenario("A test of alpha.test fails and the JSON output cannot be written", AreaTag.Json) {
+      withSeveralModules { build =>
+        Given("Alpha1's test slow fails")
+        failAlpha1Slow(build)
+        And("a regular file exists at <blocker>")
+        val blocker = build.workspace / "blocker"
+        os.write(blocker, "a file")
+        val reportInsideBlocker = blocker / "report.json"
+        When("mill -j 2 scalatest/test alpha.test beta.test -fJ <blocker>/report.json is invoked")
+        val result = runTestCommandWithTwoJobs(build)("alpha.test", "beta.test", "-fJ", s"$blocker/report.json")
+        val failureLines = result.consoleLines.filter(_.contains("The test command cannot write its JSON output"))
+
+        withClue(result.debugString) {
+          Then("Mill reports that the test command failed, with a message naming <blocker>/report.json")
+          shouldFail(result)
+          failureLines should not be empty
+          failureLines.filterNot(_.contains(reportInsideBlocker.toString)) shouldBe empty
+
+          And("that message names neither alpha.test nor beta.test")
+          failureLines.filter(line => line.contains("alpha.test") || line.contains("beta.test")) shouldBe empty
+          result.consoleText should not include "The tests of"
+        }
+      }
+    }
+
+    Scenario("A static initializer of a beta.test class throws during discovery", AreaTag.Capture) {
+      withSeveralModules { build =>
+        Given("beta.test also holds the class samples.Throwing, a public Java class that extends org.scalatest.funsuite.AnyFunSuite and holds no test")
+        And("samples.Throwing's only public constructor takes no argument")
+        And(
+          "samples.Throwing's static initializer writes the line loading samples.Throwing to stdout, " +
+            "then throws an IllegalStateException whose message is samples.Throwing fails to load as the scenario asks"
+        )
+        addThrowingToBetaTest(build)
+        val (result, json) = whenTheTestCommandIsInvokedWithNoFlagsParsingJsonOutput(build)("alpha.test", "beta.test")
+
+        withClue(result.debugString) {
+          Then("the files Alpha1.fast, Alpha1.slow, Alpha2.fast and Alpha2.slow exist in <markers>")
+          build.markers should contain allOf ("Alpha1.fast", "Alpha1.slow", "Alpha2.fast", "Alpha2.slow")
+
+          And(
+            "the module node beta.test holds no run node, its outcome is aborted, and its failures holds exactly one entry, " +
+              "whose message contains samples.Throwing fails to load as the scenario asks"
+          )
+          runNodesOf(json, "beta.test") shouldBe empty
+          shouldBeAbortedWithOneFailureContaining(json, "beta.test", "samples.Throwing fails to load as the scenario asks")
+
+          And(
+            "the module node beta.test has an output that holds exactly one item, a stdio item whose stream is stdout " +
+              "and whose text is loading samples.Throwing followed by a line terminator"
+          )
+          val betaOutput = moduleNode(json, "beta.test").output
+          betaOutput.map(_.kind) shouldBe Seq(OutputItemKind.Stdio)
+          betaOutput.head.capturedLine match {
+            case CapturedLine.Stdout(text) => text should fullyMatch regex """loading samples\.Throwing(\r\n|\n|\r)"""
+            case line => fail(s"$line is not on stdout")
+          }
+
+          And("the module node alpha.test has no outcome and no failures")
+          shouldHaveNoKeys(moduleNode(json, "alpha.test"), "outcome", "failures")
+        }
+
+        And("the test command fails")
+        shouldFail(result)
       }
     }
   }

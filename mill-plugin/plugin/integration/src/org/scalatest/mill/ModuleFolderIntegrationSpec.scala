@@ -4,10 +4,10 @@ import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
 import org.scalatest.mill.tags.Workers
+import org.xml.sax.SAXException
 import org.xml.sax.helpers.DefaultHandler
 
 import javax.xml.parsers.DocumentBuilderFactory
-import scala.util.Try
 
 @Workers
 final class ModuleFolderIntegrationSpec
@@ -42,33 +42,41 @@ final class ModuleFolderIntegrationSpec
       val builder = DocumentBuilderFactory.newInstance().newDocumentBuilder()
       // The default error handler writes each parse error to stderr.
       builder.setErrorHandler(new DefaultHandler)
-      Try(builder.parse(file.toIO).getDocumentElement.getTagName).toOption.exists(root => root == "testsuites" || root == "testsuite")
+      // A file that cannot be read fails the scenario; only one that is not XML is not a report.
+      try {
+        val root = builder.parse(file.toIO).getDocumentElement.getTagName
+        root == "testsuites" || root == "testsuite"
+      } catch {
+        case _: SAXException => false
+      }
     }
 
     def describe(arguments: Seq[String]): String = if (arguments.isEmpty) "no arguments" else arguments.mkString(" ")
 
+    final case class ReportSettingAndArguments(setting: String, arguments: Seq[String])
+
     val reportSettingsAndArguments = Seq(
-      """Some("test-report.xml")""" -> Nil,
-      """Some("junit-results.xml")""" -> Seq("--", "samples.Alpha*"),
-      """Some("test-report.xml")""" -> Seq("--", "--", "-n", "samples.Fast"),
-      """Some("test-report.xml")""" -> Seq("--", "samples.Gamma*"),
-      "None" -> Seq("--", "*", "--", "-l", "samples.Fast")
+      ReportSettingAndArguments("""Some("test-report.xml")""", Nil),
+      ReportSettingAndArguments("""Some("junit-results.xml")""", Seq("--", "samples.Alpha*")),
+      ReportSettingAndArguments("""Some("test-report.xml")""", Seq("--", "--", "-n", "samples.Fast")),
+      ReportSettingAndArguments("""Some("test-report.xml")""", Seq("--", "samples.Gamma*")),
+      ReportSettingAndArguments("None", Seq("--", "*", "--", "-l", "samples.Fast"))
     )
 
-    val sharedBuildByReportSetting = reportSettingsAndArguments.map { case (setting, _) => setting }.distinct.map { setting =>
+    val sharedBuildByReportSetting = reportSettingsAndArguments.map(_.setting).distinct.map { setting =>
       setting -> sharedMarkingSuites { build =>
         build.addToTestModule(s"def testReportXml: T[Option[String]] = Task { $setting }")
         build.replaceInSample(s"${SampleSuite.Beta1}.scala", SampleTest.Slow.withEmptyBody, SampleTest.Slow.failing)
       }
     }.toMap
 
-    for ((setting, arguments) <- reportSettingsAndArguments) {
-      Scenario(s"With testReportXml $setting and ${describe(arguments)}, the module folder holds no JUnit XML report") {
-        Given(s"the module's testReportXml is $setting")
+    for (report <- reportSettingsAndArguments) {
+      Scenario(s"With testReportXml ${report.setting} and ${describe(report.arguments)}, the module folder holds no JUnit XML report") {
+        Given(s"the module's testReportXml is ${report.setting}")
         And("Beta1's test slow fails")
-        When(s"the test command runs core.test, writing JSON output, with ${describe(arguments)}")
-        sharedBuildByReportSetting(setting).use { build =>
-          val result = runWritingJsonOutput(build, arguments*)
+        When(s"the test command runs core.test, writing JSON output, with ${describe(report.arguments)}")
+        sharedBuildByReportSetting(report.setting).use { build =>
+          val result = runWritingJsonOutput(build, report.arguments*)
 
           Then("no file in the module folder or in any folder inside it is an XML document whose root element is testsuites or testsuite")
           withClue(result.debugString) {

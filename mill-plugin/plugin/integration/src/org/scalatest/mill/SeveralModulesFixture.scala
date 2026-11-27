@@ -23,9 +23,6 @@ trait SeveralModulesFixture extends JsonOutputFixture with SharedFixtureBuilds w
     sharedBuild.use(test)
   }
 
-  protected def givenABuildThatAddsTheMillPlugin(): Unit =
-    Given("a Mill 1.3.1 build that adds the Mill plugin, at the release of this fork under test, as the entry com.edc::scalatest-mill of its build.mill header's mvnDeps")
-
   protected def andAlphaTestAndBetaTestUseThatRelease(): Unit =
     And("the build's JVM test modules alpha.test and beta.test each test with com.edc::scalatest at that release, and their definitions name nothing of the plugin")
 

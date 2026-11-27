@@ -32,7 +32,7 @@ final class ModulesTheTestCommandCannotRunSpec extends AnyFeatureSpec with Given
   private def runTestCommandOnAlpha(build: FixtureBuild): TestCommandResult = runTestCommandWithTwoJobsWritingJsonOutput(build)("alpha.test")
 
   private def givenTheBuild(): Unit = {
-    Given("a Mill 1.3.1 build that adds the Mill plugin, at the release of this fork under test, as the entry com.edc::scalatest-mill of its build.mill header's mvnDeps")
+    givenABuildThatAddsTheMillPlugin()
     And("the build's JVM test module alpha.test tests with com.edc::scalatest at that release and holds the suite Alpha1, an AnyFunSuite whose test fast succeeds")
     And(
       "the build also has these test modules, each with one test that succeeds: " +
@@ -58,7 +58,7 @@ final class ModulesTheTestCommandCannotRunSpec extends AnyFeatureSpec with Given
   private def shouldNameModulesTheTestCommandCannotRun(result: TestCommandResult, modules: Seq[String]): Unit =
     withClue(result.debugString) {
       result.consoleText should include(cannotRunModulesHeader)
-      modules.foreach(module => result.consoleLines.exists(line => line.contains(s"  $module ") || line.contains(s"  $module's ")) shouldBe true)
+      modules.filterNot(module => result.consoleLines.exists(line => line.contains(s"  $module ") || line.contains(s"  $module's "))) shouldBe empty
     }
 
   Feature("Modules the test command cannot run") {
@@ -86,8 +86,7 @@ final class ModulesTheTestCommandCannotRunSpec extends AnyFeatureSpec with Given
         And("that message names unresolved.test as a module whose tests cannot start, with a failure that contains com.example:absent_3:0.0.1")
         withClue(result.debugString) {
           val linesAfterHeader = result.consoleLines.dropWhile(line => !line.contains(modulesWhoseTestsCannotStartHeader))
-          linesAfterHeader.exists(_.contains("  unresolved.test:")) shouldBe true
-          linesAfterHeader.exists(_.contains("com.example:absent_3:0.0.1")) shouldBe true
+          Seq("  unresolved.test:", "com.example:absent_3:0.0.1").filterNot(text => linesAfterHeader.exists(_.contains(text))) shouldBe empty
         }
 
         shouldStartNoTestAndWriteNoConsolidatedOutput(build, result)
@@ -107,7 +106,7 @@ final class ModulesTheTestCommandCannotRunSpec extends AnyFeatureSpec with Given
           build.markers should have size 2
 
           And("the file at <report> holds JSON output whose root holds exactly the module nodes alpha.test and indirect.test, in that order")
-          build.jsonOutput.contents.map(_.name) shouldBe Seq("alpha.test", "indirect.test")
+          build.jsonOutput.contentNames shouldBe Seq("alpha.test", "indirect.test")
         }
 
         And("the test command succeeds")
@@ -142,6 +141,23 @@ final class ModulesTheTestCommandCannotRunSpec extends AnyFeatureSpec with Given
         Then("Mill reports that the test command failed, with a message naming the module selector util")
         shouldFail(result)
         shouldWriteToTheConsole(result, "Module selector util resolves to no test module")
+
+        shouldStartNoTestAndWriteNoConsolidatedOutput(build, result)
+      }
+    }
+
+    Scenario("Module selectors alpha.test, util and tool") {
+      withModulesTheTestCommandCannotRun { build =>
+        Given("the build also has the JVM modules util and tool, neither of which is a test module or holds a module")
+        build.appendToBuild("object util extends SampleModule\n\nobject tool extends SampleModule")
+        val result = whenTheTestCommandIsInvokedWithTwoJobsWritingJsonOutput(build, "alpha.test", "util", "tool")
+
+        Then("Mill reports that the test command failed, with a message naming the module selectors util and tool")
+        shouldFail(result)
+        withClue(result.debugString) {
+          Seq("Module selector util resolves to no test module", "Module selector tool resolves to no test module")
+            .filterNot(result.consoleText.contains) shouldBe empty
+        }
 
         shouldStartNoTestAndWriteNoConsolidatedOutput(build, result)
       }

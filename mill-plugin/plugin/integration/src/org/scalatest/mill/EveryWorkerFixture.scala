@@ -72,19 +72,16 @@ private final class EveryWorkerBuild(fixtureBuild: FixtureBuild) {
 
   def removeSuites(): Unit = os.remove.all(fixtureBuild.samples)
 
-  private val testBodySendingWorkingDirectory: String = """info(System.getProperty("user.dir"))"""
-
   def emptyMarkersFolder(): os.Path = {
-    val markers = fixtureBuild.workspace / "markers"
-    os.makeDir(markers)
-    markers
+    WorkspaceReset.emptyMarkersFolder.restore(fixtureBuild)
+    fixtureBuild.markersFolder
   }
 
   def writeSuiteThatWaitsFor(suite: String, otherSuite: String, markers: os.Path): Unit = {
     val markersLiteral = "\"" + markers.toString.replace('\\', '/') + "\""
     writeSuite(
       suite,
-      s"""$testBodySendingWorkingDirectory
+      s"""${SampleTest.bodySendingWorkingDirectory}
          |    val markers = java.nio.file.Paths.get($markersLiteral)
          |    java.nio.file.Files.write(markers.resolve("$suite"), Array.emptyByteArray)
          |    val deadline = System.nanoTime() + 30L * 1000 * 1000 * 1000
@@ -106,7 +103,7 @@ private final class EveryWorkerBuild(fixtureBuild: FixtureBuild) {
 
   def removeForkGrouping(): Unit = fixtureBuild.replaceInBuild(s"def testForkGrouping = Task { $defaultForkGrouping }", "")
 
-  def turnOnTestParallelism(): Unit = fixtureBuild.replaceInBuild("def testParallelism = false", "def testParallelism = true")
+  def turnOnTestParallelism(): Unit = fixtureBuild.turnOnTestParallelism()
 
   def turnOffTestSandboxing(): Unit =
     fixtureBuild.replaceInBuild("def testForkGrouping", "def testSandboxWorkingDir = false\n    def testForkGrouping")

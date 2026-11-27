@@ -4,6 +4,7 @@ import mill.api.PathRef
 import mill.testkit.IntegrationTester
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should
+import org.scalatest.mill.tags.AreaTag
 import org.scalatest.mill.tags.CoreTag
 import org.scalatest.mill.tags.MillCoexistence
 
@@ -53,7 +54,7 @@ final class HeaderPluginSpec extends AnyFreeSpec with should.Matchers with Share
           }
         }
 
-        registerTest("passes core.test.testForked", CoreTag.when(scala == "3.3")*) {
+        "passes core.test.testForked".taggedAs(AreaTag.MillCoexistence, CoreTag.when(scala == "3.3")*) in {
           sharedBuild.use { build =>
             val result = build.eval(Seq("core.test.testForked"))
             withClue(result.debugString) {

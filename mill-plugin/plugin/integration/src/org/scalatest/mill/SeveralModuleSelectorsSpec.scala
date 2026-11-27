@@ -62,13 +62,7 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
     if (os.exists(build.markersFolder / marker.fileName)) os.read.lines(build.markersFolder / marker.fileName) else Nil
 
   private def infoMessagesOfTest(json: JsonNode, suite: String, test: String): Seq[String] =
-    json
-      .node(NodeKind.Suite, suite)
-      .nodes
-      .filter(node => node.kind == NodeKind.Test && node.name == test)
-      .flatMap(_.output)
-      .filter(_.kind == OutputItemKind.Info)
-      .map(_.message)
+    json.node(NodeKind.Suite, suite).node(NodeKind.Test, test).infoMessagesInSubtree
 
   Feature("Several module selectors") {
 
@@ -183,9 +177,9 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
     Scenario("The working directory of each module's tests", AreaTag.Workers) {
       withSeveralModules { build =>
         Given("Alpha1's test fast and Beta1's test fast each send an info message holding the system property user.dir")
-        val sendingWorkingDirectory = """test("fast") { info(System.getProperty("user.dir")) }"""
-        replaceInSuite(build, "alpha", "Alpha1")("""test("fast") {}""", sendingWorkingDirectory)
-        replaceInSuite(build, "beta", "Beta1")("""test("fast") {}""", sendingWorkingDirectory)
+        val fast = SampleTest.Fast.untagged
+        replaceInSuite(build, "alpha", "Alpha1")(fast.withEmptyBody, fast.sendingWorkingDirectory)
+        replaceInSuite(build, "beta", "Beta1")(fast.withEmptyBody, fast.sendingWorkingDirectory)
         val (result, json) = whenTheTestCommandIsInvokedWithTwoJobsParsingJsonOutput(build)("alpha.test", "beta.test")
 
         withClue(result.debugString) {

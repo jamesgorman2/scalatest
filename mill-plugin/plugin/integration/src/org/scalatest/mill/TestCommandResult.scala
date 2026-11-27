@@ -62,15 +62,16 @@ final case class TestCommandResult(eval: IntegrationTester.EvalResult) {
 
   def colourMarkedSubtreeOf(nodeLine: String): Seq[String] = linesOfSubtree(nodeLine, colourMarkedTreeLines)
 
-  private def linesOfSubtree(nodeLine: String, lines: Seq[String]): Seq[String] = {
-    val output = treeLines
-    val start = output.indexWhere(_.trim == nodeLine)
+  // The subtree is found in `treeLines` and taken from `renderedTreeLines`, which holds the same lines, one for one, as
+  // the caller renders them, such as colour-marked.
+  private def linesOfSubtree(nodeLine: String, renderedTreeLines: Seq[String]): Seq[String] = {
+    val start = treeLines.indexWhere(_.trim == nodeLine)
     if (start < 0) {
       Nil
     } else {
-      val indentation = TestCommandResult.indentationOf(output(start))
-      val underCount = output.drop(start + 1).takeWhile(line => TestCommandResult.indentationOf(line) > indentation).size
-      lines.slice(start, start + 1 + underCount).map(_.drop(indentation))
+      val indentation = TestCommandResult.indentationOf(treeLines(start))
+      val underCount = treeLines.drop(start + 1).takeWhile(line => TestCommandResult.indentationOf(line) > indentation).size
+      renderedTreeLines.slice(start, start + 1 + underCount).map(_.drop(indentation))
     }
   }
 

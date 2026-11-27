@@ -30,8 +30,7 @@ trait SingleModuleFixture extends SharedFixtureBuilds { this: Suite & should.Mat
 
   protected def moduleNode(json: JsonNode): JsonNode = json.node(NodeKind.Module, "core.test")
 
-  protected def infoMessages(json: JsonNode): Seq[String] =
-    moduleNode(json).nodes.flatMap(_.output).filter(_.kind == OutputItemKind.Info).map(_.message)
+  protected def infoMessages(json: JsonNode): Seq[String] = moduleNode(json).infoMessagesInSubtree
 
   protected def makeAlpha1FastSendInfo(build: FixtureBuild, messageExpression: String): Unit =
     build.replaceInSample(

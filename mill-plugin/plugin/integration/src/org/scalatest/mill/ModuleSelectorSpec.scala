@@ -12,21 +12,17 @@ final class ModuleSelectorSpec extends AnyFeatureSpec with GivenWhenThen with sh
 
   Feature("The test command fails before any test starts unless given module selectors that each resolve to JVM test modules") {
 
+    final case class SelectorThatFails(description: String, arguments: Seq[String], rejection: String)
+
     val selectorsThatFail = Seq(
-      (
-        "one resolving to a module that is not a test module",
-        Seq("core"),
-        "Module selector core resolves to no test module"
-      ),
-      (
-        "one resolving to no module",
-        Seq("nosuch.test"),
-        "Module selector nosuch.test resolves to no module: "
-      )
+      SelectorThatFails("one resolving to a module that is not a test module", Seq("core"), "Module selector core resolves to no test module"),
+      SelectorThatFails("one resolving to no module", Seq("nosuch.test"), "Module selector nosuch.test resolves to no module: ")
     )
 
-    for ((what, arguments, rejection) <- selectorsThatFail) {
-      Scenario(s"The test command given ${arguments.mkString(" ")}, $what, fails before any test starts") {
+    for (selector <- selectorsThatFail) {
+      val arguments = selector.arguments
+      val rejection = selector.rejection
+      Scenario(s"The test command given ${arguments.mkString(" ")}, ${selector.description}, fails before any test starts") {
         sharedModuleSelectorsBuild.use { build =>
           Given("the JVM module core, which is not a test module, and its JVM test module core.test, holding AddSuite")
           When(s"the test command is given ${arguments.mkString(" ")}")

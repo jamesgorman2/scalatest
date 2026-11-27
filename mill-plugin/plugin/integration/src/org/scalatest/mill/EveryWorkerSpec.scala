@@ -9,9 +9,6 @@ import org.scalatest.mill.tags.Workers
 @Workers
 final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with EveryWorkerFixture {
 
-  private def infoMessages(node: JsonNode): Seq[String] =
-    node.nodes.flatMap(_.output).filter(_.kind == OutputItemKind.Info).map(_.message)
-
   Feature("Every worker of a JVM module") {
 
     Scenario("Without test parallelism, each fork group runs its suites in one worker of its own") {
@@ -87,7 +84,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
         }
 
         And("one of those runs names only worker-0 in its info messages, and the other only worker-1")
-        val workerIndexesInNumberOrder = secondForkGroupRuns.sortBy(_.number).map(run => infoMessages(run).map(build.workerIndexOf).distinct)
+        val workerIndexesInNumberOrder = secondForkGroupRuns.sortBy(_.number).map(run => run.infoMessagesInSubtree.map(build.workerIndexOf).distinct)
         withClue(result.debugString) {
           workerIndexesInNumberOrder should contain theSameElementsAs Seq(Seq(Some(0)), Seq(Some(1)))
         }

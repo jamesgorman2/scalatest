@@ -113,6 +113,8 @@ final class JsonNode(val raw: ujson.Value) extends JsonWrapper {
 
   def output: Seq[OutputItem] = field("output").toSeq.flatMap(_.arr).map(new OutputItem(_))
 
+  def infoMessagesInSubtree: Seq[String] = nodes.flatMap(_.output).filter(_.kind == OutputItemKind.Info).map(_.message)
+
   def capturedLines: Seq[CapturedLine] = output.filter(_.kind == OutputItemKind.Stdio).map(_.capturedLine)
 
   def stdoutLines: Seq[String] = capturedLines.collect { case CapturedLine.Stdout(text) => text }.mkString.linesIterator.toSeq

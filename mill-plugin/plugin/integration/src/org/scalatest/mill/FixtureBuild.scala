@@ -68,6 +68,8 @@ final class FixtureBuild(tester: IntegrationTester) {
   def addToTestModule(members: String*): Unit =
     replaceInBuild(testModuleDependencies, (testModuleDependencies +: members.map("    " + _)).mkString("\n"))
 
+  def turnOnTestParallelism(): Unit = replaceInBuild("def testParallelism = false", "def testParallelism = true")
+
   def setModuleArguments(moduleArguments: Seq[String]): Unit =
     addToTestModule(moduleArguments.map(argument => s"\"$argument\"").mkString("def testArgsDefault = Seq(", ", ", ")"))
 

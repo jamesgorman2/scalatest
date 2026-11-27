@@ -10,7 +10,7 @@ import org.scalatest.mill.tags.Arguments
 final class ClassGlobsSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with SingleModuleFixture {
 
   private def noTestMatchedFailuresOfModule(json: JsonNode): Seq[String] =
-    moduleNode(json).failureMessages.filter(_.startsWith("Test selector does not match any test"))
+    moduleNode(json).failureMessages.filter(_.startsWith(noTestMatchedMessageStart))
 
   private def makeTestsSendWorkingDirectory(build: FixtureBuild, suite: SampleSuite, tests: SampleTest*): Unit =
     tests.foreach(test => build.replaceInSample(s"$suite.scala", test.withEmptyBody, test.sendingWorkingDirectory))
@@ -61,7 +61,7 @@ final class ClassGlobsSpec extends AnyFeatureSpec with GivenWhenThen with should
       And("Alpha1's test fast sends an info message holding the system property user.dir")
       When("the test command runs core.test, writing JSON output, with -- samples.Alpha1")
       withMarkingSuites { build =>
-        build.replaceInBuild("def testParallelism = false", "def testParallelism = true")
+        build.turnOnTestParallelism()
         makeTestsSendWorkingDirectory(build, SampleSuite.Alpha1, SampleTest.Fast)
         val (result, json) = runWithClassGlobsReadingJsonOutput(build, "samples.Alpha1")
 
