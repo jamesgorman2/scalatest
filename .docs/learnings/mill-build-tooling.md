@@ -272,12 +272,19 @@ date: 2026-11-28
 In Mill 1.3.1, `CoursierModule.Resolver.resolution` calls `.get` on the `Result` that `Lib.resolveDependenciesMetadataSafe` returns. A failed resolution therefore throws a `RuntimeException` from inside the task's body, and the evaluation records the task as `ExecResult.Exception`, not `ExecResult.Failure`. The exception's message is Coursier's error, which begins and ends with a line break.
 
 An exception from test discovery can reach `ExecResult.Exception` as `mill.api.daemon.Result.SerializedException`:
-- With `javaHome` or discovery runtime options, discovery runs in a JVM worker subprocess, and `MillRpcClient` rebuilds every link of the returned cause chain as a `SerializedException` (`mill/rpc/MillRpcClient.scala`). `JvmWorkerImpl.apply` picks the subprocess when either is non-empty. Mill's own `discoveredTestClasses` passes `testDiscoverRuntimeOptions`, which `QuarkusModule` overrides non-empty.
-- With neither, discovery runs in Mill's process inside `Jvm.withClassLoader`. Its `Result.SerializedException.partialFrom` replaces only an exception whose class the discovery class loader defined, or one whose cause it replaced (`mill/util/Jvm.scala`). A JDK exception with a JDK cause, such as a static initializer's `ExceptionInInitializerError`, arrives unchanged.
+- With `javaHome` or discovery runtime options, discovery runs in a JVM worker subprocess, and `MillRpcClient` rebuilds every link of the returned cause chain as a `SerializedException` (`mill/rpc/MillRpcClient.scala`). `JvmWorkerImpl.apply` picks the subprocess when either is non-empty. Mill's own `discoveredTestClasses` passes `testDiscoverRuntimeOptions`, which `QuarkusModule` overrides with a non-empty value.
+- With neither, discovery runs in Mill's process inside `Jvm.withClassLoader`. `withClassLoader` calls `Result.SerializedException.partialFrom`, which replaces only an exception whose class the discovery class loader defined, or one whose cause it replaced (`mill/util/Jvm.scala`). A JDK exception with a JDK cause, such as a static initializer's `ExceptionInInitializerError`, arrives unchanged.
 
 A `SerializedException`'s `getMessage` is the original's message, but only its `info` (`Result.Failure.ExceptionInfo`'s `clsName`) holds the original's class name. Where the original had no message, such as `ExceptionInInitializerError`, `toString` is only `mill.api.daemon.Result$SerializedException`, so falling back to `toString` loses both what was thrown and its cause.
 
-Code that reads a task's failure from `executionResults.transitiveResults` must handle both `ExecResult.Failure` (read `msg`) and `ExecResult.Exception`. For an exception, read the class name from `info.clsName` where the throwable is a `SerializedException`, otherwise from its class, read the message with `getMessage`, and walk `getCause` for the causes. Trim the result before writing it on one line or after a task name.
+Code that reads a task's failure from `executionResults.transitiveResults` must handle both `ExecResult.Failure` (read `msg`) and `ExecResult.Exception`.
+
+For an exception:
+- read the class name from `info.clsName` where the throwable is a `SerializedException`, otherwise from its class;
+- read the message with `getMessage`;
+- walk `getCause` for the causes.
+
+Trim the result before writing it on one line or after a task name.
 </learning>
 
 <learning>

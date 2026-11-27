@@ -36,7 +36,7 @@ This design checks every selected JVM test module before any test starts, then r
 - A check task evaluates no compile. A module's tests therefore wait on every selected module's dependency resolution and `testArgsDefault`, but on no other module's compile (AC-007).
 - A check task is anonymous, so Mill caches none of it: every test command resolves every selected module's dependencies again before any test starts. Coursier's cache keeps the metadata, so a warm check downloads nothing.
   - On a warm build of 30 JVM test modules, each with one test, on a 16-core Windows machine, the check took 331 to 423 ms in each of six test commands. Each whole test command took 9.6 to 19.5 s, and each of six `mill __.testForked` runs 8.1 to 16.5 s.
-  - The check is not cached. Mill caches only a named task, which is a member of a module, and the plugin cannot add one to a selected module, whose definition need not name the plugin. A cache of the plugin's own would have to be invalidated on every input of each module's resolution, to save about 10 ms a module.
+  - Mill caches only a named task, which is a member of a module. The plugin cannot add one to a selected module, whose definition need not name the plugin. A cache of the plugin's own would have to be invalidated on every input of each module's resolution, to save about 10 ms a module.
 - A JVM test module tests with the release of this fork where its resolution holds `com.edc:scalatest-core_3` at the version the consolidation library was built at (AC-010, AC-011, AC-020).
 - Once that `execute` returns, and before **Start**, the test command fails where any selected module is:
   - a Scala.js or Native test module;
@@ -89,8 +89,9 @@ This design checks every selected JVM test module before any test starts, then r
   - The check task has no task name, so the line for the check task's own failure names no task. That line is the resolution's error, as Coursier reports it.
 - In each failure attached to a module whose tests did not start or whose anonymous task failed, a failed task's error is:
   - for `Failure`, its message;
-  - for `Exception`, the exception's message, or its class name where it has none, then each cause by class name and message, outermost first. A static initializer's `ExceptionInInitializerError` has no message, so its cause carries what was thrown.
-  - Mill can replace an exception with a `Result.SerializedException`, as it does for one returned over RPC from a `javaHome` subprocess. Its message is the original's, but only its `info` holds the original's class name, so the error takes the class name from there.
+  - for `Exception`, the exception's message, or its class name where it has none, then each cause by class name and message, outermost first.
+    - A static initializer's `ExceptionInInitializerError` has no message, so its cause carries what was thrown.
+    - Mill can replace an exception with a `Result.SerializedException`, as it does for one returned over RPC from a JVM worker subprocess. Its message is the original's, but only its `info` holds the original's class name, so the error takes the class name from there.
 - Each such module marks the consolidation state failed, so the test command takes its result from that state after **End**, not from either `execute`'s result (`../decisions/architecture-library-and-modules.md` "The consolidation library, not the Mill plugin, decides whether the test command has failed.").
 - Where that state is failed, unless the JSON output cannot be written, the test command's failure names the modules that **Read the modules that failed the test command** returns (AC-027). The test command attaches no failure to the root, so that read returns at least one module.
 - Where the JSON output cannot be written, the failure says so and names no module (AC-030).

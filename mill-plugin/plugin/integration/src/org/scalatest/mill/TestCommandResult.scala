@@ -62,8 +62,8 @@ final case class TestCommandResult(eval: IntegrationTester.EvalResult) {
 
   def colourMarkedSubtreeOf(nodeLine: String): Seq[String] = linesOfSubtree(nodeLine, colourMarkedTreeLines)
 
-  // The subtree is found in `treeLines` and taken from `renderedTreeLines`, which holds the same lines, one for one, as
-  // the caller renders them, such as colour-marked.
+  // The subtree is found in `treeLines` and taken from `renderedTreeLines`, which holds the same lines in the same
+  // order, rendered as the caller needs, such as colour-marked.
   private def linesOfSubtree(nodeLine: String, renderedTreeLines: Seq[String]): Seq[String] = {
     val start = treeLines.indexWhere(_.trim == nodeLine)
     if (start < 0) {

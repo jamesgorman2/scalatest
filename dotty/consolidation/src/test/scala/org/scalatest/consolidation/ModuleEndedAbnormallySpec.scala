@@ -13,7 +13,7 @@ import org.scalatest.time.Span
 final class ModuleEndedAbnormallySpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with Eventually with ConsolidatedRuns {
 
   private def givenAnotherModuleCompleted(): Consolidation = {
-    Given("a consolidation with a run of another module that ends completed")
+    Given("a consolidation with a run of another module that ends completed and whose test succeeds")
     startedWithOtherModuleCompleted()
   }
 

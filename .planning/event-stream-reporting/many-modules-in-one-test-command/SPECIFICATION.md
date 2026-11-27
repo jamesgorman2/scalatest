@@ -237,7 +237,7 @@ Feature: Every selected module runs, whatever happens to the others
       When the test command is invoked with no flags and the module selectors `alpha.test broken.test beta.test`
       Then Mill reports that the test command failed, with the message `The tests of alpha.test and broken.test failed`
 
-  Rule: A module whose test discovery throws has an aborted module node whose one failure names what was thrown, keeps what discovery wrote, fails the test command, and does not stop another module's tests
+  Rule: A module whose test discovery throws has an aborted module node whose one failure names what was thrown and whose output holds what discovery wrote, fails the test command, and does not stop another module's tests
     Scenario: AC-029 A static initializer of a beta.test class throws during discovery
       Given `beta.test` also holds the class `samples.Throwing`, a public Java class that extends `org.scalatest.funsuite.AnyFunSuite` and holds no test
       And `samples.Throwing`'s only public constructor takes no argument

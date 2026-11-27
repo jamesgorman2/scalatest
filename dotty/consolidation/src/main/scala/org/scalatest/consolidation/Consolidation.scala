@@ -45,7 +45,7 @@ final class Consolidation private[consolidation] (
   /**
    * Whether a failure is attached to the module, any of the module's runs has an outcome other than completed, or a
    * process of the module ended before any run existed in it. A run whose event stream ended without recording how the
-   * run ended has an outcome other than completed. A failed or cancelled test, a suite aborted, or a node aborted or
+   * run ended has an outcome other than completed. A failed or canceled test, an aborted suite, or a node aborted or
    * not run inside a completed run does not count, though each fails the test command (see
    * [[modulesFailingTheTestCommand]]). Unlike [[state]], this takes the consolidation's lock, and it answers before and
    * after the consolidation ends.
@@ -298,7 +298,7 @@ final class RunFeed private[consolidation] (consolidation: Consolidation, newRun
       val decoded = event.decoded
       run.set(run.get.added(decoded))
       // A run that ends abnormally may have lost its module's test results, so it ends the module abnormally. A failed
-      // or cancelled test or an aborted suite by itself fails only the test command.
+      // or canceled test or an aborted suite by itself fails only the test command.
       if (RunAssembly.endsRunAbnormally(decoded)) {
         consolidation.endModuleAbnormally(module)
       } else if (RunAssembly.reportsFailure(decoded)) {

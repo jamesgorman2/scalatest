@@ -23,7 +23,7 @@ final class ThrownExceptionSpec extends AnyWordSpec with should.Matchers {
     }
 
     "the exception has a message and causes" should {
-      "give the message, then each cause in order, outermost first, a cause without a message by its class alone" in {
+      "give the message, then each cause outermost first, naming a cause without a message by its class alone" in {
         val innermost = ThrownException("java.io.IOException", None, None)
         ThrownException("java.lang.RuntimeException", Some("wrapped"), Some(cause.copy(cause = Some(innermost)))).error shouldBe
           "wrapped, caused by java.lang.IllegalStateException: samples.Throwing fails to load, caused by java.io.IOException"

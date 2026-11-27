@@ -302,10 +302,10 @@ private[mill] object JvmTestModuleRun {
       workerEndings: Seq[WorkerRun.Ending]
   ): Unit = {
     // Fails the module as Mill 1.3.1's `testOnly` does where its class globs gave no test result once the workers
-    // ended. The consolidation, not the result Mill gives for each worker, tells whether a test result
-    // reached it. Mill skips this check where a fork group failed to lay out, a worker failed to start or run, or a
-    // worker's JVM ended without writing its result. Unlike Mill, the test command skips it for such a JVM only where
-    // the module has already ended abnormally. A JVM that dies after its run ended leaves no aborted run or class, so the module
+    // ended. The consolidation, not the result Mill gives for each worker, tells whether a test result reached it.
+    // Mill skips this check where a fork group failed to lay out, a worker failed to start or run, or a worker's JVM
+    // ended without writing its result. Unlike Mill, the test command skips it for such a JVM only where the module
+    // has already ended abnormally. A JVM that dies after its run ended leaves no aborted run or class, so the module
     // could otherwise pass where Mill's fails.
     val missingTestResultExplained =
       !everyForkGroupLaidOut ||
