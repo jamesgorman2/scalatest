@@ -176,11 +176,14 @@ A path taken from the test build's processes, such as `user.dir`, can therefore 
 </learning>
 
 <learning>
-date: 2026-11-19
+date: 2026-11-27
 ---
-Under `testParallelism`, Mill 1.3.1's test queue varies between invocations on every platform. It may run a fork group's classes in one worker or split them across several, so which worker runs which class varies. On Windows it also sometimes runs one test class in two workers; both write a `CLAIM` for it in their `claim.log`. This race rarely shows when a scenario runs alone.
+Under `testParallelism`, Mill 1.3.1's test queue varies between invocations on every platform. It may run a fork group's classes in one worker or split them across several, so which worker runs which class varies. On Windows it also sometimes runs one test class in several workers; each writes a `CLAIM` for it in its `claim.log`.
 
-An integration test that compares output across invocations, or expects a fixed number of runs, must not depend on the queue. Mill's default is `testParallelism = true`, so set `def testParallelism = false` in the fixture unless parallel workers are what the test is about.
+This race rarely shows when a scenario runs alone. It shows readily in a tag-filtered run (`testForked -n <tag>`), where most test classes have nothing to run and their workers finish at once: the first slow class can then run in many workers. In one such run with 16 workers, one class ran in 5, giving 14 report entries and a summed ScalaTest summary of 14 for 10 distinct tests. The duplicate runs inflate the summed summaries and the report's entries, and the extra copies compete for CPU.
+
+- An integration test that compares output across invocations, or expects a fixed number of runs, must not depend on the queue. Mill's default is `testParallelism = true`, so set `def testParallelism = false` in the fixture unless parallel workers are what the test is about.
+- Count tests as the distinct `<testcase>` names in the run's `test-report.xml`. In a tag-filtered run, expect duplicate runs of the first slow class.
 </learning>
 
 <learning>
