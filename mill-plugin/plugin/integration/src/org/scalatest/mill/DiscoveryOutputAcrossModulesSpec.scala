@@ -64,7 +64,7 @@ final class DiscoveryOutputAcrossModulesSpec extends AnyFeatureSpec with GivenWh
     Scenario("beta.test's runs, output and failure in the human-readable output", AreaTag.HumanReadable) {
       inSharedBuild(sharedClassGlobsAcrossModulesWithNoisy) { build =>
         givenNoisyInBetaTest()
-        val result = whenTheTestCommandIsInvokedOnBothModulesWithReport(build, "-oH", "--", "samples.*", "--", "-z", "nothing-matches")
+        val result = whenTheTestCommandIsInvokedOnBothModulesWritingJsonOutput(build, "-oH", "--", "samples.*", "--", "-z", "nothing-matches")
         val betaSubtree = result.subtreeOf("[beta.test]")
         val underBeta = betaSubtree.drop(1)
         val (beforeLastFour, lastFour) = underBeta.splitAt(underBeta.size - 4)
