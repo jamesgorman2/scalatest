@@ -267,11 +267,13 @@ For a metadata-only resolution in the runtime configuration, either:
 </learning>
 
 <learning>
-date: 2026-11-27
+date: 2026-11-28
 ---
 In Mill 1.3.1, `CoursierModule.Resolver.resolution` calls `.get` on the `Result` that `Lib.resolveDependenciesMetadataSafe` returns. A failed resolution therefore throws a `RuntimeException` from inside the task's body, and the evaluation records the task as `ExecResult.Exception`, not `ExecResult.Failure`. The exception's message is Coursier's error, which begins and ends with a line break.
 
-Code that reads a task's failure from `executionResults.transitiveResults` must handle both `ExecResult.Failure` (read `msg`) and `ExecResult.Exception` (read the throwable's message). Trim the message before writing it on one line or after a task name.
+An exception thrown inside a class loader Mill creates, such as test discovery's (`Jvm.withClassLoader`) or a `javaHome` subprocess's (returned over RPC), reaches `ExecResult.Exception` as `mill.api.daemon.Result.SerializedException`. It keeps the original's class name and message only in its `info` (`Result.Failure.ExceptionInfo`'s `clsName` and `msg`), and each cause is another `SerializedException`. Where the original had no message, such as a static initializer's `ExceptionInInitializerError`, `getMessage` is null and `toString` is only `mill.api.daemon.Result$SerializedException`, so falling back to `toString` loses both what was thrown and its cause.
+
+Code that reads a task's failure from `executionResults.transitiveResults` must handle both `ExecResult.Failure` (read `msg`) and `ExecResult.Exception`. For an exception, read `info.clsName` and `info.msg` where the throwable is a `SerializedException`, otherwise its class and message, and walk `getCause` for the causes. Trim the result before writing it on one line or after a task name.
 </learning>
 
 <learning>
