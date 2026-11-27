@@ -100,9 +100,7 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
   Feature("Every selected module runs, whatever happens to the others") {
 
     for (millFlags <- MillFlags.values) {
-      val coreTags = if (millFlags == MillFlags.Empty) Seq(CoreTag) else Nil
-
-      Scenario(s"A test of alpha.test fails, flags ${millFlags.description}", coreTags*) {
+      Scenario(s"A test of alpha.test fails, flags ${millFlags.description}", CoreTag.when(millFlags == MillFlags.Empty)*) {
         inSharedSeveralModules(sharedSeveralModulesWithAlpha1SlowFailing) { build =>
           Given("Alpha1's test slow fails")
           val (result, _) = runParsingJsonOutput(build, millFlags.arguments*)("alpha.test", "beta.test")

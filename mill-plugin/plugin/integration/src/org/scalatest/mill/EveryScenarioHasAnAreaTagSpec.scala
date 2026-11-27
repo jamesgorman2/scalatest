@@ -43,10 +43,10 @@ final class EveryScenarioHasAnAreaTagSpec extends AnyFeatureSpec with GivenWhenT
       suites.map(_.suiteName) should contain allOf ("EveryWorkerSpec", "HeaderPluginSpec")
 
       When("the tags of each suite's scenarios are read")
-      val scenariosWithoutAnAreaTagBySuite = suites.flatMap(suite => scenariosWithoutAnAreaTag(suite).map(scenario => s"${suite.suiteName}: $scenario"))
+      val scenarioLabelsWithoutAnAreaTag = suites.flatMap(suite => scenariosWithoutAnAreaTag(suite).map(scenario => s"${suite.suiteName}: $scenario"))
 
       Then("no scenario lacks an area tag")
-      scenariosWithoutAnAreaTagBySuite shouldBe empty
+      scenarioLabelsWithoutAnAreaTag shouldBe empty
     }
 
     Scenario("A scenario that carries only the Core tag, or no tag, lacks an area tag") {

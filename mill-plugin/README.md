@@ -53,10 +53,10 @@ Publish the fork and the library first (§ Publishing, step 1). Then, in `mill-p
 
 Every integration scenario carries the tag of each area of the plugin it tests. The tags are in `org.scalatest.mill.tags`: a Java annotation tags a whole suite, and `AreaTag` or `CoreTag` tags one scenario.
 
-A change to one area runs the core set and that area's tag. Each `-n` adds a tag's scenarios to the run:
+A change to one area runs the unit tests, the core set and that area's tag. Each `-n` adds a tag's scenarios to the run:
 
 ```
-./mill --no-daemon plugin.integration.testForked -n org.scalatest.mill.tags.Core -n org.scalatest.mill.tags.Workers
+./mill --no-daemon plugin.test.testForked + plugin.integration.testForked -n org.scalatest.mill.tags.Core -n org.scalatest.mill.tags.Workers
 ```
 
 The core set alone:
@@ -67,38 +67,46 @@ The core set alone:
 
 The core set holds one scenario for each stage of the test command, end to end, and `EveryScenarioHasAnAreaTagSpec`, which fails when a scenario carries no area tag. `test-all.sh`, `test-all.ps1` and CI run every scenario.
 
-Run a tag when these files change. Files without a path are in `plugin/src/org/scalatest/mill/`.
+A change under `dotty/` also needs, at the repository root:
+
+- the library's tests, `sbt scalatestConsolidation/test`, where the change is under `dotty/consolidation/`;
+- § Publishing step 1, before any plugin test runs. The plugin and the fixture builds take the fork and the library from `~/.ivy2/local`, so without it they test the old ones.
+
+Run a tag when these files change. Paths are from the repository root. Files without a path are in `mill-plugin/plugin/src/org/scalatest/mill/`. The library's files are in `dotty/consolidation/src/main/scala/org/scalatest/consolidation/`.
 
 | Tag | Files |
 |---|---|
-| `Arguments` | `TestCommandArguments`, `AllowedFlag`, `FrameworkArguments`, `ClassGlob`, `StdoutContent`, `RunArguments`, `ModuleScalaTestArguments`, `ModuleSelectorArgument`; `ScalaTestArgument` in `dotty/consolidation` |
+| `Arguments` | `TestCommandArguments`, `AllowedFlag`, `FrameworkArguments`, `ClassGlob`, `StdoutContent`, `RunArguments`, `ModuleScalaTestArguments`, `ModuleSelectorArgument`; `ScalaTestArgument` in the library |
 | `Modules` | `ModuleSelection`, `SelectedTestModule`, `ModuleCheck`, `ModuleCheckTask`, `CannotRunReason`, `ResolvedDependency`, `Organization`, `ArtifactName`, `LibraryVersion`, `FailFastOffEvaluator`, `EvaluatedTasks`, `FailedTask`, `FirstFailure`, `TaskName` |
 | `Workers` | `JvmTestModuleInputs`, `WorkerLayout`, `ForkGroupLabel`, `PaddedIndex`, `PathUnderModule`, `WorkerRun`, `WorkerProcess`, `ProcessExit`, `DelegatingTaskCtx`, `ModuleFolder`, `ModuleFolderTaskCtx` |
 | `Capture` | `OutputCapture`, `LineSplitter`, `StreamLines`, `EventLogReader`, `EventLogFile`, `EventLogLines`, `WorkerTaskCtx` |
-| `HumanReadable` | `HumanReadableOutput` and `ConsolidationState` in `dotty/consolidation` |
-| `Json` | `JsonOutputFile`; `JsonOutput` and `JsonOutputWriter` in `dotty/consolidation`; `consolidated.schema.json` |
-| `MillCoexistence` | `TestCommandModule`; the `plugin` module's dependencies and publishing settings in `build.mill`; the plugin header of each fixture build |
+| `HumanReadable` | `HumanReadableOutput` and `ConsolidationState` in the library |
+| `Json` | `JsonOutputFile`; `JsonOutput` and `JsonOutputWriter` in the library; `mill-plugin/consolidated.schema.json` |
+| `MillCoexistence` | `TestCommandModule`; the `plugin` module's dependencies and publishing settings in `mill-plugin/build.mill`; the plugin header of each fixture build |
 | `Arguments`, `Modules`, `Json` | `TestCommandFailure` |
 
-`TestCommand.scala` and `JvmTestModuleRun.scala` change with most tasks, so they map by method:
+`TestCommand.scala` and `JvmTestModuleRun.scala` change with most tasks, so they map by member:
 
-| File | Method | Tags |
+| File | Member | Tags |
 |---|---|---|
 | `TestCommand.scala` | `run` | `Arguments`, `Modules`, `Json` |
 | | `checkAndRunTests`, `addModuleFailures` | `Modules` |
 | | `consolidateSelectedModules` | `Json`, `HumanReadable`, `Capture` |
 | | `moduleRunTask`, `clearedModuleFolder` | `Workers` |
-| `JvmTestModuleRun.scala` | `execute`, `layOutWorkers`, `runWorkers`, `processEndedWith`, `resultLog`, `inModuleFolder`, `WorkerLauncher`, `QueueLauncher`, `BatchLauncher`, `filesystemIgnoresCase`, `launcherOrReportFailure`, `layOutForkGroups` | `Workers` |
-| | `discoveredTestClasses`, `attachingDiscoveryOutput`, `startWorker` | `Capture` |
+| `JvmTestModuleRun.scala` | `execute`, `layOutWorkers`, `runWorkers`, `processEndedWith`, `resultLog`, `inModuleFolder`, `WorkerLauncher`, `QueueLauncher`, `BatchLauncher`, `BatchSelector`, `filesystemIgnoresCase`, `launcherOrReportFailure`, `layOutForkGroups` | `Workers` |
+| | `discoveredTestClasses`, `attachingDiscoveryOutput`, `startWorker`, `eventLogFileName` | `Capture` |
 | | `reportNoTestResultForClassGlobs` | `Arguments` |
+
+An integration test helper in `mill-plugin/plugin/integration/src/org/scalatest/mill/` that the list below does not name, such as `EveryWorkerFixture`, runs the tags of each suite that uses it, directly or through another helper.
 
 Run every test (`plugin.test.testForked + plugin.integration.testForked`) when any of these change:
 
 - `TestCommand.scala` or `TestCommandModule.scala` as a whole, such as a method's signature that the others call;
-- `EnglishList`, or the alias in `plugin/src/scalatest/package.scala`;
-- the versions in `build.mill`;
-- the shared integration test helpers: `FixtureBuilds`, `FixtureBuild`, `SharedFixtureBuilds`, `WorkspaceReset`, `TestCommandResult`, `JsonNode`, `JsonOutputFixture`, `IntegrationEnvironment` and `MillConsole`;
-- the `Consolidation` API in `dotty/consolidation`, or the emitter's event-log format;
+- `EnglishList`, or the alias in `mill-plugin/plugin/src/scalatest/package.scala`;
+- any library file the tables do not name, such as `Consolidation` or `TreeAssembler`;
+- the event-log format: `dotty/core/src/main/scala/org/scalatest/tools/TestEventLogEmitter.scala` and `dotty/core/src/main/scala/org/scalatest/events/TestEventLog*.scala`;
+- in `mill-plugin/`: `.mill-version`, `mill`, `mill.bat`, and the versions and the `plugin.test` and `plugin.integration` modules in `build.mill`;
+- the shared integration test helpers: `FixtureBuilds`, `FixtureBuild`, `FixtureName`, `SharedFixtureBuilds`, `SingleModuleFixture`, `SeveralModulesFixture`, `WorkspaceReset`, `TestCommandResult`, `JsonNode`, `JsonPattern`, `JsonOutputFixture`, `Durations`, `IntegrationEnvironment` and `MillConsole`;
 - the JSON output's keys or shape, because scenarios of every area read the `-fJ` output;
 - how the console tree is rendered, beyond one kind of line.
 

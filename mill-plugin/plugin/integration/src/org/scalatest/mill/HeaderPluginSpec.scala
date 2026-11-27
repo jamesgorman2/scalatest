@@ -29,7 +29,6 @@ final class HeaderPluginSpec extends AnyFreeSpec with should.Matchers with Share
       s"with a test module on Scala $scala" - {
         val fixture = FixtureName.onScala(scala)
         val sharedBuild = sharedFixtureBuild(fixture, WorkspaceReset.fixtureFiles(os.sub / "core"))(_ => ())
-        val coreTags = if (scala == "3.3") Seq(CoreTag) else Nil
 
         "has that line, naming the plugin's own version, as its whole header" in {
           val header = os.read.lines(IntegrationEnvironment.fixture(fixture) / "build.mill").takeWhile(_.startsWith("//|"))
@@ -54,7 +53,7 @@ final class HeaderPluginSpec extends AnyFreeSpec with should.Matchers with Share
           }
         }
 
-        registerTest("passes core.test.testForked", coreTags*) {
+        registerTest("passes core.test.testForked", CoreTag.when(scala == "3.3")*) {
           sharedBuild.use { build =>
             val result = build.eval(Seq("core.test.testForked"))
             withClue(result.debugString) {
