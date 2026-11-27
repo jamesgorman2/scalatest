@@ -121,6 +121,17 @@ final class TestCommandFailureSpec extends AnyWordSpec with should.Matchers {
       }
     }
 
+    "built from the modules that failed" should {
+      "name those modules where any failed" in {
+        TestCommandFailure.fromFailedModules(Seq(ModuleName("alpha.test"), ModuleName("broken.test"))).message shouldBe
+          "The tests of alpha.test and broken.test failed"
+      }
+
+      "say the failure is outside the tests of every selected module where none failed" in {
+        TestCommandFailure.fromFailedModules(Seq.empty).message shouldBe "The test command failed outside the tests of every selected module"
+      }
+    }
+
     "the JSON output path is a folder" should {
       "name the path" in {
         TestCommandFailure.JsonOutputPathIsFolder(path).message shouldBe

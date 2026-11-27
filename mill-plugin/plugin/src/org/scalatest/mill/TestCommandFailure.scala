@@ -60,3 +60,12 @@ private[mill] enum TestCommandFailure extends Exception with NoStackTrace {
     }
   }
 }
+
+private[mill] object TestCommandFailure {
+
+  def fromFailedModules(modules: Seq[ModuleName]): TestCommandFailure =
+    if (modules.isEmpty)
+      FailedOutsideSelectedModules
+    else
+      ModulesFailed(modules)
+}

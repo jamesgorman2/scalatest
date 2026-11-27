@@ -79,13 +79,10 @@ private[mill] final class TestCommand private (
     )
     val endedState = consolidation.end(Some(now()))
     jsonOutputWritten.flatMap { _ =>
-      val failedModules = consolidation.modulesFailingTheTestCommand
-      if (!endedState.failed)
-        Right(())
-      else if (failedModules.isEmpty)
-        Left(TestCommandFailure.FailedOutsideSelectedModules)
+      if (endedState.failed)
+        Left(TestCommandFailure.fromFailedModules(consolidation.modulesFailingTheTestCommand))
       else
-        Left(TestCommandFailure.ModulesFailed(failedModules))
+        Right(())
     }
   }
 
