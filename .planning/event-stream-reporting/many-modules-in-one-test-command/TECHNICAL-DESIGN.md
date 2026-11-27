@@ -41,7 +41,7 @@ This design checks every selected JVM test module before any test starts, then r
   - a JVM test module whose `testArgsDefault` holds an argument that `ModuleScalaTestArguments.kept` rejects.
 - That failure names each such module and each rejected argument (AC-010, AC-011, AC-019). The test command fails before **Start**, so it writes no consolidated output.
 - A module whose check task does not succeed, as where its dependencies fail to resolve, is a module whose tests did not start (AC-015; § A module whose tests cannot start). The fail-fast-off evaluator still runs every other module's check task.
-  - Where the test command fails before **Start**, its failure also names each such module, ordered by name, with the failure message that module's node would hold (AC-011).
+  - Where the test command cannot run a selected test module, its failure also names each such module, ordered by name, with the failure message that module's node would hold (AC-011).
 - The test command builds each module's `RunArguments` in its own body, from the arguments `ModuleScalaTestArguments.kept` keeps from the module's `testArgsDefault` and from the framework arguments.
 
 ### One task per module
@@ -85,4 +85,4 @@ This design checks every selected JVM test module before any test starts, then r
   - The check task itself fails where the module's resolution fails, since the check task resolves the module's dependencies in its own body.
   - The check task has no task name, so the line for the check task's own failure names no task. That line is the resolution's error, as Coursier reports it.
 - Each such module marks the consolidation state failed, so the test command takes its result from that state after **End**, not from either `execute`'s result (`../decisions/architecture-library-and-modules.md` "The consolidation library, not the Mill plugin, decides whether the test command has failed.").
-- Where that state is failed, the test command's failure names the modules that **Read the modules that failed the test command** returns (AC-027). Where it returns none, as where only the root has failed, the failure says the test command failed outside the tests of every selected module.
+- Where that state is failed and the JSON output is written, the test command's failure names the modules that **Read the modules that failed the test command** returns (AC-027). Where it returns none, as where only the root has failed, the failure says the test command failed outside the tests of every selected module. Where the JSON output is not written, the failure is that the JSON output cannot be written, and names no module.

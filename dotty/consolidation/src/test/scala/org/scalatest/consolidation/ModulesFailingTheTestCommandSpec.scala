@@ -21,6 +21,7 @@ final class ModulesFailingTheTestCommandSpec extends AnyFeatureSpec with GivenWh
   private def shouldBeFailedByTheModuleAlone(consolidation: Consolidation): Unit = {
     Then("the module, and no other, fails the test command")
     consolidation.modulesFailingTheTestCommand shouldBe Vector(module)
+    And("the consolidation state is failed")
     consolidation.state shouldBe ConsolidationState.OpenFailed
   }
 

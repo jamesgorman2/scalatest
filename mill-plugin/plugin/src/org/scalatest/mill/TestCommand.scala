@@ -27,8 +27,8 @@ private[mill] final class TestCommand private (
     val (jvmModules, otherModules) = selection.modules.partition(_.isJvm)
     val checkTasks = jvmModules.map(module => module -> ModuleCheckTask.of(module))
     val checkResults = EvaluatedTasks.of(failFastOffEvaluator.execute(checkTasks.map(_._2), logger = ctx.log))
-    // A module whose check task failed is not a module the test command cannot run. Its tests do not start, and its
-    // failure goes on its module node, or, where the test command cannot run another module, into the command's failure.
+    // A module whose check task failed is not a module the test command cannot run: its failure alone does not stop
+    // the other modules' tests.
     val (checkFailures, moduleChecks) = checkTasks.partitionMap { case (module, task) =>
       checkResults.valueOrFailure(task).left.map(failure => module -> failure).map(check => module -> check)
     }
@@ -79,7 +79,13 @@ private[mill] final class TestCommand private (
     )
     val endedState = consolidation.end(Some(now()))
     jsonOutputWritten.flatMap { _ =>
-      Either.cond(!endedState.failed, (), TestCommandFailure.ModulesFailed(consolidation.modulesFailingTheTestCommand))
+      val failedModules = consolidation.modulesFailingTheTestCommand
+      if (!endedState.failed)
+        Right(())
+      else if (failedModules.isEmpty)
+        Left(TestCommandFailure.FailedOutsideSelectedModules)
+      else
+        Left(TestCommandFailure.ModulesFailed(failedModules))
     }
   }
 

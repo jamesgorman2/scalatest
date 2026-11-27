@@ -29,7 +29,7 @@ Bare `AC-nnn` IDs are this document's. The epic's requirements are cited as `../
 - Each failure the test command can attribute to one selected test module, shown on that module's node in the JSON and human-readable outputs. Such failures include:
   - the module's class globs matching no test;
   - the module's tests not starting, where the module fails to compile, its dependencies fail to resolve, or another task its tests depend on fails.
-- The test command's failure naming exactly the selected test modules that failed, and, where it fails before any test starts, each selected test module whose tests cannot start, with that module's failure.
+- The test command's failure naming exactly the selected test modules that failed, where its tests have run and its JSON output is written, and, where it cannot run a selected test module, each selected test module whose tests cannot start, with that module's failure.
 - What Mill's test discovery writes for a selected test module, shown on that module's node in the JSON and human-readable outputs.
 - The class globs and framework arguments applying alike to every selected test module.
 - Failing the test command before any test starts where the test command is given no module selector, or a module selector resolves to no test module.
@@ -231,7 +231,7 @@ Feature: Every selected module runs, whatever happens to the others
       Then the files `Alpha1.fast` and `Late1.fast` exist in `<markers>`
       And the test command succeeds
 
-  Rule: Where the test command fails once its tests have run, its failure names exactly the selected modules that failed
+  Rule: Where the test command fails once its tests have run and its JSON output is written, its failure names exactly the selected modules that failed
     A selected module has failed where its module node, or any node under it, fails the test command (`../SPECIFICATION.md` R-137), such as an aborted module node, a run whose outcome is not completed, a failed test, or an aborted suite.
 
     Scenario: AC-027 A test of alpha.test fails and broken.test does not compile

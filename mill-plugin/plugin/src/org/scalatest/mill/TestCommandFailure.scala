@@ -17,6 +17,7 @@ private[mill] enum TestCommandFailure extends Exception with NoStackTrace {
   case JsonOutputNotDeleted(path: Path, cause: Throwable)
   case JsonOutputNotWritten(path: Path, cause: Throwable, partlyWrittenFileDeleteFailure: Option[Throwable])
   case ModulesFailed(modules: Seq[ModuleName])
+  case FailedOutsideSelectedModules
 
   override def getMessage: String = message
 
@@ -52,10 +53,10 @@ private[mill] enum TestCommandFailure extends Exception with NoStackTrace {
       case JsonOutputNotWritten(path, cause, partlyWrittenFileDeleteFailure) =>
         s"The test command cannot write its JSON output to $path, the file $jsonOutputArgument names: $cause" +
           partlyWrittenFileDeleteFailure.fold("")(deleteFailure => s"; it cannot delete the partly written file either: $deleteFailure")
-      case ModulesFailed(Seq()) =>
-        "The test command failed outside the tests of every selected module"
       case ModulesFailed(modules) =>
         s"The tests of ${EnglishList.of(modules.map(_.value))} failed"
+      case FailedOutsideSelectedModules =>
+        "The test command failed outside the tests of every selected module"
     }
   }
 }

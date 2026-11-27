@@ -117,7 +117,7 @@ final class TestCommandFailureSpec extends AnyWordSpec with should.Matchers {
 
     "the test command failed and no selected module did" should {
       "say the failure is outside the tests of every selected module" in {
-        TestCommandFailure.ModulesFailed(Seq.empty).message shouldBe "The test command failed outside the tests of every selected module"
+        TestCommandFailure.FailedOutsideSelectedModules.message shouldBe "The test command failed outside the tests of every selected module"
       }
     }
 
