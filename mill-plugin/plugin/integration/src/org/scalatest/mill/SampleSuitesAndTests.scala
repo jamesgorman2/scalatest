@@ -6,8 +6,12 @@ enum SampleSuite {
   case Beta1
 }
 
-enum SampleTest(val name: String, tag: Option[String]) {
-  case Fast extends SampleTest("fast", Some("Fast"))
+enum SampleTag {
+  case Fast
+}
+
+enum SampleTest(val name: String, tag: Option[SampleTag]) {
+  case Fast extends SampleTest("fast", Some(SampleTag.Fast))
   case Slow extends SampleTest("slow", None)
 
   private def declaration: String = s"""test("$name"${tag.map(", " + _).getOrElse("")}) """
