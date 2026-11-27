@@ -24,8 +24,8 @@ private[mill] object FailFastOffEvaluator {
     }
     val fields = execution.productIterator.map(_.asInstanceOf[AnyRef]).toArray
     fields(failFastIndex) = java.lang.Boolean.FALSE
-    // Each constructor is chosen by its parameter count, because its parameter types are in packages this code cannot
-    // name:
+    // Each constructor is chosen by its parameter count, because some of its parameter types are in packages this code
+    // cannot name:
     // - `Execution`'s widest constructor is its primary one, the only one that takes every product field, in product
     //   order. The other builds `profileLogger` itself.
     // - `EvaluatorImpl`'s narrowest constructor takes `allowPositionalCommandArgs`, `selectiveExecution` and
