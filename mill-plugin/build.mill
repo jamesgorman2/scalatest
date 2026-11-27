@@ -58,15 +58,15 @@ object plugin extends PluginScalaModule, PublishModule {
   object test extends ScalaTests, TestModule.ScalaTest {
     // The plugin's Mill classes are compile-only. The unit tests build Mill's `Result.SerializedException`.
     def mvnDeps: T[Seq[Dep]] = Seq(
-      mvn"com.edc::scalatest:${Versions.fork}",
-      mvn"com.lihaoyi::mill-core-api-daemon:${Versions.mill}"
+      mvn"com.edc::scalatest::${Versions.fork}",
+      mvn"com.lihaoyi::mill-core-api-daemon::${Versions.mill}"
     )
   }
 
   object integration extends ScalaTests, TestModule.ScalaTest {
     def mvnDeps: T[Seq[Dep]] = Seq(
-      mvn"com.lihaoyi::mill-testkit:${Versions.mill}",
-      mvn"com.edc::scalatest:${Versions.fork}",
+      mvn"com.lihaoyi::mill-testkit::${Versions.mill}",
+      mvn"com.edc::scalatest::${Versions.fork}",
       mvn"org.scala-sbt:test-interface:${Versions.testInterface}",
       mvn"ch.epfl.scala:bsp4j:${Versions.bsp4j}"
     )

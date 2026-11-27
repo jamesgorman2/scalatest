@@ -16,12 +16,12 @@ private[mill] final case class ThrownException(className: String, message: Optio
 private[mill] object ThrownException {
 
   def from(throwable: Throwable): ThrownException = {
-    val cause = Option(throwable.getCause).map(from)
-    throwable match {
+    val className = throwable match {
       // Mill can replace an exception, as it does one returned over RPC, with one of its own class. Only `info` holds
       // the original's class name.
-      case serialized: Result.SerializedException => ThrownException(serialized.info.clsName, Option(serialized.getMessage), cause)
-      case other => ThrownException(other.getClass.getName, Option(other.getMessage), cause)
+      case serialized: Result.SerializedException => serialized.info.clsName
+      case other => other.getClass.getName
     }
+    ThrownException(className, Option(throwable.getMessage), Option(throwable.getCause).map(from))
   }
 }

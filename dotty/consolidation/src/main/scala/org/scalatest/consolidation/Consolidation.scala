@@ -45,9 +45,10 @@ final class Consolidation private[consolidation] (
   /**
    * Whether a failure is attached to the module, any of the module's runs has an outcome other than completed, or a
    * process of the module ended before any run existed in it. A run whose event stream ended without recording how the
-   * run ended has an outcome other than completed. A failed or cancelled test, or a suite aborted inside a completed
-   * run, does not count, though each fails the test command (see [[modulesFailingTheTestCommand]]). Unlike [[state]],
-   * this takes the consolidation's lock, and it answers before and after the consolidation ends.
+   * run ended has an outcome other than completed. A failed or cancelled test, a suite aborted, or a node aborted or
+   * not run inside a completed run does not count, though each fails the test command (see
+   * [[modulesFailingTheTestCommand]]). Unlike [[state]], this takes the consolidation's lock, and it answers before and
+   * after the consolidation ends.
    */
   def hasEndedAbnormally(module: ModuleName): Boolean =
     synchronized {
