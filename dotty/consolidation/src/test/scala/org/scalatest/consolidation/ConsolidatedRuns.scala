@@ -12,6 +12,8 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
 
   val module: ModuleName = ModuleName("core.test")
 
+  val otherModule: ModuleName = ModuleName("api.test")
+
   extension (literal: String) {
 
     def stripExpectedMargin: String =
@@ -94,6 +96,14 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
 
   def runOfCalculatorSuiteHolding(nodes: String, testEvents: String*): TestRunPart =
     TestRunPart.Events(completedRunOf(eventLogOfSuite("CalculatorSuite", nodes, testEvents*)))
+
+  val runWithSucceededTest: TestRunPart = runOfCalculatorSuite("""test "adds": TestStarting""", """test "adds": TestSucceeded""")
+
+  def startedWithOtherModuleCompleted(): Consolidation = {
+    val consolidation = startedWithColour()
+    consolidation.addRun(otherModule)(_.addAll(runWithSucceededTest))
+    consolidation
+  }
 
   def structureOf(suite: String, nodes: String): String =
     (Vector("structure", s"""  suite "$suite", class "samples.$suite"""") ++ ConsolidatedRuns.nested(nodes, depth = 2)).mkString("\n")

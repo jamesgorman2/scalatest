@@ -26,7 +26,7 @@ final class Consolidation private[consolidation] (
   private var rootAttachments = Attachments.none
   private val moduleAttachments = mutable.Map.empty[ModuleName, Attachments]
   private val modulesWithTestResult = mutable.Set.empty[ModuleName]
-  private val failedModules = mutable.Set.empty[ModuleName]
+  private val modulesEndedAbnormally = mutable.Set.empty[ModuleName]
   private val modulesFailingTestCommand = mutable.Set.empty[ModuleName]
 
   /** A read made after an operation returns sees any failure that operation added. */
@@ -45,12 +45,13 @@ final class Consolidation private[consolidation] (
   /**
    * Whether a failure is attached to the module, any of the module's runs has an outcome other than completed, or a
    * process of the module ended before any run existed in it. A run whose event stream ended without recording how the
-   * run ended has an outcome other than completed. A test that fails does not count. Unlike [[state]], this takes the
-   * consolidation's lock, and it answers before and after the consolidation ends.
+   * run ended has an outcome other than completed. A test that fails, or a suite that aborts inside a completed run,
+   * does not count, though either fails the test command (see [[modulesFailingTheTestCommand]]). Unlike [[state]], this
+   * takes the consolidation's lock, and it answers before and after the consolidation ends.
    */
-  def hasFailed(module: ModuleName): Boolean =
+  def hasEndedAbnormally(module: ModuleName): Boolean =
     synchronized {
-      failedModules.contains(module)
+      modulesEndedAbnormally.contains(module)
     }
 
   /**
@@ -98,14 +99,15 @@ final class Consolidation private[consolidation] (
   }
 
   /**
-   * Adds a process of the module that ended before any run existed in it. This fails the test command and the module.
+   * Adds a process of the module that ended before any run existed in it. This fails the test command and ends the
+   * module abnormally.
    *
    * @throws java.lang.IllegalStateException if the consolidation has ended
    */
   def addProcessEndedBeforeAnyRun(module: ModuleName): Unit =
     synchronized {
       requireOpen()
-      failModule(module)
+      endModuleAbnormally(module)
     }
 
   /**
@@ -123,8 +125,8 @@ final class Consolidation private[consolidation] (
 
   /**
    * Attaches to the module the message of a failure that belongs to none of its runs, such as its tests not starting.
-   * This fails the test command and the module. A module given a failure but no run still appears in the
-   * human-readable and JSON outputs. The module's failures follow its captured lines, in the order they were attached.
+   * This fails the test command and ends the module abnormally. A module given a failure but no run still appears in
+   * the human-readable and JSON outputs. The module's failures follow its captured lines, in the order they were attached.
    *
    * @throws java.lang.IllegalStateException if the consolidation has ended
    */
@@ -132,7 +134,7 @@ final class Consolidation private[consolidation] (
     synchronized {
       requireOpen()
       attachToModule(module, _.withFailure(message))
-      failModule(module)
+      endModuleAbnormally(module)
     }
 
   /**
@@ -222,9 +224,9 @@ final class Consolidation private[consolidation] (
     modulesWithTestResult += module
   }
 
-  private[consolidation] def failModule(module: ModuleName): Unit = {
+  private[consolidation] def endModuleAbnormally(module: ModuleName): Unit = {
     assertLockHeld()
-    failedModules += module
+    modulesEndedAbnormally += module
     failTestCommandFrom(module)
   }
 
@@ -294,8 +296,10 @@ final class RunFeed private[consolidation] (consolidation: Consolidation, newRun
       }
       val decoded = event.decoded
       run.set(run.get.added(decoded))
+      // A run that ends abnormally ends its module abnormally, which also fails the test command. A failed test or an
+      // aborted suite fails only the test command, as the run around it still completes.
       if (RunAssembly.endsRunAbnormally(decoded)) {
-        consolidation.failModule(module)
+        consolidation.endModuleAbnormally(module)
       } else if (RunAssembly.reportsFailure(decoded)) {
         consolidation.failTestCommandFrom(module)
       }
@@ -317,12 +321,15 @@ final class RunFeed private[consolidation] (consolidation: Consolidation, newRun
   private[consolidation] def endEventStream(): Unit =
     consolidation.feed {
       if (endedEventStream.get.isEmpty) {
+        val module = run.get.module
         val eventStream = run.get.assembledWholeEventStream
         endedEventStream.set(Some(eventStream))
-        if (eventStream.failsItsModule) {
-          consolidation.failModule(run.get.module)
+        // As in `add`: a stream that ends without recording a completed run ends its module abnormally; a node aborted
+        // or not run inside a completed run fails only the test command.
+        if (eventStream.endsItsModuleAbnormally) {
+          consolidation.endModuleAbnormally(module)
         } else if (eventStream.failsTestCommand) {
-          consolidation.failTestCommandFrom(run.get.module)
+          consolidation.failTestCommandFrom(module)
         }
       }
     }

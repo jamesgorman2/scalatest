@@ -305,12 +305,12 @@ private[mill] object JvmTestModuleRun {
     // ended. The consolidation, not the result Mill gives for each worker, tells whether a test result
     // reached it. Mill skips this check where a fork group failed to lay out, a worker failed to start or run, or a
     // worker's JVM ended without writing its result. Unlike Mill, the test command skips it for such a JVM only where
-    // the module has already failed. A JVM that dies after its run ended leaves no aborted run or class, so the module
+    // the module has already ended abnormally. A JVM that dies after its run ended leaves no aborted run or class, so the module
     // could otherwise pass where Mill's fails.
     val missingTestResultExplained =
       !everyForkGroupLaidOut ||
         workerEndings.contains(WorkerRun.Ending.Failed) ||
-        (workerEndings.contains(WorkerRun.Ending.EndedWithoutResult) && consolidation.hasFailed(module))
+        (workerEndings.contains(WorkerRun.Ending.EndedWithoutResult) && consolidation.hasEndedAbnormally(module))
     if (classGlobs.nonEmpty && !missingTestResultExplained && !consolidation.hasTestResult(module)) {
       consolidation.addModuleFailure(module, ClassGlob.noTestMatchedMessage(classGlobs))
     }

@@ -10,6 +10,8 @@ import org.scalatest.wordspec.AnyWordSpec
 
 final class ConsolidationSpec extends AnyWordSpec with should.Matchers with ConsolidatedRuns with JsonOutputs {
 
+  private final case class LateAddition(description: String, add: Consolidation => Unit)
+
   private def stateAfterRunOf(testEvents: String*): ConsolidationState = {
     val consolidation = startedWithColour()
     consolidation.addRunOf(runOfCalculatorSuite(testEvents*))
@@ -137,27 +139,19 @@ final class ConsolidationSpec extends AnyWordSpec with should.Matchers with Cons
       }
     }
 
-    "ended, then given a failure attached to a module" should {
-      "be refused" in {
-        val consolidation = startedWithColour()
-        consolidation.end()
-        an[IllegalStateException] should be thrownBy consolidation.addModuleFailure(module, "too late")
-      }
-    }
-
-    "ended, then given output attached to a module" should {
-      "be refused" in {
-        val consolidation = startedWithColour()
-        consolidation.end()
-        an[IllegalStateException] should be thrownBy consolidation.addModuleOutput(module, CapturedLine.Stdout("too late\n"))
-      }
-    }
-
-    "ended, then given a process that ended before any run existed in it" should {
-      "be refused" in {
-        val consolidation = startedWithColour()
-        consolidation.end()
-        an[IllegalStateException] should be thrownBy consolidation.addProcessEndedBeforeAnyRun(module)
+    for (
+      lateAddition <- Vector(
+        LateAddition("a failure attached to a module", _.addModuleFailure(module, "too late")),
+        LateAddition("output attached to a module", _.addModuleOutput(module, CapturedLine.Stdout("too late\n"))),
+        LateAddition("a process that ended before any run existed in it", _.addProcessEndedBeforeAnyRun(module))
+      )
+    ) {
+      s"ended, then given ${lateAddition.description}" should {
+        "be refused" in {
+          val consolidation = startedWithColour()
+          consolidation.end()
+          an[IllegalStateException] should be thrownBy lateAddition.add(consolidation)
+        }
       }
     }
 
