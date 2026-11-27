@@ -37,16 +37,19 @@ final class EveryScenarioHasAnAreaTagSpec extends AnyFeatureSpec with GivenWhenT
 
   Feature("Every integration scenario carries an area tag") {
 
-    Scenario("Every scenario of every integration suite carries at least one area tag, from its suite or its own") {
+    Scenario("Every scenario of every integration suite carries an area tag, from its suite's annotation or its own tags") {
       Given("every suite this test module runs, apart from this one")
       val suites = integrationSuites
+      // Without this, a classes folder holding no suites would pass the check below with nothing to check.
       suites.map(_.suiteName) should contain allOf ("EveryWorkerSpec", "HeaderPluginSpec")
 
       When("the tags of each suite's scenarios are read")
       val scenarioLabelsWithoutAnAreaTag = suites.flatMap(suite => scenariosWithoutAnAreaTag(suite).map(scenario => s"${suite.suiteName}: $scenario"))
 
       Then("no scenario lacks an area tag")
-      scenarioLabelsWithoutAnAreaTag shouldBe empty
+      withClue("Tag each listed scenario with an AreaTag, or its suite with an annotation from org.scalatest.mill.tags: ") {
+        scenarioLabelsWithoutAnAreaTag shouldBe empty
+      }
     }
 
     Scenario("A scenario that carries only the Core tag, or no tag, lacks an area tag") {

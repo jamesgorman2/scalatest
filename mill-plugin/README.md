@@ -82,7 +82,7 @@ Run a tag when one of its files changes. Paths are from the repository root. A n
 | `Capture` | `OutputCapture`, `LineSplitter`, `StreamLines`, `EventLogReader`, `EventLogFile`, `EventLogLines`, `WorkerTaskCtx` |
 | `HumanReadable` | `HumanReadableOutput` and `ConsolidationState` in the library |
 | `Json` | `JsonOutputFile`; `JsonOutput` and `JsonOutputWriter` in the library; `mill-plugin/consolidated.schema.json` |
-| `MillCoexistence` | `TestCommandModule`; the `plugin` module's dependencies and publishing settings in `mill-plugin/build.mill`; the plugin header of each fixture build |
+| `MillCoexistence` | `TestCommandModule`, other than the `test` command's name and parameters; the `plugin` module's dependencies and publishing settings in `mill-plugin/build.mill`; the plugin header of each fixture build |
 | `Arguments`, `Modules`, `Json` | `TestCommandFailure` |
 
 `TestCommand.scala` and `JvmTestModuleRun.scala` change in most tasks, so they are mapped by member:
@@ -104,7 +104,8 @@ For a change to one of these, run the tags of every suite that uses it, directly
 
 Run every test (`plugin.test.testForked + plugin.integration.testForked`) when any of these change:
 
-- `TestCommand.scala` or `TestCommandModule.scala` as a whole, such as a method's signature that the others call;
+- in `TestCommand.scala`, anything that cuts across members, such as the class's constructor parameters or a member's signature that other members or `TestCommandModule` call;
+- the name or parameters of the `test` command in `TestCommandModule`, because every scenario runs it;
 - `EnglishList`, or the alias in `mill-plugin/plugin/src/scalatest/package.scala`;
 - any library file the tables do not name, such as `Consolidation` or `TreeAssembler`;
 - the event-log format: `dotty/core/src/main/scala/org/scalatest/tools/TestEventLogEmitter.scala` and `dotty/core/src/main/scala/org/scalatest/events/TestEventLog*.scala`;
