@@ -4,7 +4,7 @@ import org.scalatest.GivenWhenThen
 import org.scalatest.Suite
 import org.scalatest.matchers.should
 
-trait SeveralModulesFixture extends JsonOutputFixture with SharedFixtureBuilds { this: Suite & should.Matchers & GivenWhenThen =>
+trait SeveralModulesFixture extends JsonOutputFixture with SharedFixtureBuilds with FixtureBuildSteps { this: Suite & should.Matchers & GivenWhenThen =>
 
   protected def givenTheBackground(): Unit
 
@@ -51,33 +51,27 @@ trait SeveralModulesFixture extends JsonOutputFixture with SharedFixtureBuilds {
       "}"
     ).mkString("\n")
 
-  protected def moduleWithTestModuleHolding(module: String, members: String*): String =
-    Seq(
-      s"object $module extends SampleModule {",
-      "  object test extends SampleTests {",
-      indented(2)(members.mkString("\n\n")),
-      "  }",
-      "}"
-    ).mkString("\n")
-
-  protected def indented(levels: Int)(code: String): String =
-    code.linesIterator.map(line => if (line.isEmpty) line else "  " * levels + line).mkString("\n")
-
   protected def replaceInSuite(build: FixtureBuild, module: String, suite: String)(from: String, to: String): Unit =
     build.replaceInSource(build.workspace / module / "test" / "src" / "samples" / s"$suite.scala", from, to)
 
-  protected def runTestCommand(build: FixtureBuild, millFlags: String*)(arguments: String*): TestCommandResult =
-    build.runTestCommandWithMillArguments(FixtureBuild.jobsArguments(2) ++ millFlags)(arguments*)
-
-  protected def whenTheTestCommandIsInvokedWith(arguments: String): Unit =
-    When(s"the test command is invoked with $arguments")
-
-  protected def resultAndJsonOutputOfTestCommand(build: FixtureBuild, millFlags: String*)(selectors: String*): (TestCommandResult, JsonNode) =
-    build.resultAndJsonOutput(runTestCommand(build, millFlags*)((selectors :+ "-fJ" :+ build.jsonOutputFile.toString)*))
+  protected def runTestCommandWithTwoJobsParsingJsonOutput(build: FixtureBuild, millFlags: String*)(selectors: String*): (TestCommandResult, JsonNode) =
+    build.resultAndJsonOutput(runTestCommandWithTwoJobsWritingJsonOutput(build, millFlags*)(selectors*))
 
   protected def moduleNode(json: JsonNode, module: String): JsonNode = json.node(NodeKind.Module, module)
 
   protected def runNodesOf(json: JsonNode, module: String): Seq[JsonNode] = moduleNode(json, module).nodes.filter(_.kind == NodeKind.Run)
 
   protected def moduleNodeNames(json: JsonNode): Seq[String] = json.contents.map(_.name)
+
+  protected def shouldBeAbortedWithOneFailure(json: JsonNode, module: String): Unit = {
+    val node = moduleNode(json, module)
+    node.outcome shouldBe Some("aborted")
+    node.failureMessages should have size 1
+  }
+
+  protected def shouldBeAbortedWithOneFailureContaining(json: JsonNode, module: String, text: String): Unit = {
+    runNodesOf(json, module) shouldBe empty
+    shouldBeAbortedWithOneFailure(json, module)
+    moduleNode(json, module).failureMessages.head should include(text)
+  }
 }

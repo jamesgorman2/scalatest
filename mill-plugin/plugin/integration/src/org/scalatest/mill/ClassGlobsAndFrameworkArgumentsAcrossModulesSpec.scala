@@ -43,13 +43,11 @@ final class ClassGlobsAndFrameworkArgumentsAcrossModulesSpec extends AnyFeatureS
           build.markers shouldBe Seq("Alpha1.fast", "Alpha1.slow", "Alpha2.fast", "Alpha2.slow")
 
           And("in the JSON output, the module node beta.test holds no run node, its outcome is aborted, and its failures holds exactly one entry")
-          val beta = moduleNode(json, "beta.test")
           runNodesOf(json, "beta.test") shouldBe empty
-          beta.outcome shouldBe Some("aborted")
-          beta.failureMessages should have size 1
+          shouldBeAbortedWithOneFailure(json, "beta.test")
 
           And("that entry's message is Test selector does not match any test: samples.Alpha* and Run discoveredTestClasses to see available tests, joined by a line feed")
-          beta.failureMessages.head shouldBe noTestMatchedMessageNaming("samples.Alpha*")
+          moduleNode(json, "beta.test").failureMessages.head shouldBe noTestMatchedMessageNaming("samples.Alpha*")
 
           And("in the JSON output, the module node alpha.test has no outcome and no failures")
           shouldHaveNoKeys(moduleNode(json, "alpha.test"), "outcome", "failures")
@@ -74,8 +72,7 @@ final class ClassGlobsAndFrameworkArgumentsAcrossModulesSpec extends AnyFeatureS
           And("in the JSON output, the module nodes alpha.test and beta.test each hold one or more run nodes, and each has the outcome aborted and a failures that holds exactly one entry")
           for (module <- Seq("alpha.test", "beta.test")) {
             runNodesOf(json, module) should not be empty
-            moduleNode(json, module).outcome shouldBe Some("aborted")
-            moduleNode(json, module).failureMessages should have size 1
+            shouldBeAbortedWithOneFailure(json, module)
           }
 
           And("each of those entries' message is Test selector does not match any test: *1 and Run discoveredTestClasses to see available tests, joined by a line feed")

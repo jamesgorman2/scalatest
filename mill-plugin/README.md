@@ -90,8 +90,8 @@ Run a tag when one of its files changes. Paths are from the repository root. A n
 | File | Member | Tags |
 |---|---|---|
 | `TestCommand.scala` | `run` | `Arguments`, `Modules`, `Json` |
-| | `checkAndRunTests`, `addModuleFailures` | `Modules` |
-| | `consolidateSelectedModules` | `Json`, `HumanReadable`, `Capture` |
+| | `checkAndRunTests`, `ModuleTask`, `CheckedModule`, `RunnableModule` | `Modules` |
+| | `runTests` | `Modules`, `Json`, `HumanReadable`, `Capture` |
 | | `moduleRunTask`, `clearedModuleFolder` | `Workers` |
 | `JvmTestModuleRun.scala` | `execute`, `layOutWorkers`, `runWorkers`, `processEndedWith`, `resultLog`, `inModuleFolder`, `WorkerLauncher`, `QueueLauncher`, `BatchLauncher`, `BatchSelector`, `filesystemIgnoresCase`, `launcherOrReportFailure`, `layOutForkGroups` | `Workers` |
 | | `discoveredTestClasses`, `attachingDiscoveryOutput`, `startWorker`, `eventLogFileName` | `Capture` |
@@ -110,7 +110,7 @@ Run every test (`plugin.test.testForked + plugin.integration.testForked`) when a
 - any library file the tables do not name, such as `Consolidation` or `TreeAssembler`;
 - the event-log format: `dotty/core/src/main/scala/org/scalatest/tools/TestEventLogEmitter.scala` and `dotty/core/src/main/scala/org/scalatest/events/TestEventLog*.scala`;
 - in `mill-plugin/`: `.mill-version`, `mill`, `mill.bat`, and, in `build.mill`, the `Versions` object and the `plugin.test` and `plugin.integration` modules;
-- the shared integration test helpers: `FixtureBuilds`, `FixtureBuild`, `FixtureName`, `SharedFixtureBuilds`, `SingleModuleFixture`, `SeveralModulesFixture`, `WorkspaceReset`, `TestCommandResult`, `JsonNode`, `JsonPattern`, `JsonOutputFixture`, `Durations`, `IntegrationEnvironment` and `MillConsole`;
+- the shared integration test helpers: `FixtureBuilds`, `FixtureBuildSteps`, `FixtureBuild`, `FixtureName`, `SharedFixtureBuilds`, `SingleModuleFixture`, `SeveralModulesFixture`, `WorkspaceReset`, `TestCommandResult`, `JsonNode`, `JsonPattern`, `JsonOutputFixture`, `Durations`, `IntegrationEnvironment` and `MillConsole`;
 - the fixture builds that those helpers read: `arguments`, `class-globs-and-framework-arguments`, `json-output` and `several-modules`;
 - the tags in `mill-plugin/plugin/integration/src/org/scalatest/mill/tags/`, because a wrong tag drops scenarios from a `-n` run;
 - the JSON output's keys or shape, because scenarios of every area read the `-fJ` output;

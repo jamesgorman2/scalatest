@@ -55,7 +55,7 @@ final class ModuleFolderIntegrationSpec
       "None" -> Seq("--", "*", "--", "-l", "samples.Fast")
     )
 
-    val sharedBuildByReportSetting = reportSettingsAndArguments.map(_._1).distinct.map { setting =>
+    val sharedBuildByReportSetting = reportSettingsAndArguments.map { case (setting, _) => setting }.distinct.map { setting =>
       setting -> sharedMarkingSuites { build =>
         build.addToTestModule(s"def testReportXml: T[Option[String]] = Task { $setting }")
         build.replaceInSample(s"${SampleSuite.Beta1}.scala", SampleTest.Slow.withEmptyBody, SampleTest.Slow.failing)

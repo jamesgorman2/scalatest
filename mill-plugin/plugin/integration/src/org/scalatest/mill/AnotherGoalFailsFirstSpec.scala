@@ -13,13 +13,13 @@ final class AnotherGoalFailsFirstSpec extends AnyFeatureSpec with GivenWhenThen 
     And("the build's JVM test module alpha.test tests with com.edc::scalatest at that release and holds the suite Alpha1, an AnyFunSuite whose test fast creates a file in <markers> when it runs")
     And("the build's module broken does not compile")
     And("<markers> is an absolute path at which an empty folder exists")
-    And("<report> is an absolute path at which a file exists that an earlier test command wrote")
+    andAnEarlierTestCommandWroteTheReport()
     andEachArgumentReachesMillAsWritten()
   }
 
   private val sharedBuildWithBrokenModuleAndEarlierReport: SharedFixtureBuild =
     sharedFixtureBuildWithEarlierReport(FixtureName.severalModules, addBrokenModuleThatDoesNotCompile) { build =>
-      runTestCommand(build)("alpha.test", "beta.test", "-fJ", build.jsonOutputFile.toString)
+      runTestCommandWithTwoJobsWritingJsonOutput(build)("alpha.test", "beta.test")
     }
 
   private def addBrokenModuleThatDoesNotCompile(build: FixtureBuild): Unit = {
@@ -44,16 +44,13 @@ final class AnotherGoalFailsFirstSpec extends AnyFeatureSpec with GivenWhenThen 
         shouldWriteToTheConsole(result, "broken.compile Compilation failed")
 
         withClue(result.debugString) {
-          And("no file exists in <markers>")
-          build.markers shouldBe empty
+          andNoFileShouldExistInTheMarkers(build)
 
           And("the file at <report> has the content and modification time it had before mill was invoked")
           os.read(build.jsonOutputFile) shouldBe reportBefore
           os.mtime(build.jsonOutputFile) shouldBe reportModifiedBefore
 
-          And("Mill's console shows no consolidated output")
-          result.treeLines shouldBe empty
-          result.summaryLinesAnywhereOnTheConsole shouldBe empty
+          andTheConsoleShouldShowNoConsolidatedOutput(result)
         }
       }
     }

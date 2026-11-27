@@ -92,20 +92,12 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
 
   private def runWithFlagsParsingJsonOutput(build: FixtureBuild, millFlags: MillFlags)(selectors: String*): (TestCommandResult, JsonNode) = {
     whenTheTestCommandIsInvokedWith(s"the flags ${millFlags.description} and ${theModuleSelectors(selectors)}")
-    resultAndJsonOutputOfTestCommand(build, millFlags.arguments*)(selectors*)
+    runTestCommandWithTwoJobsParsingJsonOutput(build, millFlags.arguments*)(selectors*)
   }
 
   private def runWithNoFlagsParsingJsonOutput(build: FixtureBuild)(selectors: String*): (TestCommandResult, JsonNode) = {
     whenTheTestCommandIsInvokedWith(s"no flags and ${theModuleSelectors(selectors)}")
-    resultAndJsonOutputOfTestCommand(build)(selectors*)
-  }
-
-  private def shouldBeAbortedWithOneFailureContaining(json: JsonNode, module: String, text: String): Unit = {
-    val node = moduleNode(json, module)
-    runNodesOf(json, module) shouldBe empty
-    node.outcome shouldBe Some("aborted")
-    node.failureMessages should have size 1
-    node.failureMessages.head should include(text)
+    runTestCommandWithTwoJobsParsingJsonOutput(build)(selectors*)
   }
 
   private def brokenTestShouldAbortWhileAlphaAndBetaRun(build: FixtureBuild, result: TestCommandResult, json: JsonNode, failureText: String): Unit = {
@@ -186,7 +178,7 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
     Scenario("broken.test's failure in the human-readable output", AreaTag.HumanReadable) {
       inSharedSeveralModulesWithBrokenTestThatDoesNotCompile { build =>
         When("mill -j 2 scalatest/test alpha.test broken.test beta.test -oH is invoked")
-        val result = runTestCommand(build)("alpha.test", "broken.test", "beta.test", "-oH")
+        val result = runTestCommandWithTwoJobs(build)("alpha.test", "broken.test", "beta.test", "-oH")
         val lines = result.treeLines
         val colourMarkedLines = result.colourMarkedTreeLines
         val moduleLine = lines.indexOf("[broken.test]")
@@ -204,7 +196,7 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
           }
 
           And("there is at least one such line, and one of them contains broken.test.compile")
-          failureLines.map(_._1).filter(_.contains("broken.test.compile")) should not be empty
+          failureLines.collect { case (line, _) if line.contains("broken.test.compile") => line } should not be empty
         }
 
         And("the test command fails")

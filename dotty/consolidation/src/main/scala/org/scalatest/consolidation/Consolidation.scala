@@ -288,17 +288,19 @@ final class RunFeed private[consolidation] (consolidation: Consolidation, newRun
    */
   def add(event: RunEvent): Unit =
     consolidation.feed {
+      val module = run.get.module
       if (endedEventStream.get.nonEmpty) {
-        throw new IllegalStateException(s"the event stream of a run under ${run.get.module.value} has ended")
+        throw new IllegalStateException(s"the event stream of a run under ${module.value} has ended")
       }
-      run.set(run.get.added(event.decoded))
-      if (RunAssembly.endsRunAbnormally(event.decoded)) {
-        consolidation.failModule(run.get.module)
-      } else if (RunAssembly.reportsFailure(event.decoded)) {
-        consolidation.failTestCommandFrom(run.get.module)
+      val decoded = event.decoded
+      run.set(run.get.added(decoded))
+      if (RunAssembly.endsRunAbnormally(decoded)) {
+        consolidation.failModule(module)
+      } else if (RunAssembly.reportsFailure(decoded)) {
+        consolidation.failTestCommandFrom(module)
       }
-      if (RunAssembly.reportsTestResult(event.decoded)) {
-        consolidation.recordTestResult(run.get.module)
+      if (RunAssembly.reportsTestResult(decoded)) {
+        consolidation.recordTestResult(module)
       }
     }
 
@@ -317,7 +319,7 @@ final class RunFeed private[consolidation] (consolidation: Consolidation, newRun
       if (endedEventStream.get.isEmpty) {
         val eventStream = run.get.assembledWholeEventStream
         endedEventStream.set(Some(eventStream))
-        if (eventStream.endedOtherThanCompleted) {
+        if (eventStream.failsItsModule) {
           consolidation.failModule(run.get.module)
         } else if (eventStream.failsTestCommand) {
           consolidation.failTestCommandFrom(run.get.module)

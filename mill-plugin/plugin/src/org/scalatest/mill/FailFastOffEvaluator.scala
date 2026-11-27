@@ -24,6 +24,13 @@ private[mill] object FailFastOffEvaluator {
     }
     val fields = execution.productIterator.map(_.asInstanceOf[AnyRef]).toArray
     fields(failFastIndex) = java.lang.Boolean.FALSE
+    // Each constructor is chosen by its parameter count, as their parameter types are in packages this code cannot name.
+    // `Execution`'s widest constructor is its primary one, the only one that takes every product field, in product
+    // order; the other builds `profileLogger` itself. `EvaluatorImpl`'s narrowest constructor takes
+    // `allowPositionalCommandArgs`, `selectiveExecution` and `execution`, and builds its own `scriptModuleInit`; its
+    // primary one also takes `scriptModuleInit`. A Mill release breaks this if it gives `Execution` another constructor
+    // at least as wide as its primary one, or if `EvaluatorImpl`'s narrowest constructor no longer takes exactly those
+    // three values, in that order.
     val executionCopy = execution.getClass.getConstructors.maxBy(_.getParameterCount).newInstance(fields*)
     impl.getClass.getConstructors
       .minBy(_.getParameterCount)

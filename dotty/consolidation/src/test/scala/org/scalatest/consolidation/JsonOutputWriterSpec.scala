@@ -2,7 +2,6 @@ package org.scalatest.consolidation
 
 import java.time.Instant
 import org.scalactic.source.Position
-import org.scalatest.ScalaTestVersions
 import org.scalatest.events.CapturedStream
 import org.scalatest.events.DecodedEvent
 import org.scalatest.events.DecodedStackDepth
@@ -93,7 +92,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with should.Matchers with C
         consolidation.end(Some(Instant.ofEpochMilli(1600L)))
         json.root shouldBe objectOf(
           "kind" -> text("root"),
-          "scalaTestVersion" -> text(ScalaTestVersions.ScalaTestVersion),
+          "scalaTestVersion" -> text(Consolidation.scalaTestVersion),
           "buildTool" -> objectOf("name" -> text("Mill"), "version" -> text("1.3.1")),
           "moduleSelectors" -> arrayOf(
             objectOf("selector" -> text("__.test"), "modules" -> arrayOf(text("app.test"), text("core.test"))),

@@ -26,6 +26,6 @@ trait ClassGlobsAcrossModulesFixture extends SeveralModulesFixture { this: Suite
 
   protected def runOnBothModulesWithReport(build: FixtureBuild, arguments: String*): TestCommandResult = {
     whenTheTestCommandIsInvokedWith(arguments.mkString(" "))
-    runTestCommand(build)((Seq("alpha.test", "beta.test", "-fJ", build.jsonOutputFile.toString) ++ arguments)*)
+    runTestCommandWithTwoJobs(build)((Seq("alpha.test", "beta.test", "-fJ", build.jsonOutputFile.toString) ++ arguments)*)
   }
 }

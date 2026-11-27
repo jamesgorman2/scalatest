@@ -36,11 +36,13 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
 
   private val alphaAndEveryTestModule: Seq[String] = Seq("alpha.test", "__.test")
 
+  private final case class ModuleSelectorEntry(selector: String, modules: Seq[String])
+
   private final case class RunAndMarkerLineCounts(result: TestCommandResult, json: JsonNode, markerLineCounts: Seq[(SampleMarker, Int)])
 
   private lazy val sharedRunOnAlphaAndEveryTestModule: RunAndMarkerLineCounts =
     sharedUnchangedSeveralModules.use { build =>
-      val (result, json) = resultAndJsonOutputOfTestCommand(build)(alphaAndEveryTestModule*)
+      val (result, json) = runTestCommandWithTwoJobsParsingJsonOutput(build)(alphaAndEveryTestModule*)
       RunAndMarkerLineCounts(result, json, SampleMarker.all.map(marker => marker -> markerLines(build, marker).size))
     }
 
@@ -50,13 +52,11 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
     sharedRunOnAlphaAndEveryTestModule
   }
 
-  private def runParsingJsonOutput(build: FixtureBuild)(selectors: String*): (TestCommandResult, JsonNode) = {
-    whenTheTestCommandIsInvokedWith(theModuleSelectors(selectors))
-    resultAndJsonOutputOfTestCommand(build)(selectors*)
-  }
+  private def runParsingJsonOutput(build: FixtureBuild)(selectors: String*): (TestCommandResult, JsonNode) =
+    build.resultAndJsonOutput(runTestCommandOnModuleSelectors(build, selectors*))
 
-  private def moduleSelectorsOf(json: JsonNode): Seq[(String, Seq[String])] =
-    json("moduleSelectors").arr.toSeq.map(entry => entry("selector").str -> entry("modules").arr.toSeq.map(_.str))
+  private def moduleSelectorsOf(json: JsonNode): Seq[ModuleSelectorEntry] =
+    json("moduleSelectors").arr.toSeq.map(entry => ModuleSelectorEntry(entry("selector").str, entry("modules").arr.toSeq.map(_.str)))
 
   private def markerLines(build: FixtureBuild, marker: SampleMarker): Seq[String] =
     if (os.exists(build.markersFolder / marker.fileName)) os.read.lines(build.markersFolder / marker.fileName) else Nil
@@ -75,7 +75,7 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
     Scenario("Module selectors on either side of an output argument", AreaTag.Modules) {
       inSharedBuild(sharedUnchangedSeveralModules) { build =>
         When("mill -j 2 scalatest/test alpha.test -fJ <report> beta.test is invoked")
-        val result = runTestCommand(build)("alpha.test", "-fJ", build.jsonOutputFile.toString, "beta.test")
+        val result = runTestCommandWithTwoJobs(build)("alpha.test", "-fJ", build.jsonOutputFile.toString, "beta.test")
         val (_, json) = build.resultAndJsonOutput(result)
 
         withClue(result.debugString) {
@@ -83,7 +83,7 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
           moduleNodeNames(json) shouldBe Seq("alpha.test", "beta.test")
 
           And("the JSON output's root moduleSelectors holds exactly two entries, whose selector values are alpha.test and beta.test, in that order")
-          moduleSelectorsOf(json).map(_._1) shouldBe Seq("alpha.test", "beta.test")
+          moduleSelectorsOf(json).map(_.selector) shouldBe Seq("alpha.test", "beta.test")
         }
 
         And("the test command succeeds")
@@ -94,23 +94,13 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
     Scenario("Only an output argument", AreaTag.Modules) {
       inSharedBuild(sharedUnchangedSeveralModules) { build =>
         When("mill -j 2 scalatest/test -fJ <report> is invoked")
-        val result = runTestCommand(build)("-fJ", build.jsonOutputFile.toString)
+        val result = runTestCommandWithTwoJobs(build)("-fJ", build.jsonOutputFile.toString)
 
         Then("Mill reports that the test command failed, with a message saying that the test command was given no module selector")
         shouldFail(result)
         shouldWriteToTheConsole(result, "The test command takes one or more module selectors, but was given none")
 
-        withClue(result.debugString) {
-          And("no file exists in <markers>")
-          build.markers shouldBe empty
-
-          And("nothing exists at <report>")
-          os.exists(build.jsonOutputFile) shouldBe false
-
-          And("Mill's console shows no consolidated output")
-          result.treeLines shouldBe empty
-          result.summaryLinesAnywhereOnTheConsole shouldBe empty
-        }
+        shouldStartNoTestAndWriteNoConsolidatedOutput(build, result)
       }
     }
 
@@ -139,7 +129,7 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
           moduleNodeNames(json) shouldBe Seq("alpha.test", "beta.test")
 
           And("the JSON output's root moduleSelectors holds exactly one entry, whose selector is __ and whose modules holds exactly alpha.test and beta.test")
-          moduleSelectorsOf(json) shouldBe Seq("__" -> Seq("alpha.test", "beta.test"))
+          moduleSelectorsOf(json) shouldBe Seq(ModuleSelectorEntry("__", Seq("alpha.test", "beta.test")))
         }
 
         And("the test command succeeds")
@@ -156,10 +146,10 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
         moduleSelectors should have size 2
 
         And("the first entry's selector is alpha.test and its modules holds exactly alpha.test")
-        moduleSelectors.head shouldBe (("alpha.test", Seq("alpha.test")))
+        moduleSelectors.head shouldBe ModuleSelectorEntry("alpha.test", Seq("alpha.test"))
 
         And("the second entry's selector is __.test and its modules holds exactly alpha.test and beta.test, in that order")
-        moduleSelectors(1) shouldBe (("__.test", Seq("alpha.test", "beta.test")))
+        moduleSelectors(1) shouldBe ModuleSelectorEntry("__.test", Seq("alpha.test", "beta.test"))
       }
     }
 
@@ -171,10 +161,10 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
 
         withClue(result.debugString) {
           Then("the JSON output's root moduleSelectors holds exactly one entry, whose selector is __.test")
-          moduleSelectors.map(_._1) shouldBe Seq("__.test")
+          moduleSelectors.map(_.selector) shouldBe Seq("__.test")
 
           And("that entry's modules holds exactly B1.test, alpha.test, b10.test, b2.test and beta.test, in that order")
-          moduleSelectors.head._2 shouldBe Seq("B1.test", "alpha.test", "b10.test", "b2.test", "beta.test")
+          moduleSelectors.head.modules shouldBe Seq("B1.test", "alpha.test", "b10.test", "b2.test", "beta.test")
         }
       }
     }

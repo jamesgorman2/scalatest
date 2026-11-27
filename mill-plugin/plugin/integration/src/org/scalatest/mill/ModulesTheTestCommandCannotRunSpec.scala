@@ -7,14 +7,14 @@ import org.scalatest.mill.tags.AreaTag
 import org.scalatest.mill.tags.Modules
 
 @Modules
-final class ModulesTheTestCommandCannotRunSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with SharedFixtureBuilds {
+final class ModulesTheTestCommandCannotRunSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with SharedFixtureBuilds with FixtureBuildSteps {
 
   private val cannotRunModulesHeader: String = "The test command cannot run these selected test modules:"
 
   private val modulesWhoseTestsCannotStartHeader: String = "The tests of these selected test modules cannot start:"
 
   private val sharedModulesTheTestCommandCannotRun: SharedFixtureBuild =
-    sharedFixtureBuildWithEarlierReport(FixtureName.modulesTheTestCommandCannotRun, _ => ())(invokeTestCommandOnAlpha)
+    sharedFixtureBuildWithEarlierReport(FixtureName.modulesTheTestCommandCannotRun, _ => ())(runTestCommandOnAlpha)
 
   private def inSharedModulesTheTestCommandCannotRun[A](test: FixtureBuild => A): A = {
     givenTheBuild()
@@ -24,13 +24,12 @@ final class ModulesTheTestCommandCannotRunSpec extends AnyFeatureSpec with Given
   private def withModulesTheTestCommandCannotRun[A](test: FixtureBuild => A): A =
     withFixtureBuild(FixtureName.modulesTheTestCommandCannotRun) { build =>
       givenTheBuild()
-      writeEarlierReport(build)(invokeTestCommandOnAlpha)
-      os.remove.all(build.markersFolder)
-      os.makeDir.all(build.markersFolder)
+      writeEarlierReport(build)(runTestCommandOnAlpha)
+      WorkspaceReset.emptyMarkersFolder.restore(build)
       test(build)
     }
 
-  private def invokeTestCommandOnAlpha(build: FixtureBuild): TestCommandResult = invokeTestCommand(build, Seq("alpha.test"))
+  private def runTestCommandOnAlpha(build: FixtureBuild): TestCommandResult = runTestCommandWithTwoJobsWritingJsonOutput(build)("alpha.test")
 
   private def givenTheBuild(): Unit = {
     Given("a Mill 1.3.1 build that adds the Mill plugin, at the release of this fork under test, as the entry com.edc::scalatest-mill of its build.mill header's mvnDeps")
@@ -49,24 +48,12 @@ final class ModulesTheTestCommandCannotRunSpec extends AnyFeatureSpec with Given
         "and whose mvnDeps also holds com.example::absent:0.0.1, which no repository the build uses holds"
     )
     And("<markers> is an absolute path at which an empty folder exists, and each test, when it runs, creates a file in <markers>")
-    And("<report> is an absolute path at which a file exists that an earlier test command wrote")
+    andAnEarlierTestCommandWroteTheReport()
     And("the test command is invoked as mill -j 2 scalatest/test <selectors> -fJ <report>, each argument reaching mill exactly as written, with no shell expansion")
   }
 
-  private def invokeTestCommand(build: FixtureBuild, selectors: Seq[String]): TestCommandResult =
-    build.runTestCommandWithMillArguments(FixtureBuild.jobsArguments(2))((selectors :+ "-fJ" :+ build.jsonOutputFile.toString)*)
-
-  private def runTestCommand(build: FixtureBuild, selectors: String*): TestCommandResult = {
-    When(s"the test command is invoked with ${theModuleSelectors(selectors)}")
-    invokeTestCommand(build, selectors)
-  }
-
-  private def addTestModule(build: FixtureBuild, module: String, members: String*): Unit =
-    build.appendToBuild(
-      (Seq(s"object $module extends SampleModule {", "  object test extends SampleTests, TestModule.ScalaTest {") ++
-        members.map("    " + _) ++
-        Seq("  }", "}")).mkString("\n")
-    )
+  private def addScalaTestModule(build: FixtureBuild, module: String, members: String*): Unit =
+    build.appendToBuild(moduleWithTestModule(module, "SampleTests, TestModule.ScalaTest", members))
 
   private def shouldNameModulesTheTestCommandCannotRun(result: TestCommandResult, modules: Seq[String]): Unit =
     withClue(result.debugString) {
@@ -74,24 +61,11 @@ final class ModulesTheTestCommandCannotRunSpec extends AnyFeatureSpec with Given
       modules.foreach(module => result.consoleLines.exists(line => line.contains(s"  $module ") || line.contains(s"  $module's ")) shouldBe true)
     }
 
-  private def shouldStartNoTestAndWriteNoConsolidatedOutput(build: FixtureBuild, result: TestCommandResult): Unit =
-    withClue(result.debugString) {
-      And("no file exists in <markers>")
-      build.markers shouldBe empty
-
-      And("nothing exists at <report>")
-      os.exists(build.jsonOutputFile) shouldBe false
-
-      And("Mill's console shows no consolidated output")
-      result.treeLines shouldBe empty
-      result.summaryLinesAnywhereOnTheConsole shouldBe empty
-    }
-
   Feature("Modules the test command cannot run") {
 
     Scenario("Module selectors alpha.test and other.test") {
       inSharedModulesTheTestCommandCannotRun { build =>
-        val result = runTestCommand(build, "alpha.test", "other.test")
+        val result = runTestCommandOnModuleSelectors(build, "alpha.test", "other.test")
 
         Then("Mill reports that the test command failed, with a message naming other.test")
         shouldFail(result)
@@ -103,7 +77,7 @@ final class ModulesTheTestCommandCannotRunSpec extends AnyFeatureSpec with Given
 
     Scenario("A module selector that resolves to every test module") {
       inSharedModulesTheTestCommandCannotRun { build =>
-        val result = runTestCommand(build, "__.test")
+        val result = runTestCommandOnModuleSelectors(build, "__.test")
 
         Then("Mill reports that the test command failed, with a message naming each of munit.test, utest.test, upstream.test, other.test, js.test and native.test")
         shouldFail(result)
@@ -125,8 +99,8 @@ final class ModulesTheTestCommandCannotRunSpec extends AnyFeatureSpec with Given
         Given("the build also has the JVM module shared, which is not a test module and whose mvnDeps holds com.edc::scalatest at the release under test")
         build.appendToBuild("object shared extends SampleModule {\n  def mvnDeps = Seq(mvn\"com.edc::scalatest::3.2.20\")\n}")
         And("the build also has the JVM test module indirect.test, whose moduleDeps holds shared, whose own mvnDeps holds nothing of this fork, and which holds one test that succeeds")
-        addTestModule(build, "indirect", "def moduleDeps = super.moduleDeps ++ Seq(shared)")
-        val result = runTestCommand(build, "alpha.test", "indirect.test")
+        addScalaTestModule(build, "indirect", "def moduleDeps = super.moduleDeps ++ Seq(shared)")
+        val result = runTestCommandOnModuleSelectors(build, "alpha.test", "indirect.test")
 
         withClue(result.debugString) {
           Then("exactly two files exist in <markers>")
@@ -147,8 +121,8 @@ final class ModulesTheTestCommandCannotRunSpec extends AnyFeatureSpec with Given
           "the build also has the JVM test module args.test, which tests with com.edc::scalatest at the release under test, holds one test that succeeds, " +
             "and whose testArgsDefault is --not-a-scalatest-argument"
         )
-        addTestModule(build, "args", "def mvnDeps = Seq(mvn\"com.edc::scalatest::3.2.20\")", "def testArgsDefault = Seq(\"--not-a-scalatest-argument\")")
-        val result = runTestCommand(build, "alpha.test", "args.test")
+        addScalaTestModule(build, "args", "def mvnDeps = Seq(mvn\"com.edc::scalatest::3.2.20\")", "def testArgsDefault = Seq(\"--not-a-scalatest-argument\")")
+        val result = runTestCommandOnModuleSelectors(build, "alpha.test", "args.test")
 
         Then("Mill reports that the test command failed, with a message naming --not-a-scalatest-argument")
         shouldFail(result)
@@ -163,7 +137,7 @@ final class ModulesTheTestCommandCannotRunSpec extends AnyFeatureSpec with Given
       withModulesTheTestCommandCannotRun { build =>
         Given("the build also has the JVM module util, which is not a test module and holds no module")
         build.appendToBuild("object util extends SampleModule")
-        val result = runTestCommand(build, "alpha.test", "util")
+        val result = runTestCommandOnModuleSelectors(build, "alpha.test", "util")
 
         Then("Mill reports that the test command failed, with a message naming the module selector util")
         shouldFail(result)

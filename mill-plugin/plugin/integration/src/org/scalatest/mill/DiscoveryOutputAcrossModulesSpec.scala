@@ -66,26 +66,27 @@ final class DiscoveryOutputAcrossModulesSpec extends AnyFeatureSpec with GivenWh
         givenNoisyInBetaTest()
         val result = runOnBothModulesWithReport(build, "-oH", "--", "samples.*", "--", "-z", "nothing-matches")
         val betaSubtree = result.subtreeOf("[beta.test]")
-        val underBeta = betaSubtree.zip(result.colourMarkedSubtreeOf("[beta.test]")).drop(1)
+        val underBeta = betaSubtree.drop(1)
         val (beforeLastFour, lastFour) = underBeta.splitAt(underBeta.size - 4)
+        val colourMarkedLastFour = result.colourMarkedSubtreeOf("[beta.test]").drop(1).takeRight(4)
 
         withClue(result.debugString) {
           Then("in the human-readable output on stdout, the lines that follow [beta.test] and are indented more than it end with these lines, in this order:")
           betaSubtree should not be empty
-          lastFour.map(_._1) shouldBe Seq(
+          lastFour shouldBe Seq(
             "  [stdout] loading samples.Noisy",
             "  *** MODULE ABORTED ***",
             "    Test selector does not match any test: samples.*",
             "    Run discoveredTestClasses to see available tests"
           )
-          lastFour.drop(1).map(_._2) shouldBe Seq(
+          colourMarkedLastFour.drop(1) shouldBe Seq(
             "  {red}*** MODULE ABORTED ***{reset}",
             "    {red}Test selector does not match any test: samples.*{reset}",
             "    {red}Run discoveredTestClasses to see available tests{reset}"
           )
 
           And("among the lines that follow [beta.test] and are indented more than it, a line that begins Run and is indented one level more than [beta.test] comes before those four lines")
-          beforeLastFour.map(_._1).filter(_.startsWith("  Run ")) should not be empty
+          beforeLastFour.filter(_.startsWith("  Run ")) should not be empty
         }
 
         And("the test command fails")

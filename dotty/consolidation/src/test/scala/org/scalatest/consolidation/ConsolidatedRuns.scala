@@ -131,6 +131,22 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
   def colourMarkedOutputFrom(eventLog: String): ColourMarkedOutput = colourMarkedOutputFrom(TestRunPart.Events(eventLog))
 
   def colourMarkedOutputFrom(parts: TestRunPart*): ColourMarkedOutput = colourMarkedOutputAfter(_.addRunOf(parts*))
+
+  val sqrtPropSpecEventLog: String =
+    """
+    run started
+    structure
+      suite "SqrtPropSpec", class "samples.SqrtPropSpec"
+        test "sqrt of a square is the root", label "- sqrt of a square is the root"
+    suite "SqrtPropSpec": SuiteStarting
+    test "sqrt of a square is the root": TestStarting
+    test "sqrt of a square is the root": TestSucceeded
+    suite "SqrtPropSpec": SuiteCompleted
+    run ended completed
+    """
+
+  def addSqrtPropSpecRun(consolidation: Consolidation): Unit =
+    consolidation.addRunOf(TestRunPart.Events(sqrtPropSpecEventLog))
 }
 
 private[consolidation] object ConsolidatedRuns {
