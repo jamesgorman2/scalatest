@@ -29,8 +29,8 @@ Bare `AC-nnn` IDs are this document's. The epic's requirements are cited as `../
 - Each failure the test command can attribute to one selected test module, shown on that module's node in the JSON and human-readable outputs. Such failures include:
   - the module's class globs matching no test;
   - the module's tests not starting, where the module fails to compile, its dependencies fail to resolve, or another task its tests depend on fails.
-- The test command's failure naming exactly the selected test modules that failed, where its tests have run, unless its JSON output cannot be written.
-- Where the test command cannot run a selected test module, its failure naming each other selected test module whose tests are known not to start before any test starts, such as one whose dependencies fail to resolve, with that module's failure.
+- Once the tests have run, the test command's failure naming exactly the selected test modules that failed, unless its JSON output cannot be written.
+- Where the test command cannot run a selected test module, its failure also naming each other selected test module whose tests are known, before any test starts, not to start, such as one whose dependencies fail to resolve. The failure gives each such module's own failure.
 - What Mill's test discovery writes for a selected test module, shown on that module's node in the JSON and human-readable outputs.
 - The class globs and framework arguments applying alike to every selected test module.
 - Failing the test command before any test starts where the test command is given no module selector, or a module selector resolves to no test module.
@@ -361,7 +361,7 @@ Feature: Modules the test command cannot run
         | `js.test`       |
         | `native.test`   |
 
-  Rule: The failure names every test module the test command cannot run, and every other selected test module whose tests are known not to start before any test starts, with that module's failure
+  Rule: The failure names every test module the test command cannot run, and every other selected test module whose tests are known not to start, with that module's failure
     Before any test starts, a module's tests are known not to start where its dependencies fail to resolve, or where its `testArgsDefault` or a task its dependency resolution depends on fails.
     The failure gives such a module's failure as its module node would hold it, as in AC-015.
 

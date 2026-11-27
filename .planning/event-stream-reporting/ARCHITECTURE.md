@@ -252,10 +252,12 @@ The Mill plugin is the library's only caller (`decisions/event-log-contract.md` 
   - a process of the module ended before any run existed in it.
 
   A failure attached to another module does not count. The test command reads it once every test process of the module has ended and before **End** (§ Modules § Mill plugin, Test command).
-- **Read the modules that failed the test command**: returns, at any time from **Start** and under the consolidation's lock, each module, ordered by name, that holds a node that fails the test command (`SPECIFICATION.md` R-137). Such a module is one where:
+- **Read the modules that failed the test command**: returns, at any time from **Start** and under the consolidation's lock, the modules, ordered by name, holding a node that fails the test command (`SPECIFICATION.md` R-137). Such a module is one where:
   - a failure is attached to the module;
-  - a process of the module ended before any run existed in it; or
-  - a run of the module has an outcome other than completed, reports a failed or canceled test or an aborted suite, or, once its event stream has ended, holds a node that is aborted or not run.
+  - a process of the module ended before any run existed in it;
+  - a run of the module has an outcome other than completed;
+  - a run of the module reports a failed or canceled test or an aborted suite; or
+  - a run of the module, once its event stream has ended, holds a node that is aborted or not run.
 
   A failure attached to the root belongs to no module. The test command reads it after **End** (`many-modules-in-one-test-command/TECHNICAL-DESIGN.md` § A module whose tests cannot start).
 - **Read the version the library was built at**: returns the version of `com.edc:scalatest-core_3` the library was built at, which the JSON output writes as `scalaTestVersion` (`../../mill-plugin/consolidated.schema.json` `$defs/root`). Core holds that version only in a `private[scalatest]` constant (§ Modules § Consolidation library), which the plugin, outside core's package, cannot read. The test command compares it with the version of `com.edc:scalatest-core_3` each selected module resolves (`many-modules-in-one-test-command/TECHNICAL-DESIGN.md` § The check before any test starts).
