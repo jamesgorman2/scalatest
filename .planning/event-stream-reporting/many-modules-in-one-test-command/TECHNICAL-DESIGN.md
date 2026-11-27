@@ -18,7 +18,7 @@ This design checks every selected JVM test module before any test starts, then r
   - the human-readable writer writes a module's output lines and its `*** MODULE ABORTED ***` block after the module's runs, built as it builds the root's (AC-023, AC-026);
   - attaching a failure fails the consolidation state (`../SPECIFICATION.md` R-137).
 - **Add a process that ended before any run existed in it**: `addProcessEndedBeforeAnyRun`, which takes the process's module.
-- **Read whether a module has failed**: `hasEndedAbnormally`, which the module run's no-match check reads in place of the consolidation state (`../SPECIFICATION.md` R-053a, R-098e).
+- **Read whether a module has ended abnormally**: `hasEndedAbnormally`, which the module run's no-match check reads in place of the consolidation state (`../SPECIFICATION.md` R-053a, R-098e).
 - **Read the modules that failed the test command**: `modulesFailingTheTestCommand`, which the test command reads after **End** to name the modules in its failure (AC-027; § A module whose tests cannot start).
 - **Read the version the library was built at**: `Consolidation.scalaTestVersion`, which the check before any test starts compares with each module's resolved `com.edc:scalatest-core_3` (§ The check before any test starts).
 
@@ -30,7 +30,7 @@ This design checks every selected JVM test module before any test starts, then r
 - The test command then calls `execute` once on the fail-fast-off evaluator, over one anonymous *check task* for each selected JVM test module, and none for a Scala.js or Native test module. A module's check task reads:
   - the module's `testArgsDefault`;
   - the Coursier resolution of the module's runtime dependencies, which covers the dependencies of every module the module depends on:
-    - The check task calls the module's `millResolver`'s `resolution` on the module's `coursierDependencyTask`, which names the runtime configuration itself. `resolution` fetches metadata only.
+    - The check task names the runtime configuration on a copy of the module's `coursierDependencyTask`, and calls the module's `millResolver`'s `resolution` on that copy. `resolution` fetches metadata only.
     - `resolvedRunMvnDeps` uses the same resolver and root dependency but calls `classpath`, whose parameters set the runtime configuration as the default configuration and add the Gradle runtime variant attributes. `resolution` takes the module's `resolutionParams` unchanged, so the check's resolution has neither.
 - Once that `execute` returns, the test command holds each module's check result: the module's `testArgsDefault`, and the library and version of each dependency the resolution keeps.
 - A check task evaluates no compile. A module's tests therefore wait on every selected module's dependency resolution and `testArgsDefault`, but on no other module's compile (AC-007).

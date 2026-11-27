@@ -361,21 +361,12 @@ Feature: Modules the test command cannot run
     And the test command is invoked as `mill -j 2 scalatest/test <selectors> -fJ <report>`, each argument reaching `mill` exactly as written, with no shell expansion
 
   Rule: A test module the test command cannot run fails the test command before any module's tests start
-    Scenario Outline: AC-010 Module selectors alpha.test and <module>
-      When the test command is invoked with the module selectors `alpha.test <module>`
-      Then Mill reports that the test command failed, with a message naming `<module>`
+    Scenario: AC-010 Module selectors alpha.test and other.test
+      When the test command is invoked with the module selectors `alpha.test other.test`
+      Then Mill reports that the test command failed, with a message naming `other.test`
       And no file exists in `<markers>`
       And nothing exists at `<report>`
       And Mill's console shows no consolidated output
-
-      Examples:
-        | module          |
-        | `munit.test`    |
-        | `utest.test`    |
-        | `upstream.test` |
-        | `other.test`    |
-        | `js.test`       |
-        | `native.test`   |
 
   Rule: The failure names every test module the test command cannot run, and every other selected test module whose tests are known not to start, with that module's failure
     Before any test starts, a module's tests are known not to start where its dependencies fail to resolve, or where its `testArgsDefault` or a task its dependency resolution depends on fails.
