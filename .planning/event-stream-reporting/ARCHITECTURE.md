@@ -259,7 +259,7 @@ The Mill plugin is the library's only caller (`decisions/event-log-contract.md` 
   - a run of the module reports a failed or canceled test or an aborted suite; or
   - a run of the module, once its event stream has ended, holds a node that is aborted or not run.
 
-  A failure attached to the root belongs to no module. The test command reads it after **End** (`many-modules-in-one-test-command/TECHNICAL-DESIGN.md` § A module whose tests cannot start).
+  A failure attached to the root belongs to no module.
 - **Read the version the library was built at**: returns the version of `com.edc:scalatest-core_3` the library was built at, which the JSON output writes as `scalaTestVersion` (`../../mill-plugin/consolidated.schema.json` `$defs/root`). Core holds that version only in a `private[scalatest]` constant (§ Modules § Consolidation library), which the plugin, outside core's package, cannot read. The test command compares it with the version of `com.edc:scalatest-core_3` each selected module resolves (`many-modules-in-one-test-command/TECHNICAL-DESIGN.md` § The check before any test starts).
 
 ## Data flow
@@ -331,7 +331,7 @@ flowchart LR
   PROC -- "stdout and stderr (JVM), less output captured against a node" --> CAP
   DEC -- "event stream, live" --> LIB
   CAP -- "output captured against the run" --> LIB
-  CMD -- "each run's module, selectors, test classes each process was assigned, modules not started, test classes left in a queue, processes with no run, output and failures for each module and for the root, Mill version, start and end times of the root and each module" --> LIB
+  CMD -- "each run's module, selectors, test classes each process was assigned, modules not started, test classes left in a queue, processes with no run, output and failures for each module, Mill version, start and end times of the root and each module" --> LIB
   LIB -- "ScalaTest arguments grouped by flag; runner argument; consolidation state; whether a module has a test result; whether a module has failed; the modules that failed the test command; the version the library was built at" --> CMD
   LIB -- "on stdout: progress summary, redrawn as events arrive; human-readable, once every stream has ended" --> LOG --> CON[Console]
   LIB -- "each output a -f names: progress as events arrive; human-readable and JSON once every stream has ended" --> OUT["Files the test command's arguments name"]
