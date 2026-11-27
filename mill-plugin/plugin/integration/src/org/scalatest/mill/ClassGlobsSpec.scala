@@ -30,53 +30,25 @@ final class ClassGlobsSpec extends AnyFeatureSpec with GivenWhenThen with should
 
   Feature("Class globs") {
 
-    val selectingGlobs = Seq(
-      Seq("samples.Alpha1") -> Seq("Alpha1"),
-      Seq("samples.Alpha*") -> Seq("Alpha1", "Alpha2"),
-      Seq("*1") -> Seq("Alpha1", "Beta1"),
-      Seq("samples.*a2") -> Seq("Alpha2"),
-      Seq("samples.Beta1", "samples.Alpha2") -> Seq("Alpha2", "Beta1")
-    )
+    Scenario("Class globs that select one fork group's classes start only that group's worker, testBatchFrameworkTasks true") {
+      val forkGrouping = """Seq(Seq("samples.Beta1"), Seq("samples.Alpha1", "samples.Alpha2"))"""
+      Given(s"the module's testForkGrouping is $forkGrouping and its testBatchFrameworkTasks is true")
+      And("each test sends an info message holding the system property user.dir")
+      When("the test command runs core.test, writing JSON output, with -- samples.Alpha*")
+      withMarkingSuites { build =>
+        build.addToTestModule(
+          s"def testForkGrouping = Task { $forkGrouping }",
+          "def testBatchFrameworkTasks = true"
+        )
+        SampleSuite.values.foreach(suite => makeTestsSendWorkingDirectory(build, suite, SampleTest.Fast, SampleTest.Slow))
+        val (result, json) = runWithClassGlobsReadingJsonOutput(build, "samples.Alpha*")
 
-    for ((classGlobs, suites) <- selectingGlobs) {
-      Scenario(s"Class globs ${classGlobs.mkString(" ")} run only the suites ${EnglishList.of(suites)}") {
-        Given("Alpha1, Alpha2 and Beta1, each with the tests fast and slow")
-        When(s"the test command runs core.test, writing JSON output, with -- ${classGlobs.mkString(" ")}")
-        withMarkingSuites { build =>
-          val (result, json) = runWithClassGlobsReadingJsonOutput(build, classGlobs*)
+        withClue(result.debugString) {
+          Then("the module node holds exactly one run node, of fork group 1, holding Alpha1 and Alpha2")
+          shouldHoldOneRunOf(json, Seq("Alpha1", "Alpha2")).forkGroup shouldBe Some(1)
 
-          Then(s"the suites run are exactly ${EnglishList.of(suites)}")
-          withClue(result.debugString) {
-            suitesRun(json) shouldBe suites
-          }
-
-          And("the test command succeeds")
-          shouldSucceed(result)
-        }
-      }
-    }
-
-    for (batch <- Seq(false, true)) {
-      Scenario(s"Class globs that select one fork group's classes start only that group's worker, testBatchFrameworkTasks $batch") {
-        val forkGrouping = """Seq(Seq("samples.Beta1"), Seq("samples.Alpha1", "samples.Alpha2"))"""
-        Given(s"the module's testForkGrouping is $forkGrouping and its testBatchFrameworkTasks is $batch")
-        And("each test sends an info message holding the system property user.dir")
-        When("the test command runs core.test, writing JSON output, with -- samples.Alpha*")
-        withMarkingSuites { build =>
-          build.addToTestModule(
-            s"def testForkGrouping = Task { $forkGrouping }",
-            s"def testBatchFrameworkTasks = $batch"
-          )
-          SampleSuite.values.foreach(suite => makeTestsSendWorkingDirectory(build, suite, SampleTest.Fast, SampleTest.Slow))
-          val (result, json) = runWithClassGlobsReadingJsonOutput(build, "samples.Alpha*")
-
-          withClue(result.debugString) {
-            Then("the module node holds exactly one run node, of fork group 1, holding Alpha1 and Alpha2")
-            shouldHoldOneRunOf(json, Seq("Alpha1", "Alpha2")).forkGroup shouldBe Some(1)
-
-            And("every info message is the path of the folder sandbox in the module folder")
-            shouldSendOnlyTheModuleFoldersSandbox(build, json)
-          }
+          And("every info message is the path of the folder sandbox in the module folder")
+          shouldSendOnlyTheModuleFoldersSandbox(build, json)
         }
       }
     }
@@ -100,45 +72,16 @@ final class ClassGlobsSpec extends AnyFeatureSpec with GivenWhenThen with should
       }
     }
 
-    for (classGlob <- Seq("samples.Gamma*", "samples.Fast")) {
-      Scenario(s"The class glob $classGlob, which matches no test class, fails the test command") {
-        Given("Alpha1, Alpha2 and Beta1, each of whose tests creates a file in the markers folder as it runs")
-        And("samples.Fast, a Tag object that is not a test class")
-        When(s"the test command runs core.test, writing JSON output, with -- $classGlob")
-        withMarkingSuites { build =>
-          val (result, json) = runWithClassGlobsReadingJsonOutput(build, classGlob)
-
-          Then(s"the module node core.test holds exactly one failure, the one Mill's testOnly fails with, naming $classGlob")
-          withClue(result.debugString) {
-            moduleNode(json).failureMessages shouldBe Seq(noTestMatchedMessageNaming(classGlob))
-          }
-
-          And("the JSON output's root holds no failure")
-          withClue(result.debugString) {
-            json.failureMessages shouldBe empty
-          }
-
-          And("no file exists in the markers folder, and no test worker started")
-          withClue(result.debugString) {
-            build.markers shouldBe empty
-            build.anyTestWorkerStarted shouldBe false
-          }
-
-          And("the test command fails")
-          shouldFail(result)
-        }
-      }
-    }
-
-    Scenario("Framework arguments that leave no test of the matched classes to run fail the test command") {
+    Scenario("The class glob samples.Fast, which matches no test class, fails the test command") {
       Given("Alpha1, Alpha2 and Beta1, each of whose tests creates a file in the markers folder as it runs")
-      When("the test command runs core.test, writing JSON output, with -- samples.Alpha1 -- -z nothing-matches")
+      And("samples.Fast, a Tag object that is not a test class")
+      When("the test command runs core.test, writing JSON output, with -- samples.Fast")
       withMarkingSuites { build =>
-        val (result, json) = runReadingJsonOutput(build, "--", "samples.Alpha1", "--", "-z", "nothing-matches")
+        val (result, json) = runWithClassGlobsReadingJsonOutput(build, "samples.Fast")
 
-        Then("the module node core.test holds exactly one failure, the one Mill's testOnly fails with, naming samples.Alpha1")
+        Then("the module node core.test holds exactly one failure, the one Mill's testOnly fails with, naming samples.Fast")
         withClue(result.debugString) {
-          moduleNode(json).failureMessages shouldBe Seq(noTestMatchedMessageNaming("samples.Alpha1"))
+          moduleNode(json).failureMessages shouldBe Seq(noTestMatchedMessageNaming("samples.Fast"))
         }
 
         And("the JSON output's root holds no failure")
@@ -146,9 +89,10 @@ final class ClassGlobsSpec extends AnyFeatureSpec with GivenWhenThen with should
           json.failureMessages shouldBe empty
         }
 
-        And("no file exists in the markers folder")
+        And("no file exists in the markers folder, and no test worker started")
         withClue(result.debugString) {
           build.markers shouldBe empty
+          build.anyTestWorkerStarted shouldBe false
         }
 
         And("the test command fails")

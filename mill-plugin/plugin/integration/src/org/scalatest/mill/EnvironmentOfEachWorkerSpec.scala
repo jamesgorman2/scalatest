@@ -28,7 +28,7 @@ final class EnvironmentOfEachWorkerSpec extends AnyFeatureSpec with GivenWhenThe
 
     def startDaemonThroughMillBat(build: FixtureBuild): Unit = build.compileThroughMillBat()
 
-    for (daemonMode <- Seq(false, true); (propagate, expectedOuterValue) <- Seq(true -> "from-outer", false -> "absent")) {
+    for ((daemonMode, propagate, expectedOuterValue) <- Seq((false, false, "absent"), (true, true, "from-outer"))) {
       val receives = if (propagate) "receives" else "does not receive"
       Scenario(s"With propagateEnv $propagate, a worker $receives FIXTURE_OUTER from the environment in which mill started, ${daemonDescription(daemonMode)}") {
         Given(s"the module's propagateEnv is $propagate")

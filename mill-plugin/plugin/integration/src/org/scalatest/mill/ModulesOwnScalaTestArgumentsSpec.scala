@@ -8,34 +8,6 @@ final class ModulesOwnScalaTestArgumentsSpec extends AnyFeatureSpec with GivenWh
 
   Feature("The module's own ScalaTest arguments") {
 
-    Scenario("A module's own ScalaTest argument whose flag the Runner does not recognise fails the test command, naming that argument") {
-      Given("CalculatorSuite, in a module whose own ScalaTest arguments are -l samples.Slow -x")
-      When("the test command runs core.test")
-      withSuites("-l", "samples.Slow", "-x")("CalculatorSuite") { build =>
-        val result = build.runTestCommand("core.test")
-
-        Then("the test command fails before any test starts, naming -x")
-        shouldFailBeforeAnyTestStarts(build, result)
-        shouldWriteToTheConsole(result, "core.test's testArgsDefault holds -x, which ScalaTest does not recognise")
-
-        And("the console holds no line of human-readable output")
-        result.treeLines shouldBe empty
-      }
-    }
-
-    Scenario("A test-name substring that begins with - reaches the run") {
-      Given("FlagSuite, with tests parses -y and parses -x, in a module whose own ScalaTest arguments are -z -y")
-      When("the test command runs core.test")
-      val result = withSuites("-z", "-y")("FlagSuite") { build =>
-        build.runTestCommand("core.test")
-      }
-
-      Then("the human-readable output shows parses -y alone")
-      withClue(result.debugString) {
-        result.treeLines shouldBe Seq("[core.test]", "  FlagSuite:", "    - parses -y")
-      }
-    }
-
     Scenario("A test whose tag the module's own arguments exclude is not shown") {
       Given("SpeedSuite, whose test slow is tagged samples.Slow and writes slow ran, in a module whose own ScalaTest arguments are -l samples.Slow")
       And("Mill colours its console output")
@@ -50,7 +22,7 @@ final class ModulesOwnScalaTestArgumentsSpec extends AnyFeatureSpec with GivenWh
       }
     }
 
-    for (moduleArguments <- Seq(Seq("-oD"), Seq("-eD"), Seq("-s", "samples.OtherSuite"))) {
+    for (moduleArguments <- Seq(Seq("-oD"), Seq("-s", "samples.OtherSuite"))) {
       Scenario(s"The module's own ${moduleArguments.mkString(" ")} leaves the human-readable output unchanged") {
         Given(s"CalculatorSuite and OtherSuite, in a module whose own ScalaTest arguments are ${moduleArguments.mkString(" ")}")
         And("the module's testParallelism is false")

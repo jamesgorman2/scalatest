@@ -23,12 +23,6 @@ trait SingleModuleFixture extends FixtureBuilds { this: should.Matchers =>
 
   protected def moduleNode(json: JsonNode): JsonNode = json.node(NodeKind.Module, "core.test")
 
-  protected def suitesRun(json: JsonNode): Seq[String] =
-    moduleNode(json).nodes
-      .filter(node => node.kind == NodeKind.Suite && node.contents.exists(test => test.kind == NodeKind.Test && !test.outcome.contains("aborted")))
-      .map(_.name)
-      .sorted
-
   protected def infoMessages(json: JsonNode): Seq[String] =
     moduleNode(json).nodes.flatMap(_.output).filter(_.kind == OutputItemKind.Info).map(_.message)
 

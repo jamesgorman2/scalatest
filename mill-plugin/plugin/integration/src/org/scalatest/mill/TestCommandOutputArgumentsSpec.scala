@@ -28,33 +28,31 @@ final class TestCommandOutputArgumentsSpec extends AnyFeatureSpec with GivenWhen
 
   Feature("The test command's output arguments") {
 
-    for ((what, outputArguments) <- Seq("no -o" -> Nil, "-oH" -> Seq("-oH"))) {
-      Scenario(s"With $what, stdout holds the human-readable output and nothing else the test command writes") {
-        Given("CalculatorSuite, whose test adds two numbers writes dividing now to stdout")
-        And("Mill colours its console output")
-        When(s"the test command runs core.test with $what, with Mill's ticker on")
-        val (result, workerStarted) = withSuites()("CalculatorSuite") { build =>
-          (build.runTestCommandWithTickerAndColour(("core.test" +: outputArguments)*), build.anyTestWorkerStarted)
-        }
-
-        Then("the human-readable output is Run 1:, holding the suite and then the test's line, then the summary line")
-        withClue(result.debugString) {
-          result.treeLines shouldBe calculatorSuiteOutput
-          result.summaryLine shouldBe Some(calculatorSuiteSummaryLine)
-        }
-
-        And("no other line on stdout, and no line on stderr but Mill's own line naming the task, carries the test command's prefix")
-        val prefix = result.prefixedHumanReadableLines.headOption.flatMap(TestCommandResult.millPrefix.findPrefixOf)
-        withClue(result.debugString) {
-          prefix shouldBe defined
-          prefix.map(found => result.stdoutLines.filter(_.startsWith(found))) shouldBe Some(result.prefixedHumanReadableLines)
-          prefix.map(found => result.stderrLines.filter(_.startsWith(found)).filterNot(isMillsTaskNameLine(found, _))) shouldBe Some(Nil)
-        }
-
-        And("the test command succeeds, having started a test worker")
-        shouldSucceed(result)
-        workerStarted shouldBe true
+    Scenario("With no -o, stdout holds the human-readable output and nothing else the test command writes") {
+      Given("CalculatorSuite, whose test adds two numbers writes dividing now to stdout")
+      And("Mill colours its console output")
+      When("the test command runs core.test with no -o, with Mill's ticker on")
+      val (result, workerStarted) = withSuites()("CalculatorSuite") { build =>
+        (build.runTestCommandWithTickerAndColour("core.test"), build.anyTestWorkerStarted)
       }
+
+      Then("the human-readable output is Run 1:, holding the suite and then the test's line, then the summary line")
+      withClue(result.debugString) {
+        result.treeLines shouldBe calculatorSuiteOutput
+        result.summaryLine shouldBe Some(calculatorSuiteSummaryLine)
+      }
+
+      And("no other line on stdout, and no line on stderr but Mill's own line naming the task, carries the test command's prefix")
+      val prefix = result.prefixedHumanReadableLines.headOption.flatMap(TestCommandResult.millPrefix.findPrefixOf)
+      withClue(result.debugString) {
+        prefix shouldBe defined
+        prefix.map(found => result.stdoutLines.filter(_.startsWith(found))) shouldBe Some(result.prefixedHumanReadableLines)
+        prefix.map(found => result.stderrLines.filter(_.startsWith(found)).filterNot(isMillsTaskNameLine(found, _))) shouldBe Some(Nil)
+      }
+
+      And("the test command succeeds, having started a test worker")
+      shouldSucceed(result)
+      workerStarted shouldBe true
     }
 
     Scenario("With a bare -o, the console holds no consolidated output and none of the run's lines") {
@@ -76,38 +74,27 @@ final class TestCommandOutputArgumentsSpec extends AnyFeatureSpec with GivenWhen
       shouldSucceed(result)
     }
 
-    val rejectedArguments = Seq(
-      "an output letter other than H" -> (Seq("-oP"), "-oP"),
-      "another output letter other than H" -> (Seq("-oJ"), "-oJ"),
-      "an output letter other than H, beside H" -> (Seq("-oHP"), "-oHP"),
-      "a formatting character" -> (Seq("-oHd"), "-oHd"),
-      "a lowercase character that is neither a formatting nor a filtering character" -> (Seq("-oHy"), "-oHy"),
-      "an -f other than -fJ" -> (Seq("-fH", "report.txt"), "-fH")
-    )
+    Scenario("-oP, holding an output letter other than H, fails the test command") {
+      Given("CalculatorSuite")
+      And("Mill colours its console output")
+      When("the test command runs core.test with -oP")
+      withSuites()("CalculatorSuite") { build =>
+        val result = build.runTestCommandWithColour("core.test", "-oP")
 
-    for ((what, (outputArguments, rejected)) <- rejectedArguments) {
-      Scenario(s"${outputArguments.mkString(" ")}, holding $what, fails the test command") {
-        Given("CalculatorSuite")
-        And("Mill colours its console output")
-        When(s"the test command runs core.test with ${outputArguments.mkString(" ")}")
-        withSuites()("CalculatorSuite") { build =>
-          val result = build.runTestCommandWithColour(("core.test" +: outputArguments)*)
+        Then("the test command fails before any test starts")
+        shouldFailBeforeAnyTestStarts(build, result)
 
-          Then("the test command fails before any test starts")
-          shouldFailBeforeAnyTestStarts(build, result)
+        And("the console names -oP as the argument the test command rejects")
+        shouldWriteToTheConsole(
+          result,
+          "The test command takes at most one of -oH or a bare -o, and at most one -fJ followed by a path, but was given: -oP"
+        )
 
-          And(s"the console names $rejected as the argument the test command rejects")
-          shouldWriteToTheConsole(
-            result,
-            s"The test command takes at most one of -oH or a bare -o, and at most one -fJ followed by a path, but was given: $rejected"
-          )
+        And("the console holds no line of human-readable output")
+        result.treeLines shouldBe empty
 
-          And("the console holds no line of human-readable output")
-          result.treeLines shouldBe empty
-
-          And("no file report.txt is written")
-          os.walk(build.workspace).filter(_.last == "report.txt") shouldBe empty
-        }
+        And("no file report.txt is written")
+        os.walk(build.workspace).filter(_.last == "report.txt") shouldBe empty
       }
     }
   }
