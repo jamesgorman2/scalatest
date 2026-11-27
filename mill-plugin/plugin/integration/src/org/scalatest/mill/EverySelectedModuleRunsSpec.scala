@@ -4,6 +4,13 @@ import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
 
+private enum MillFlags(val flags: Seq[String]) {
+  case NoFlags extends MillFlags(Nil)
+  case KeepGoing extends MillFlags(Seq("--keep-going"))
+
+  def description: String = if (flags.isEmpty) "none" else flags.mkString(" ")
+}
+
 final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with SeveralModulesFixture {
 
   private def addLateTestCompilingAfterAlpha1Fast(build: FixtureBuild): Unit = {
@@ -79,15 +86,13 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
 
   Feature("Every selected module runs, whatever happens to the others") {
 
-    val millFlagsAndDescriptions = Seq(Nil, Seq("--keep-going")).map(millFlags => (millFlags, if (millFlags.isEmpty) "none" else millFlags.mkString(" ")))
+    for (millFlags <- MillFlags.values) {
 
-    for ((millFlags, flagsDescription) <- millFlagsAndDescriptions) {
-
-      Scenario(s"A test of alpha.test fails, flags $flagsDescription") {
+      Scenario(s"A test of alpha.test fails, flags ${millFlags.description}") {
         withSeveralModules { build =>
           Given("Alpha1's test slow fails")
           replaceInSuite(build, "alpha", "Alpha1")("""test("slow") {}""", """test("slow") { fail("fails as the scenario asks") }""")
-          val (result, _) = runParsingJsonOutput(build, millFlags*)("alpha.test", "beta.test")
+          val (result, _) = runParsingJsonOutput(build, millFlags.flags*)("alpha.test", "beta.test")
 
           Then("the files Beta1.fast and Beta1.slow exist in <markers>")
           withClue(result.debugString) {
@@ -100,12 +105,12 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
       }
     }
 
-    for ((millFlags, flagsDescription) <- millFlagsAndDescriptions) {
+    for (millFlags <- MillFlags.values) {
 
-      Scenario(s"broken.test does not compile, flags $flagsDescription") {
+      Scenario(s"broken.test does not compile, flags ${millFlags.description}") {
         withSeveralModules { build =>
           addBrokenTestThatDoesNotCompile(build)
-          val (result, json) = runParsingJsonOutput(build, millFlags*)("alpha.test", "broken.test", "beta.test")
+          val (result, json) = runParsingJsonOutput(build, millFlags.flags*)("alpha.test", "broken.test", "beta.test")
 
           brokenTestShouldAbortWhileAlphaAndBetaRun(build, result, json, "broken.test.compile")
         }
