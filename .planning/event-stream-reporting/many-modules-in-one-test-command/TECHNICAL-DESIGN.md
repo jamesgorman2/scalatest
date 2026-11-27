@@ -34,6 +34,9 @@ This design checks every selected JVM test module before any test starts, then r
     - `resolvedRunMvnDeps` uses the same resolver and root dependency but calls `classpath`, whose parameters set the runtime configuration as the default configuration and add the Gradle runtime variant attributes. `resolution` takes the module's `resolutionParams` unchanged, so the check's resolution has neither.
 - Once that `execute` returns, the test command holds each module's check result: the module's `testArgsDefault`, and the library and version of each dependency the resolution keeps.
 - A check task evaluates no compile. A module's tests therefore wait on every selected module's dependency resolution and `testArgsDefault`, but on no other module's compile (AC-007).
+- A check task is anonymous, so Mill caches none of it: every test command resolves every selected module's dependencies again before any test starts. Coursier's cache keeps the metadata, so a warm check downloads nothing.
+  - On a warm build of 30 JVM test modules, each with one test, on a 16-core Windows machine, the check took 331 to 423 ms in each of six test commands. Each whole test command took 9.6 to 19.5 s, and each of six `mill __.testForked` runs 8.1 to 16.5 s.
+  - The check is not cached. Mill caches only a named task, which is a member of a module, and the plugin cannot add one to a selected module, whose definition need not name the plugin. A cache of the plugin's own would have to be invalidated on every input of each module's resolution, to save about 10 ms a module.
 - A JVM test module tests with the release of this fork where its resolution holds `com.edc:scalatest-core_3` at the version the consolidation library was built at (AC-010, AC-011, AC-020).
 - Once that `execute` returns, and before **Start**, the test command fails where any selected module is:
   - a Scala.js or Native test module;
