@@ -49,7 +49,7 @@ Pass `--compat` to either script to also run the Dotty compatibility test suites
 
 This should be run in the foreground.
 
-A task that changes one area of the Mill plugin runs the plugin's unit tests, that area's integration tests and the core set instead. A change to the consolidation library also runs the library's tests and republishes it. See `mill-plugin/README.md` § Running one area's integration tests.
+For a change to one area of the Mill plugin, run the plugin's unit tests, that area's integration tests and the core set instead. A change under `dotty/` also needs the fork and the library republished first, and a change to the consolidation library also needs the library's tests. See `mill-plugin/README.md` § Running one area's integration tests.
 
 ## BDD Gherkins
 
