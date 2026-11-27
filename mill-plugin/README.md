@@ -97,7 +97,10 @@ Run a tag when these files change. Paths are from the repository root. Files wit
 | | `discoveredTestClasses`, `attachingDiscoveryOutput`, `startWorker`, `eventLogFileName` | `Capture` |
 | | `reportNoTestResultForClassGlobs` | `Arguments` |
 
-An integration test helper in `mill-plugin/plugin/integration/src/org/scalatest/mill/` that the list below does not name, such as `EveryWorkerFixture`, runs the tags of each suite that uses it, directly or through another helper.
+A change to one of these runs the tags of each suite that uses it, directly or through a helper:
+
+- an integration test helper in `mill-plugin/plugin/integration/src/org/scalatest/mill/` that the list below does not name, such as `EveryWorkerFixture`;
+- a fixture build under `mill-plugin/plugin/integration/resources/` that the list below does not name, such as `every-worker`, beyond its plugin header.
 
 Run every test (`plugin.test.testForked + plugin.integration.testForked`) when any of these change:
 
@@ -107,6 +110,8 @@ Run every test (`plugin.test.testForked + plugin.integration.testForked`) when a
 - the event-log format: `dotty/core/src/main/scala/org/scalatest/tools/TestEventLogEmitter.scala` and `dotty/core/src/main/scala/org/scalatest/events/TestEventLog*.scala`;
 - in `mill-plugin/`: `.mill-version`, `mill`, `mill.bat`, and the versions and the `plugin.test` and `plugin.integration` modules in `build.mill`;
 - the shared integration test helpers: `FixtureBuilds`, `FixtureBuild`, `FixtureName`, `SharedFixtureBuilds`, `SingleModuleFixture`, `SeveralModulesFixture`, `WorkspaceReset`, `TestCommandResult`, `JsonNode`, `JsonPattern`, `JsonOutputFixture`, `Durations`, `IntegrationEnvironment` and `MillConsole`;
+- the fixture builds that those helpers read: `arguments`, `class-globs-and-framework-arguments`, `json-output` and `several-modules`;
+- the tags in `mill-plugin/plugin/integration/src/org/scalatest/mill/tags/`, because a wrong tag drops scenarios from a `-n` run;
 - the JSON output's keys or shape, because scenarios of every area read the `-fJ` output;
 - how the console tree is rendered, beyond one kind of line.
 
