@@ -53,7 +53,7 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
   }
 
   private def runParsingJsonOutput(build: FixtureBuild)(selectors: String*): (TestCommandResult, JsonNode) =
-    build.resultAndJsonOutput(runTestCommandOnModuleSelectors(build, selectors*))
+    build.resultAndJsonOutput(whenTheTestCommandIsInvokedWithTwoJobsWritingJsonOutput(build, selectors*))
 
   private def moduleSelectorsOf(json: JsonNode): Seq[ModuleSelectorEntry] =
     json("moduleSelectors").arr.toSeq.map(entry => ModuleSelectorEntry(entry("selector").str, entry("modules").arr.toSeq.map(_.str)))

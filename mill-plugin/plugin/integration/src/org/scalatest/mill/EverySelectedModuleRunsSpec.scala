@@ -109,6 +109,7 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
       moduleNodeNames(json) shouldBe Seq("alpha.test", "beta.test", "broken.test")
 
       And(s"the module node broken.test holds no run node, its outcome is aborted, and its failures holds exactly one entry, whose message contains $failureText")
+      runNodesOf(json, "broken.test") shouldBe empty
       shouldBeAbortedWithOneFailureContaining(json, "broken.test", failureText)
 
       And("the module nodes alpha.test and beta.test have no outcome and no failures")
@@ -216,6 +217,7 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
           build.markers should contain noneOf ("Beta1.fast", "Beta1.slow")
 
           And("the module node beta.test holds no run node, its outcome is aborted, and its failures holds exactly one entry, whose message contains samples.Beta1 and does not contain beta.test")
+          runNodesOf(json, "beta.test") shouldBe empty
           shouldBeAbortedWithOneFailureContaining(json, "beta.test", "samples.Beta1")
           moduleNode(json, "beta.test").failureMessages.head should not include "beta.test"
 

@@ -30,10 +30,8 @@ private[mill] final class TestCommand private (
     val checkResults = EvaluatedTasks.of(failFastOffEvaluator.execute(checkTasks.map(_.task), logger = ctx.log))
     // A module whose check task failed is not a module the test command cannot run: its failure alone does not stop
     // the other modules' tests.
-    val (failedChecks, checkedModules) = checkTasks.partitionMap { checkTask =>
-      checkTask.resultIn(checkResults).left.map(FailedModuleCheck(checkTask.module.name, _)).map(TestCommand.CheckedModule(checkTask.module, _))
-    }
-    val (jvmModuleReasons, runnableModules) = checkedModules.partitionMap(_.runnable(commandArguments.frameworkArguments))
+    val (failedChecks, checkedModules) = checkTasks.partitionMap(checkTask => TestCommand.CheckedModule.from(checkTask, checkResults))
+    val (jvmModuleReasons, runnableModules) = checkedModules.partitionMap(_.toRunnable(commandArguments.frameworkArguments))
     val cannotRunReasons = otherModules.map(module => CannotRunReason.NotJvm(module.name)) ++ jvmModuleReasons.flatten
     if (cannotRunReasons.nonEmpty)
       Left(TestCommandFailure.CannotRunModules(cannotRunReasons.sortBy(_.module.value), failedChecks.sortBy(_.module.value)))
@@ -67,7 +65,9 @@ private[mill] final class TestCommand private (
     val runResults = EvaluatedTasks.of(failFastOffEvaluator.execute(runTasks.map(_.task), logger = ctx.log))
     // Where a module run task fails, or Mill skips it because a task upstream of it failed, the task attaches no
     // failure to its module, so the test command attaches it here.
-    runTasks.foreach(runTask => runTask.resultIn(runResults).left.foreach(consolidation.addModuleFailure(runTask.module.name, _)))
+    runTasks.foreach { runTask =>
+      runTask.failureIn(runResults).foreach(failure => consolidation.addModuleFailure(runTask.module.name, failure))
+    }
     val endedState = consolidation.end(Some(now()))
     jsonOutputWritten.flatMap { _ =>
       if (endedState.failed)
@@ -142,12 +142,23 @@ private[mill] object TestCommand {
   private final case class ModuleTask[V](module: SelectedTestModule, task: Task[V]) {
 
     def resultIn(results: EvaluatedTasks): Either[String, V] = results.valueOrFailure(task)
+
+    def failureIn(results: EvaluatedTasks): Option[String] = resultIn(results).left.toOption
   }
 
   private final case class CheckedModule(module: SelectedTestModule, check: ModuleCheck) {
 
-    def runnable(frameworkArguments: Seq[ScalaTestArgument.Flagged]): Either[Seq[CannotRunReason], RunnableModule] =
+    def toRunnable(frameworkArguments: Seq[ScalaTestArgument.Flagged]): Either[Seq[CannotRunReason], RunnableModule] =
       check.runArguments(module.name, frameworkArguments).map(RunnableModule(module, _))
+  }
+
+  private object CheckedModule {
+
+    def from(checkTask: ModuleTask[ModuleCheck], results: EvaluatedTasks): Either[FailedModuleCheck, CheckedModule] =
+      checkTask
+        .resultIn(results)
+        .left.map(message => FailedModuleCheck(checkTask.module.name, message))
+        .map(check => CheckedModule(checkTask.module, check))
   }
 
   private final case class RunnableModule(module: SelectedTestModule, runArguments: RunArguments)

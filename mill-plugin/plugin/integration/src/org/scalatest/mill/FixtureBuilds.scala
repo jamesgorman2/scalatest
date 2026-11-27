@@ -81,7 +81,7 @@ trait FixtureBuildSteps extends FixtureBuilds { this: should.Matchers & GivenWhe
   protected def whenTheTestCommandIsInvokedWith(arguments: String): Unit =
     When(s"the test command is invoked with $arguments")
 
-  protected def runTestCommandOnModuleSelectors(build: FixtureBuild, selectors: String*): TestCommandResult = {
+  protected def whenTheTestCommandIsInvokedWithTwoJobsWritingJsonOutput(build: FixtureBuild, selectors: String*): TestCommandResult = {
     whenTheTestCommandIsInvokedWith(theModuleSelectors(selectors))
     runTestCommandWithTwoJobsWritingJsonOutput(build)(selectors*)
   }

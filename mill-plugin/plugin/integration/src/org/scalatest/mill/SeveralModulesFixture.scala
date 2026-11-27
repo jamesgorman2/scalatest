@@ -70,7 +70,6 @@ trait SeveralModulesFixture extends JsonOutputFixture with SharedFixtureBuilds w
   }
 
   protected def shouldBeAbortedWithOneFailureContaining(json: JsonNode, module: String, text: String): Unit = {
-    runNodesOf(json, module) shouldBe empty
     shouldBeAbortedWithOneFailure(json, module)
     moduleNode(json, module).failureMessages.head should include(text)
   }

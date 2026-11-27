@@ -65,7 +65,7 @@ final class ModulesTheTestCommandCannotRunSpec extends AnyFeatureSpec with Given
 
     Scenario("Module selectors alpha.test and other.test") {
       inSharedModulesTheTestCommandCannotRun { build =>
-        val result = runTestCommandOnModuleSelectors(build, "alpha.test", "other.test")
+        val result = whenTheTestCommandIsInvokedWithTwoJobsWritingJsonOutput(build, "alpha.test", "other.test")
 
         Then("Mill reports that the test command failed, with a message naming other.test")
         shouldFail(result)
@@ -77,7 +77,7 @@ final class ModulesTheTestCommandCannotRunSpec extends AnyFeatureSpec with Given
 
     Scenario("A module selector that resolves to every test module") {
       inSharedModulesTheTestCommandCannotRun { build =>
-        val result = runTestCommandOnModuleSelectors(build, "__.test")
+        val result = whenTheTestCommandIsInvokedWithTwoJobsWritingJsonOutput(build, "__.test")
 
         Then("Mill reports that the test command failed, with a message naming each of munit.test, utest.test, upstream.test, other.test, js.test and native.test")
         shouldFail(result)
@@ -100,7 +100,7 @@ final class ModulesTheTestCommandCannotRunSpec extends AnyFeatureSpec with Given
         build.appendToBuild("object shared extends SampleModule {\n  def mvnDeps = Seq(mvn\"com.edc::scalatest::3.2.20\")\n}")
         And("the build also has the JVM test module indirect.test, whose moduleDeps holds shared, whose own mvnDeps holds nothing of this fork, and which holds one test that succeeds")
         addScalaTestModule(build, "indirect", "def moduleDeps = super.moduleDeps ++ Seq(shared)")
-        val result = runTestCommandOnModuleSelectors(build, "alpha.test", "indirect.test")
+        val result = whenTheTestCommandIsInvokedWithTwoJobsWritingJsonOutput(build, "alpha.test", "indirect.test")
 
         withClue(result.debugString) {
           Then("exactly two files exist in <markers>")
@@ -122,7 +122,7 @@ final class ModulesTheTestCommandCannotRunSpec extends AnyFeatureSpec with Given
             "and whose testArgsDefault is --not-a-scalatest-argument"
         )
         addScalaTestModule(build, "args", "def mvnDeps = Seq(mvn\"com.edc::scalatest::3.2.20\")", "def testArgsDefault = Seq(\"--not-a-scalatest-argument\")")
-        val result = runTestCommandOnModuleSelectors(build, "alpha.test", "args.test")
+        val result = whenTheTestCommandIsInvokedWithTwoJobsWritingJsonOutput(build, "alpha.test", "args.test")
 
         Then("Mill reports that the test command failed, with a message naming --not-a-scalatest-argument")
         shouldFail(result)
@@ -137,7 +137,7 @@ final class ModulesTheTestCommandCannotRunSpec extends AnyFeatureSpec with Given
       withModulesTheTestCommandCannotRun { build =>
         Given("the build also has the JVM module util, which is not a test module and holds no module")
         build.appendToBuild("object util extends SampleModule")
-        val result = runTestCommandOnModuleSelectors(build, "alpha.test", "util")
+        val result = whenTheTestCommandIsInvokedWithTwoJobsWritingJsonOutput(build, "alpha.test", "util")
 
         Then("Mill reports that the test command failed, with a message naming the module selector util")
         shouldFail(result)

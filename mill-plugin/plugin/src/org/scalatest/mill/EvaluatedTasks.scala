@@ -9,7 +9,11 @@ import scala.annotation.tailrec
 private[mill] final class EvaluatedTasks private (results: Map[Task[?], ExecResult[Val]]) {
 
   def valueOrFailure[V](task: Task[V]): Either[String, V] =
-    results.get(task).flatMap(_.asSuccess).map(_.value.value.asInstanceOf[V]).toRight(FailedTask.message(failedAtOrUpstreamOf(task)))
+    results
+      .get(task)
+      .flatMap(_.asSuccess)
+      .map(_.value.value.asInstanceOf[V])
+      .toRight(FailedTask.message(failedAtOrUpstreamOf(task)))
 
   private def failedAtOrUpstreamOf(task: Task[?]): Seq[FailedTask] =
     for {
