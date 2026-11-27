@@ -60,7 +60,6 @@ final class JsonOutputArgumentSpec extends AnyFeatureSpec with GivenWhenThen wit
         }
       }
     }
-
   }
 
   Feature("Output arguments the test command rejects") {

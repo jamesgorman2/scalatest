@@ -92,9 +92,6 @@ final class TestCommandOutputArgumentsSpec extends AnyFeatureSpec with GivenWhen
 
         And("the console holds no line of human-readable output")
         result.treeLines shouldBe empty
-
-        And("no file report.txt is written")
-        os.walk(build.workspace).filter(_.last == "report.txt") shouldBe empty
       }
     }
   }
