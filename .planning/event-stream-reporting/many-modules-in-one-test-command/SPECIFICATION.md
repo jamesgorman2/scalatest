@@ -143,7 +143,8 @@ Feature: Every selected module runs, whatever happens to the others
     And the build's JVM test modules `alpha.test` and `beta.test` each test with `com.edc::scalatest` at that release, and their definitions name nothing of the plugin
     And `alpha.test` holds the suites `Alpha1` and `Alpha2`, whose classes are `samples.Alpha1` and `samples.Alpha2`, and `beta.test` holds the suite `Beta1`, whose class is `samples.Beta1`
     And each of those suites is an `AnyFunSuite` with two tests, `fast` and `slow`, both of which succeed unless the scenario says otherwise
-    And `<markers>` is an absolute path at which an empty folder exists, and each test, when it runs, creates the file `<suite>.<test>` in `<markers>`, and, once it has failed, also creates the file `<suite>.<test>.failed`
+    And `<markers>` is an absolute path at which an empty folder exists, and each test, when it runs, creates the file `<suite>.<test>` in `<markers>`
+    And each test, once it has failed, also creates the file `<suite>.<test>.failed` in `<markers>`
     And the test command is invoked as `mill -j 2 <flags> scalatest/test <selectors> -fJ <report>` unless the scenario states its own `mill` command line
     And each argument of a `mill` command line reaches `mill` exactly as written, with no shell expansion
     And `<report>` is an absolute path at which nothing exists
@@ -151,7 +152,7 @@ Feature: Every selected module runs, whatever happens to the others
 
   Rule: A failing test in one module fails the test command and does not stop another module's tests
     In AC-005, `beta.test` compiles only after `Alpha1`'s test `slow` has failed, so that `Beta1`'s tests start after that failure.
-    A failing test fails no Mill task, so both rows take the same path through the test command. The `none` row shows that another module's tests still start after a test has failed where Mill's `--keep-going` is not given, and the `--keep-going` row shows the same where it is given.
+    A failing test fails no Mill task, so both rows take the same path through the test command. Together they show that another module's tests still start after a test has failed, whether or not Mill's `--keep-going` is given.
 
     Scenario Outline: AC-005 A test of alpha.test fails, flags <flags>
       Given `Alpha1`'s test `slow` fails

@@ -22,15 +22,16 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
     andAlphaTestAndBetaTestUseThatRelease()
     andAlphaTestHoldsAlpha1AndAlpha2AndBetaTestHoldsBeta1()
     And("each of those suites is an AnyFunSuite with two tests, fast and slow, both of which succeed unless the scenario says otherwise")
-    And("<markers> is an absolute path at which an empty folder exists, and each test, when it runs, creates the file <suite>.<test> in <markers>, and, once it has failed, also creates the file <suite>.<test>.failed")
+    And("<markers> is an absolute path at which an empty folder exists, and each test, when it runs, creates the file <suite>.<test> in <markers>")
+    And("each test, once it has failed, also creates the file <suite>.<test>.failed in <markers>")
     And("the test command is invoked as mill -j 2 <flags> scalatest/test <selectors> -fJ <report> unless the scenario states its own mill command line")
     andEachArgumentReachesMillAsWritten()
     andNothingExistsAtTheReport()
     andTheJsonOutputIsParsedFromTheReport()
   }
 
-  // Mill evaluates a task's upstream tasks before its body, so the wait is upstream of the source files rather than in
-  // `compile`'s body: the compiler then starts only once the marker exists. The wait is a `Task.Input`, which Mill
+  // Mill evaluates a task's upstream tasks before its body, so the wait is upstream of `allSourceFiles` rather than in
+  // `compile`'s body. The compiler then starts only once the marker exists. The wait is a `Task.Input`, which Mill
   // evaluates on every run, so a scenario on a shared build waits even where the compile itself is cached.
   private def compileAfterMarker(marker: String): String =
     s"""def awaitMarker: T[Unit] = Task.Input {
@@ -52,7 +53,7 @@ final class EverySelectedModuleRunsSpec extends AnyFeatureSpec with GivenWhenThe
     And("Late1 is an AnyFunSuite whose test fast creates the file Late1.fast in <markers>")
     And("late.test's compile depends on a task that ends once the file Alpha1.fast exists in <markers>, and fails if that file does not exist within 120 seconds")
     // The wait is upstream of late's compile, which late.test's compile depends on. The scenario therefore also fails
-    // where the check compiles a module that late.test depends on through moduleDeps.
+    // where the check before any test starts compiles a module that late.test depends on through moduleDeps.
     build.appendToBuild(
       Seq(
         "object late extends SampleModule {",
