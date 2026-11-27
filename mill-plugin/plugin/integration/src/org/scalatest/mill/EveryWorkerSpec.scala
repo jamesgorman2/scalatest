@@ -4,10 +4,24 @@ import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
 
-final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with JsonOutputFixture {
+final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with JsonOutputFixture with SharedSandboxes {
 
   private def withEveryWorkerBuild[A](test: EveryWorkerBuild => A): A =
     withFixtureBuild(FixtureName.everyWorker)(build => test(new EveryWorkerBuild(build)))
+
+  private def sharedEveryWorkerBuild(setUp: EveryWorkerBuild => Unit): SharedSandbox =
+    sharedSandbox(
+      FixtureName.everyWorker,
+      SandboxReset.fixtureFiles(os.sub / "core" / "test" / "src" / "samples").and(SandboxReset.noMarkersFolder).and(SandboxReset.noModuleFolders)
+    )(build => setUp(new EveryWorkerBuild(build)))
+
+  private val unchangedEveryWorkerBuild: SharedSandbox = sharedEveryWorkerBuild(_ => ())
+
+  private val everyWorkerBuildWithTestParallelism: SharedSandbox = sharedEveryWorkerBuild(_.turnOnTestParallelism())
+
+  private val everyWorkerBuildWithBatchFrameworkTasks: SharedSandbox = sharedEveryWorkerBuild(_.turnOnBatchFrameworkTasks())
+
+  private def inEveryWorkerBuild[A](sandbox: SharedSandbox)(test: EveryWorkerBuild => A): A = sandbox.use(build => test(new EveryWorkerBuild(build)))
 
   private def runs(json: JsonNode): Seq[JsonNode] = json.node(NodeKind.Module, "core.test").contents
 
@@ -54,7 +68,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
   Feature("Every worker of a JVM module") {
 
     Scenario("Without test parallelism, each fork group runs its suites in one worker of its own") {
-      withEveryWorkerBuild { build =>
+      inEveryWorkerBuild(unchangedEveryWorkerBuild) { build =>
         givenTheModuleHoldsTwoForkGroups()
         And("test parallelism is off")
         When("the test command runs the module with two jobs")
@@ -70,10 +84,9 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
     }
 
     Scenario("Under test parallelism, each fork group runs its suites in one or two workers of its own") {
-      withEveryWorkerBuild { build =>
+      inEveryWorkerBuild(everyWorkerBuildWithTestParallelism) { build =>
         givenTheModuleHoldsTwoForkGroups()
         And("test parallelism is on, and test sandboxing is on by default")
-        build.turnOnTestParallelism()
         When("the test command runs the module with two jobs")
         val (result, json) = build.resultAndJsonOutputOfTestCommand(jobs = 2)
 
@@ -87,10 +100,9 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
     }
 
     Scenario("A test failing in the second fork group fails the test command, and every other suite still runs") {
-      withEveryWorkerBuild { build =>
+      inEveryWorkerBuild(everyWorkerBuildWithTestParallelism) { build =>
         givenTheModuleHoldsTwoForkGroups()
         And("test parallelism is on")
-        build.turnOnTestParallelism()
         And("A2's test fails")
         build.writeSuite("A2", """fail("A2 fails")""")
         When("the test command runs the module with two jobs")
@@ -111,10 +123,9 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
     }
 
     Scenario("A fork group whose two classes must run at the same time runs in its first two workers, numbered in that order") {
-      withEveryWorkerBuild { build =>
+      inEveryWorkerBuild(everyWorkerBuildWithTestParallelism) { build =>
         givenTheModuleHoldsTwoForkGroups()
         And("test parallelism is on")
-        build.turnOnTestParallelism()
         And("A1's and A2's tests each send their working directory as an info message, then wait up to 30 seconds for the other to start")
         val markers = build.emptyMarkersFolder()
         build.writeSuiteThatWaitsFor("A1", "A2", markers)
@@ -140,10 +151,9 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
     }
 
     Scenario("Runs are numbered by fork group even when the first fork group's run ends last") {
-      withEveryWorkerBuild { build =>
+      inEveryWorkerBuild(everyWorkerBuildWithBatchFrameworkTasks) { build =>
         givenTheModuleHoldsTwoForkGroups()
         And("testBatchFrameworkTasks is on and test parallelism is off, so the two fork groups' workers run at the same time")
-        build.turnOnBatchFrameworkTasks()
         And("B1's test sleeps before it succeeds, so the first fork group's run ends last")
         build.writeSuite("B1", "Thread.sleep(3000)")
         When("the test command runs the module with two jobs")
@@ -168,7 +178,7 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
   Feature("Each worker of a JVM module has its own event log, output and time") {
 
     Scenario("Without test parallelism, the module's time spans its runs, and each fork group's worker writes its event log in the group's processFolder") {
-      withEveryWorkerBuild { build =>
+      inEveryWorkerBuild(unchangedEveryWorkerBuild) { build =>
         givenTheModuleHoldsTwoForkGroups()
         And("test parallelism is off")
         When("the test command runs the module")
@@ -244,10 +254,9 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
     }
 
     Scenario("Under testBatchFrameworkTasks, each worker's stdout is on that worker's run alone, and none reaches the console") {
-      withEveryWorkerBuild { build =>
+      inEveryWorkerBuild(everyWorkerBuildWithBatchFrameworkTasks) { build =>
         givenTheModuleHoldsTwoForkGroups()
         And("testBatchFrameworkTasks is on and test parallelism is off")
-        build.turnOnBatchFrameworkTasks()
         And("B1's test and A1's test each write a line naming their suite to stdout")
         build.writeSuite("B1", """println("from B1")""")
         build.writeSuite("A1", """println("from A1")""")
@@ -295,10 +304,9 @@ final class EveryWorkerSpec extends AnyFeatureSpec with GivenWhenThen with shoul
     }
 
     Scenario("Under test parallelism, each worker's stdout and stderr are on that worker's run alone, and none reaches the console") {
-      withEveryWorkerBuild { build =>
+      inEveryWorkerBuild(everyWorkerBuildWithTestParallelism) { build =>
         givenTheModuleHoldsTwoForkGroups()
         And("test parallelism is on")
-        build.turnOnTestParallelism()
         And("B1's test writes a line to stdout, and A1's test writes a line to stderr")
         build.writeSuite("B1", """println("out from B1")""")
         build.writeSuite("A1", """System.err.println("err from A1")""")

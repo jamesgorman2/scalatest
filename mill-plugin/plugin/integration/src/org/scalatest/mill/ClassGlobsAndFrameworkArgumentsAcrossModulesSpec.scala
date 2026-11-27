@@ -7,23 +7,34 @@ import org.scalatest.matchers.should
 
 final class ClassGlobsAndFrameworkArgumentsAcrossModulesSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with SeveralModulesFixture {
 
-  private def withClassGlobsAcrossModules[A](test: FixtureBuild => A): A =
-    withFixtureBuild(FixtureName.classGlobsAcrossModules) { build =>
-      Given("the JVM test modules alpha.test, holding Alpha1 and Alpha2, and beta.test, holding Beta1")
-      And("each of those suites is an AnyFunSuite with two tests, fast and slow, both of which succeed, and only fast is tagged samples.Fast")
-      And("each of those modules holds the object samples.Fast, which is a Tag and not a test class")
-      And("<markers> is an absolute path at which an empty folder exists, and each test, when it runs, creates the file <suite>.<test> in <markers>")
-      And("the test command is invoked as mill -j 2 scalatest/test alpha.test beta.test -fJ <report> <arguments>, each argument reaching mill exactly as written, with no shell expansion")
-      os.makeDir.all(build.markersFolder)
-      test(build)
-    }
+  private def classGlobsAcrossModules(setUp: FixtureBuild => Unit): SharedSandbox =
+    sharedSandbox(FixtureName.classGlobsAcrossModules, SandboxReset.emptyMarkersFolder.and(SandboxReset.noJsonOutputFile))(setUp)
 
-  private def addNoisyToBetaTest(build: FixtureBuild): Unit = {
+  private val unchangedClassGlobsAcrossModules: SharedSandbox = classGlobsAcrossModules(_ => ())
+
+  private val classGlobsAcrossModulesWithNoisy: SharedSandbox = classGlobsAcrossModules(addNoisyToBetaTest)
+
+  private def inClassGlobsAcrossModules[A](sandbox: SharedSandbox)(test: FixtureBuild => A): A = {
+    givenTheClassGlobsAcrossModules()
+    sandbox.use(test)
+  }
+
+  private def givenTheClassGlobsAcrossModules(): Unit = {
+    Given("the JVM test modules alpha.test, holding Alpha1 and Alpha2, and beta.test, holding Beta1")
+    And("each of those suites is an AnyFunSuite with two tests, fast and slow, both of which succeed, and only fast is tagged samples.Fast")
+    And("each of those modules holds the object samples.Fast, which is a Tag and not a test class")
+    And("<markers> is an absolute path at which an empty folder exists, and each test, when it runs, creates the file <suite>.<test> in <markers>")
+    And("the test command is invoked as mill -j 2 scalatest/test alpha.test beta.test -fJ <report> <arguments>, each argument reaching mill exactly as written, with no shell expansion")
+  }
+
+  private def givenNoisyInBetaTest(): Unit = {
     Given("beta.test also holds the class samples.Noisy, a public Java class that extends org.scalatest.funsuite.AnyFunSuite and holds no test")
     And("samples.Noisy's only public constructor takes no argument")
     And("samples.Noisy's static initializer writes the line loading samples.Noisy to stdout")
-    os.copy(build.workspace / "noisy" / "Noisy.java", build.workspace / "beta" / "test" / "src" / "samples" / "Noisy.java")
   }
+
+  private def addNoisyToBetaTest(build: FixtureBuild): Unit =
+    os.copy(build.workspace / "noisy" / "Noisy.java", build.workspace / "beta" / "test" / "src" / "samples" / "Noisy.java")
 
   private def runOnBothModulesParsingJsonOutput(build: FixtureBuild, arguments: String*): (TestCommandResult, JsonNode) = {
     When(s"the test command is invoked with ${arguments.mkString(" ")}")
@@ -43,7 +54,7 @@ final class ClassGlobsAndFrameworkArgumentsAcrossModulesSpec extends AnyFeatureS
 
     for ((arguments, markers) <- argumentsAndMarkers) {
       Scenario(s"Arguments ${arguments.mkString(" ")}") {
-        withClassGlobsAcrossModules { build =>
+        inClassGlobsAcrossModules(unchangedClassGlobsAcrossModules) { build =>
           val (result, _) = runOnBothModulesParsingJsonOutput(build, arguments*)
 
           Then(s"the files in <markers> are exactly ${EnglishList.of(markers)}")
@@ -58,7 +69,7 @@ final class ClassGlobsAndFrameworkArgumentsAcrossModulesSpec extends AnyFeatureS
     }
 
     Scenario("Class globs that match only alpha.test's classes") {
-      withClassGlobsAcrossModules { build =>
+      inClassGlobsAcrossModules(unchangedClassGlobsAcrossModules) { build =>
         val (result, json) = runOnBothModulesParsingJsonOutput(build, "--", "samples.Alpha*")
 
         withClue(result.debugString) {
@@ -87,7 +98,7 @@ final class ClassGlobsAndFrameworkArgumentsAcrossModulesSpec extends AnyFeatureS
     }
 
     Scenario("Framework arguments that exclude every test the class globs keep") {
-      withClassGlobsAcrossModules { build =>
+      inClassGlobsAcrossModules(unchangedClassGlobsAcrossModules) { build =>
         val (result, json) = runOnBothModulesParsingJsonOutput(build, "--", "*1", "--", "-z", "nothing-matches")
 
         withClue(result.debugString) {
@@ -120,11 +131,17 @@ final class ClassGlobsAndFrameworkArgumentsAcrossModulesSpec extends AnyFeatureS
     )
 
     for ((javaHomeDescription, javaHome) <- javaHomes) {
-      Scenario(s"beta.test's discovery output in the JSON output, with javaHome $javaHomeDescription") {
-        withClassGlobsAcrossModules { build =>
+      val sandbox = javaHome.fold(classGlobsAcrossModulesWithNoisy) { path =>
+        classGlobsAcrossModules { build =>
           addNoisyToBetaTest(build)
+          addToBetaTest(build, s"def javaHome = Task { Some(PathRef(os.Path(\"\"\"$path\"\"\"))) }")
+        }
+      }
+
+      Scenario(s"beta.test's discovery output in the JSON output, with javaHome $javaHomeDescription") {
+        inClassGlobsAcrossModules(sandbox) { build =>
+          givenNoisyInBetaTest()
           And(s"beta.test's javaHome is $javaHomeDescription")
-          javaHome.foreach(path => addToBetaTest(build, s"def javaHome = Task { Some(PathRef(os.Path(\"\"\"$path\"\"\"))) }"))
           val (result, json) = runOnBothModulesParsingJsonOutput(build, "--", "samples.*", "--", "-z", "nothing-matches")
 
           withClue(result.debugString) {
@@ -147,8 +164,8 @@ final class ClassGlobsAndFrameworkArgumentsAcrossModulesSpec extends AnyFeatureS
     }
 
     Scenario("beta.test's runs, output and failure in the human-readable output") {
-      withClassGlobsAcrossModules { build =>
-        addNoisyToBetaTest(build)
+      inClassGlobsAcrossModules(classGlobsAcrossModulesWithNoisy) { build =>
+        givenNoisyInBetaTest()
         When("the test command is invoked with -oH -- samples.* -- -z nothing-matches")
         val result = runOnBothModulesWithReport(build, "-oH", "--", "samples.*", "--", "-z", "nothing-matches")
         val betaSubtree = result.subtreeOf("[beta.test]")

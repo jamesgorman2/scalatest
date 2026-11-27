@@ -4,7 +4,10 @@ import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
 
-final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with FixtureBuilds {
+final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with SharedSandboxes {
+
+  private val resultBuild: SharedSandbox =
+    sharedSandbox(FixtureName.result, SandboxReset.fixtureFiles(os.sub / "core" / "test" / "src" / "samples"))(_ => ())
 
   private def withResultFixture[A](source: String, className: String)(test: FixtureBuild => A): A =
     withFixtureBuild(FixtureName.result) { build =>
@@ -12,8 +15,11 @@ final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with
       test(build)
     }
 
-  private def runResultFixture(source: String, className: String): TestCommandResult =
-    withResultFixture(source, className)(_.runTestCommand("core.test"))
+  private def runInResultBuild(source: String, className: String): TestCommandResult =
+    resultBuild.use { build =>
+      build.addSuiteFile(build.workspace / "suites" / source, s"$className.scala")
+      build.runTestCommand("core.test")
+    }
 
   private def shouldFailTheModulesTests(result: TestCommandResult): Unit = {
     shouldFail(result)
@@ -52,7 +58,7 @@ final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with
     Scenario("A test calling System.exit(0) fails the test command") {
       Given("ExitSuite, whose test \"exits\" calls System.exit(0)")
       When("the test command runs core.test")
-      val result = runResultFixture("ExitSuite.scala", "ExitSuite")
+      val result = runInResultBuild("ExitSuite.scala", "ExitSuite")
       Then("the test command fails")
       shouldFailTheModulesTests(result)
     }
@@ -74,7 +80,7 @@ final class TestCommandResultSpec extends AnyFeatureSpec with GivenWhenThen with
     Scenario("A failed test is not named outside the human-readable output") {
       Given("StackFlatSpec, whose test \"have size 0\" fails")
       When("the test command runs core.test")
-      val result = runResultFixture("StackFlatSpec.scala", "StackFlatSpec")
+      val result = runInResultBuild("StackFlatSpec.scala", "StackFlatSpec")
 
       Then("the test command fails")
       shouldFailTheModulesTests(result)

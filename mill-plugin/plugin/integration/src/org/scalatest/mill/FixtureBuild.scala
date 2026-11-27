@@ -12,6 +12,10 @@ final class FixtureBuild(tester: IntegrationTester) {
 
   def workspace: os.Path = tester.workspacePath
 
+  def fixtureSource: os.Path = tester.workspaceSourcePath
+
+  def isAsInTheFixture(path: os.SubPath): Boolean = FixtureBuild.contents(workspace / path) == FixtureBuild.contents(fixtureSource / path)
+
   def testSources: os.Path = workspace / "core" / "test" / "src"
 
   def samples: os.Path = testSources / "samples"
@@ -62,8 +66,6 @@ final class FixtureBuild(tester: IntegrationTester) {
 
   def setModuleArguments(moduleArguments: Seq[String]): Unit =
     addToTestModule(moduleArguments.map(argument => s"\"$argument\"").mkString("def testArgsDefault = Seq(", ", ", ")"))
-
-  def removeModuleArguments(): Unit = removeBuildLines("line holding testArgsDefault")(_.contains("testArgsDefault"))
 
   private def removeBuildLines(description: String)(matches: String => Boolean): Unit =
     editBuild { build =>
@@ -156,7 +158,10 @@ final class FixtureBuild(tester: IntegrationTester) {
     // Mill writes a `testargs` file for each worker it starts.
     os.exists(folder) && os.walk(folder).exists(_.last == "testargs")
 
-  def eventLogFiles: Seq[os.Path] = os.walk(workspace / "out").filter(_.last == JvmTestModuleRun.eventLogFileName)
+  def eventLogFiles: Seq[os.Path] = {
+    val out = workspace / "out"
+    if (os.exists(out)) os.walk(out).filter(_.last == JvmTestModuleRun.eventLogFileName) else Nil
+  }
 
   // `resolve _` compiles the build, so a later command's output holds no compile messages.
   def compile(): Unit = requireCompiled(tester.eval(compilingArguments))
@@ -179,6 +184,14 @@ final class FixtureBuild(tester: IntegrationTester) {
 object FixtureBuild {
 
   def jobsArguments(jobs: Int): Seq[String] = Seq("-j", jobs.toString)
+
+  private def contents(path: os.Path): Map[os.SubPath, Seq[Byte]] =
+    if (os.isFile(path))
+      Map(os.sub -> os.read.bytes(path).toSeq)
+    else if (os.isDir(path))
+      os.walk(path).filter(os.isFile).map(file => file.subRelativeTo(path) -> os.read.bytes(file).toSeq).toMap
+    else
+      Map.empty
 
   // The `-jvm` suffix has `mill.bat` run a `.bat` file rather than a native executable.
   private val millBatVersion: String = "1.3.1-jvm"

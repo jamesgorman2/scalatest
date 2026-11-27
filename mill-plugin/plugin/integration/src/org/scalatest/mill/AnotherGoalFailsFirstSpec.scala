@@ -6,11 +6,19 @@ import org.scalatest.matchers.should
 
 final class AnotherGoalFailsFirstSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with SeveralModulesFixture {
 
-  private def addBrokenModuleThatDoesNotCompile(build: FixtureBuild): Unit = {
-    Given("the build's module broken does not compile")
-    build.appendToBuild("object broken extends SampleModule")
-    os.write(build.workspace / "broken" / "src" / "Broken.scala", "object Broken {\n  val value: Int = notDefinedAnywhere\n}\n", createFolders = true)
-  }
+  private val earlierReport: os.SubPath = os.sub / "earlier-report.json"
+
+  private val severalModulesWithReportFromAnEarlierTestCommand: SharedSandbox =
+    sharedSandbox(FixtureName.severalModules, SandboxReset.emptyMarkersFolder.and(SandboxReset.jsonOutputFileAsSavedIn(earlierReport))) { build =>
+      build.appendToBuild("object broken extends SampleModule")
+      os.write(build.workspace / "broken" / "src" / "Broken.scala", "object Broken {\n  val value: Int = notDefinedAnywhere\n}\n", createFolders = true)
+      os.makeDir.all(build.markersFolder)
+      val earlier = runTestCommand(build)("alpha.test", "beta.test", "-fJ", build.jsonOutputFile.toString)
+      withClue(earlier.debugString) {
+        os.exists(build.jsonOutputFile) shouldBe true
+      }
+      os.copy(build.jsonOutputFile, build.workspace / earlierReport)
+    }
 
   private def runMillCommandLine(build: FixtureBuild, millArguments: String*): TestCommandResult =
     TestCommandResult(build.eval(FixtureBuild.jobsArguments(2) ++ millArguments))
@@ -18,15 +26,9 @@ final class AnotherGoalFailsFirstSpec extends AnyFeatureSpec with GivenWhenThen 
   Feature("Another goal fails first") {
 
     def withReportFromAnEarlierTestCommand[A](test: FixtureBuild => A): A =
-      withSeveralModules { build =>
-        addBrokenModuleThatDoesNotCompile(build)
+      inSeveralModules(severalModulesWithReportFromAnEarlierTestCommand) { build =>
+        Given("the build's module broken does not compile")
         And("<report> is an absolute path at which a file exists that an earlier test command wrote")
-        val earlier = runTestCommand(build)("alpha.test", "beta.test", "-fJ", build.jsonOutputFile.toString)
-        withClue(earlier.debugString) {
-          os.exists(build.jsonOutputFile) shouldBe true
-        }
-        os.remove.all(build.markersFolder)
-        os.makeDir.all(build.markersFolder)
         test(build)
       }
 

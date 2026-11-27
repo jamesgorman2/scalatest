@@ -8,9 +8,32 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
 
   private val sampleMarkers: Seq[String] = Seq("Alpha1.fast", "Alpha1.slow", "Alpha2.fast", "Alpha2.slow", "Beta1.fast", "Beta1.slow")
 
-  private def addModulesThatSortByCharacterCode(build: FixtureBuild): Unit = {
-    Given("the build also has the JVM test modules B1.test, b10.test and b2.test, each holding one suite whose one test succeeds")
-    Seq("B1", "b10", "b2").foreach(module => build.appendToBuild(s"object $module extends SampleModule {\n  object test extends SampleTests\n}"))
+  private val severalModules: SharedSandbox = sharedSeveralModules(_ => ())
+
+  private val severalModulesWithModulesThatSortByCharacterCode: SharedSandbox =
+    sharedSeveralModules { build =>
+      Seq("B1", "b10", "b2").foreach(module => build.appendToBuild(s"object $module extends SampleModule {\n  object test extends SampleTests\n}"))
+    }
+
+  private def inSeveralModulesWithModulesThatSortByCharacterCode[A](test: FixtureBuild => A): A =
+    inSeveralModules(severalModulesWithModulesThatSortByCharacterCode) { build =>
+      Given("the build also has the JVM test modules B1.test, b10.test and b2.test, each holding one suite whose one test succeeds")
+      test(build)
+    }
+
+  private val alphaAndEveryTestModule: Seq[String] = Seq("alpha.test", "__.test")
+
+  // Scenarios that read the same run share one test command.
+  private lazy val alphaAndEveryTestModuleRun: (TestCommandResult, JsonNode, Seq[(String, Int)]) =
+    severalModules.use { build =>
+      val (result, json) = resultAndJsonOutputOfTestCommand(build)(alphaAndEveryTestModule*)
+      (result, json, sampleMarkers.map(marker => marker -> markerLines(build, marker).size))
+    }
+
+  private def runOnAlphaAndEveryTestModule(): (TestCommandResult, JsonNode, Seq[(String, Int)]) = {
+    givenTheSeveralModules()
+    whenTheTestCommandIsInvokedWritingJsonOutput()(alphaAndEveryTestModule*)
+    alphaAndEveryTestModuleRun
   }
 
   private def moduleSelectorsOf(json: JsonNode): Seq[(String, Seq[String])] =
@@ -31,7 +54,7 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
   Feature("Several module selectors") {
 
     Scenario("Module selectors on either side of an output argument") {
-      withSeveralModules { build =>
+      inSeveralModules(severalModules) { build =>
         When("mill -j 2 scalatest/test alpha.test -fJ <report> beta.test is invoked")
         val result = runTestCommand(build)("alpha.test", "-fJ", build.jsonOutputFile.toString, "beta.test")
         val (_, json) = build.resultAndJsonOutput(result)
@@ -50,7 +73,7 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
     }
 
     Scenario("Only an output argument fails the test command before any test starts") {
-      withSeveralModules { build =>
+      inSeveralModules(severalModules) { build =>
         When("mill -j 2 scalatest/test -fJ <report> is invoked")
         val result = runTestCommand(build)("-fJ", build.jsonOutputFile.toString)
 
@@ -73,24 +96,22 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
     }
 
     Scenario("Two module selectors that share a test module run each test module's tests once, under one module node each") {
-      withSeveralModules { build =>
-        val (result, json) = runParsingJsonOutput(build)("alpha.test", "__.test")
+      val (result, json, markerLineCounts) = runOnAlphaAndEveryTestModule()
 
-        withClue(result.debugString) {
-          Then("the JSON output's root holds exactly the module nodes alpha.test and beta.test, in that order")
-          moduleNodeNames(json) shouldBe Seq("alpha.test", "beta.test")
+      withClue(result.debugString) {
+        Then("the JSON output's root holds exactly the module nodes alpha.test and beta.test, in that order")
+        moduleNodeNames(json) shouldBe Seq("alpha.test", "beta.test")
 
-          And(s"each of the files ${EnglishList.of(sampleMarkers)} in <markers> holds exactly one line")
-          sampleMarkers.map(marker => marker -> markerLines(build, marker).size) shouldBe sampleMarkers.map(_ -> 1)
-        }
-
-        And("the test command succeeds")
-        shouldSucceed(result)
+        And(s"each of the files ${EnglishList.of(sampleMarkers)} in <markers> holds exactly one line")
+        markerLineCounts shouldBe sampleMarkers.map(_ -> 1)
       }
+
+      And("the test command succeeds")
+      shouldSucceed(result)
     }
 
     Scenario("A module selector that resolves to test modules and other modules selects only its test modules") {
-      withSeveralModules { build =>
+      inSeveralModules(severalModules) { build =>
         Given("the build's modules alpha and beta, which hold alpha.test and beta.test, are JVM modules that are not test modules")
         val (result, json) = runParsingJsonOutput(build)("__")
 
@@ -108,19 +129,16 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
     }
 
     Scenario("Two module selectors that share a test module each record it") {
-      withSeveralModules { build =>
-        val (result, json) = runParsingJsonOutput(build)("alpha.test", "__.test")
+      val (result, json, _) = runOnAlphaAndEveryTestModule()
 
-        Then("the root's moduleSelectors holds alpha.test, resolved to alpha.test, then __.test, resolved to alpha.test and beta.test")
-        withClue(result.debugString) {
-          moduleSelectorsOf(json) shouldBe Seq("alpha.test" -> Seq("alpha.test"), "__.test" -> Seq("alpha.test", "beta.test"))
-        }
+      Then("the root's moduleSelectors holds alpha.test, resolved to alpha.test, then __.test, resolved to alpha.test and beta.test")
+      withClue(result.debugString) {
+        moduleSelectorsOf(json) shouldBe Seq("alpha.test" -> Seq("alpha.test"), "__.test" -> Seq("alpha.test", "beta.test"))
       }
     }
 
     Scenario("A module selector's test modules are ordered by name") {
-      withSeveralModules { build =>
-        addModulesThatSortByCharacterCode(build)
+      inSeveralModulesWithModulesThatSortByCharacterCode { build =>
         val (result, json) = runParsingJsonOutput(build)("__.test")
 
         Then("the root's moduleSelectors holds exactly __.test, resolved to B1.test, alpha.test, b10.test, b2.test and beta.test, in that order")
@@ -131,8 +149,7 @@ final class SeveralModuleSelectorsSpec extends AnyFeatureSpec with GivenWhenThen
     }
 
     Scenario("Module nodes are ordered by name, whatever the order of the module selectors") {
-      withSeveralModules { build =>
-        addModulesThatSortByCharacterCode(build)
+      inSeveralModulesWithModulesThatSortByCharacterCode { build =>
         val (result, json) = runParsingJsonOutput(build)("b2.test", "beta.test", "b10.test", "alpha.test", "B1.test")
 
         Then("the JSON output's root holds exactly the module nodes B1.test, alpha.test, b10.test, b2.test and beta.test, in that order")

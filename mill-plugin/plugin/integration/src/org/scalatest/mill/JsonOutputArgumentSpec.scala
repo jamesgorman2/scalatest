@@ -4,9 +4,15 @@ import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
 
-final class JsonOutputArgumentSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with JsonOutputFixture {
+final class JsonOutputArgumentSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with JsonOutputFixture with SharedSandboxes {
 
   private val leftOver: String = "left over"
+
+  private val calculatorSuiteBuild: SharedSandbox =
+    sharedSandbox(
+      FixtureName.jsonOutput,
+      SandboxReset.nothingAt(os.sub / "report.json", os.sub / "other.json", os.sub / "blocker").and(SandboxReset.noModuleFolders)
+    )(_.addSuites("CalculatorSuite"))
 
   private def other(build: FixtureBuild): os.Path = build.workspace / "other.json"
 
@@ -26,7 +32,7 @@ final class JsonOutputArgumentSpec extends AnyFeatureSpec with GivenWhenThen wit
     Scenario("core.test -o -fJ <report> writes the JSON output, and -o keeps its meaning beside it") {
       Given("CalculatorSuite, whose test adds two numbers writes dividing now to stdout and succeeds")
       When("the test command is invoked as mill scalatest/test core.test -o -fJ <report>")
-      withJsonOutputFixture("CalculatorSuite") { build =>
+      calculatorSuiteBuild.use { build =>
         val result = build.runTestCommand("core.test", "-o", "-fJ", build.jsonOutputFile.toString)
 
         Then("the file at <report> holds a JSON object whose kind is root, holding the test adds two numbers, succeeded")
@@ -65,7 +71,7 @@ final class JsonOutputArgumentSpec extends AnyFeatureSpec with GivenWhenThen wit
   Feature("Output arguments the test command rejects") {
 
     Scenario("core.test -fJ <report> -fJ <other> fails the test command, naming -fJ, and leaves every file untouched") {
-      withJsonOutputFixture("CalculatorSuite") { build =>
+      calculatorSuiteBuild.use { build =>
         Given("CalculatorSuite, and the file at <report> holding the text left over")
         os.write(build.jsonOutputFile, leftOver)
         When("the test command is invoked as mill scalatest/test core.test -fJ <report> -fJ <other>")
@@ -88,7 +94,7 @@ final class JsonOutputArgumentSpec extends AnyFeatureSpec with GivenWhenThen wit
   Feature("Deleting and writing the -fJ file") {
 
     Scenario("A folder at the path fails the test command before any test starts, naming the path, and is kept") {
-      withJsonOutputFixture("CalculatorSuite") { build =>
+      calculatorSuiteBuild.use { build =>
         Given("CalculatorSuite, and a folder at <report> holding the file keep.txt")
         os.write(build.jsonOutputFile / "keep.txt", "kept", createFolders = true)
         When("the test command is invoked as mill scalatest/test core.test -fJ <report>")
@@ -107,7 +113,7 @@ final class JsonOutputArgumentSpec extends AnyFeatureSpec with GivenWhenThen wit
     }
 
     Scenario("A path inside a regular file fails the test command after the runs end, naming the path, and the human-readable output is still written") {
-      withJsonOutputFixture("CalculatorSuite") { build =>
+      calculatorSuiteBuild.use { build =>
         Given("CalculatorSuite, and a regular file at <blocker>")
         val blocker = build.workspace / "blocker"
         os.write(blocker, "a file")

@@ -4,35 +4,59 @@ import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
 
-final class ModulesTheTestCommandCannotRunSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with FixtureBuilds {
+final class ModulesTheTestCommandCannotRunSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with SharedSandboxes {
 
   private val cannotRunModulesHeader: String = "The test command cannot run these selected test modules:"
 
+  private val earlierReport: os.SubPath = os.sub / "earlier-report.json"
+
+  private val modulesTheTestCommandCannotRun: SharedSandbox =
+    sharedSandbox(
+      FixtureName.modulesTheTestCommandCannotRun,
+      SandboxReset.emptyMarkersFolder.and(SandboxReset.jsonOutputFileAsSavedIn(earlierReport))
+    ) { build =>
+      writeReportFromAnEarlierTestCommand(build)
+      os.copy(build.jsonOutputFile, build.workspace / earlierReport)
+    }
+
+  private def inModulesTheTestCommandCannotRun[A](test: FixtureBuild => A): A = {
+    givenTheBuild()
+    modulesTheTestCommandCannotRun.use(test)
+  }
+
   private def withModulesTheTestCommandCannotRun[A](test: FixtureBuild => A): A =
     withFixtureBuild(FixtureName.modulesTheTestCommandCannotRun) { build =>
-      Given("a Mill 1.3.1 build that adds the Mill plugin, at the release of this fork under test, as the entry com.edc::scalatest-mill of its build.mill header's mvnDeps")
-      And("the build's JVM test module alpha.test tests with com.edc::scalatest at that release and holds the suite Alpha1, an AnyFunSuite whose test fast succeeds")
-      And(
-        "the build also has these test modules, each with one test that succeeds: " +
-          "munit.test, on the JVM, testing with MUnit; " +
-          "utest.test, on the JVM, testing with uTest; " +
-          "upstream.test, on the JVM, testing with org.scalatest::scalatest 3.2.20; " +
-          "other.test, on the JVM, testing with com.edc::scalatest at a release other than the release under test, which a repository the build uses holds; " +
-          "js.test, on Scala.js, testing with com.edc::scalatest at the release under test, in NodeJs; " +
-          "native.test, on Native, testing with com.edc::scalatest at the release under test"
-      )
-      And("<markers> is an absolute path at which an empty folder exists, and each test, when it runs, creates a file in <markers>")
-      os.makeDir.all(build.markersFolder)
-      And("<report> is an absolute path at which a file exists that an earlier test command wrote")
-      val earlier = invokeTestCommand(build, Seq("alpha.test"))
-      withClue(earlier.debugString) {
-        os.exists(build.jsonOutputFile) shouldBe true
-      }
+      givenTheBuild()
+      writeReportFromAnEarlierTestCommand(build)
       os.remove.all(build.markersFolder)
       os.makeDir.all(build.markersFolder)
-      And("the test command is invoked as mill -j 2 scalatest/test <selectors> -fJ <report>, each argument reaching mill exactly as written, with no shell expansion")
       test(build)
     }
+
+  private def writeReportFromAnEarlierTestCommand(build: FixtureBuild): Unit = {
+    os.makeDir.all(build.markersFolder)
+    val earlier = invokeTestCommand(build, Seq("alpha.test"))
+    withClue(earlier.debugString) {
+      os.exists(build.jsonOutputFile) shouldBe true
+    }
+  }
+
+  private def givenTheBuild(): Unit = {
+    Given("a Mill 1.3.1 build that adds the Mill plugin, at the release of this fork under test, as the entry com.edc::scalatest-mill of its build.mill header's mvnDeps")
+    And("the build's JVM test module alpha.test tests with com.edc::scalatest at that release and holds the suite Alpha1, an AnyFunSuite whose test fast succeeds")
+    And(
+      "the build also has these test modules, each with one test that succeeds: " +
+        "munit.test, on the JVM, testing with MUnit; " +
+        "utest.test, on the JVM, testing with uTest; " +
+        "upstream.test, on the JVM, testing with org.scalatest::scalatest 3.2.20; " +
+        "other.test, on the JVM, testing with com.edc::scalatest at a release other than the release under test, which a repository the build uses holds; " +
+        "js.test, on Scala.js, testing with com.edc::scalatest at the release under test, in NodeJs; " +
+        "native.test, on Native, testing with com.edc::scalatest at the release under test"
+    )
+    And("<markers> is an absolute path at which an empty folder exists, and each test, when it runs, creates a file in <markers>")
+    And("<report> is an absolute path at which a file exists that an earlier test command wrote")
+    And("the test command is invoked as mill -j 2 scalatest/test <selectors> -fJ <report>, each argument reaching mill exactly as written, with no shell expansion")
+  }
 
   private def invokeTestCommand(build: FixtureBuild, selectors: Seq[String]): TestCommandResult =
     build.runTestCommandWithMillArguments(FixtureBuild.jobsArguments(2))((selectors :+ "-fJ" :+ build.jsonOutputFile.toString)*)
@@ -71,7 +95,7 @@ final class ModulesTheTestCommandCannotRunSpec extends AnyFeatureSpec with Given
   Feature("Modules the test command cannot run") {
 
     Scenario("Module selectors alpha.test and other.test") {
-      withModulesTheTestCommandCannotRun { build =>
+      inModulesTheTestCommandCannotRun { build =>
         val result = runTestCommand(build, "alpha.test", "other.test")
 
         Then("Mill reports that the test command failed, with a message naming other.test")
@@ -83,7 +107,7 @@ final class ModulesTheTestCommandCannotRunSpec extends AnyFeatureSpec with Given
     }
 
     Scenario("A module selector that resolves to every test module") {
-      withModulesTheTestCommandCannotRun { build =>
+      inModulesTheTestCommandCannotRun { build =>
         val result = runTestCommand(build, "__.test")
 
         Then("Mill reports that the test command failed, with a message naming each of munit.test, utest.test, upstream.test, other.test, js.test and native.test")

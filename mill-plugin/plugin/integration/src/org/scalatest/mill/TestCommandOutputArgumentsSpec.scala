@@ -6,7 +6,15 @@ import org.scalatest.matchers.should
 
 import scala.util.matching.Regex
 
-final class TestCommandOutputArgumentsSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with SingleModuleFixture {
+final class TestCommandOutputArgumentsSpec
+    extends AnyFeatureSpec
+    with GivenWhenThen
+    with should.Matchers
+    with SingleModuleFixture
+    with SharedSandboxes {
+
+  private val calculatorSuiteBuild: SharedSandbox =
+    sharedSandbox(FixtureName.arguments, SandboxReset.noModuleFolders)(_.addSuites("CalculatorSuite"))
 
   private val calculatorSuiteOutput: Seq[String] = Seq(
     "[core.test]",
@@ -32,7 +40,7 @@ final class TestCommandOutputArgumentsSpec extends AnyFeatureSpec with GivenWhen
       Given("CalculatorSuite, whose test adds two numbers writes dividing now to stdout")
       And("Mill colours its console output")
       When("the test command runs core.test with no -o, with Mill's ticker on")
-      val (result, workerStarted) = withSuites()("CalculatorSuite") { build =>
+      val (result, workerStarted) = calculatorSuiteBuild.use { build =>
         (build.runTestCommandWithTickerAndColour("core.test"), build.anyTestWorkerStarted)
       }
 
@@ -58,7 +66,7 @@ final class TestCommandOutputArgumentsSpec extends AnyFeatureSpec with GivenWhen
     Scenario("With a bare -o, the console holds no consolidated output and none of the run's lines") {
       Given("CalculatorSuite, whose test adds two numbers writes dividing now to stdout")
       When("the test command runs core.test with -o")
-      val result = withSuites()("CalculatorSuite") { build =>
+      val result = calculatorSuiteBuild.use { build =>
         build.runTestCommand("core.test", "-o")
       }
       val console = result.consoleLines
@@ -78,7 +86,7 @@ final class TestCommandOutputArgumentsSpec extends AnyFeatureSpec with GivenWhen
       Given("CalculatorSuite")
       And("Mill colours its console output")
       When("the test command runs core.test with -oP")
-      withSuites()("CalculatorSuite") { build =>
+      calculatorSuiteBuild.use { build =>
         val result = build.runTestCommandWithColour("core.test", "-oP")
 
         Then("the test command fails before any test starts")

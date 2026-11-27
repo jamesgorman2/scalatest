@@ -4,7 +4,7 @@ import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
 
-final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with FixtureBuilds {
+final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with SharedSandboxes {
 
   private val calculatorSuiteOutput: Seq[String] = Seq(
     "[core.test]",
@@ -31,6 +31,15 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
 
   private def withSuitesIn[A](daemonMode: Boolean)(suites: String*)(test: FixtureBuild => A): A =
     withFixtureBuild(FixtureName.capturedOutput, daemonMode) { build =>
+      build.addSuites(suites*)
+      test(build)
+    }
+
+  private val capturedOutputBuild: SharedSandbox =
+    sharedSandbox(FixtureName.capturedOutput, SandboxReset.fixtureFiles(os.sub / "build.mill", os.sub / "core" / "test" / "src" / "samples"))(_ => ())
+
+  private def withSuitesInSharedSandbox[A](suites: String*)(test: FixtureBuild => A): A =
+    capturedOutputBuild.use { build =>
       build.addSuites(suites*)
       test(build)
     }
@@ -120,7 +129,7 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
   Feature("Human-readable output on stdout is coloured whether or not Mill colours its own console output") {
 
     Scenario("The human-readable output is the same, colours included, with Mill's colour on and off") {
-      val outputs = withSuites("CalculatorSuite") { build =>
+      val outputs = withSuitesInSharedSandbox("CalculatorSuite") { build =>
         Given("CalculatorSuite, whose one test writes dividing now to stdout and succeeds")
         When("the test command runs core.test once with Mill's --color true and once with Mill's --color false")
         Seq("true", "false").map(colour => colour -> build.runTestCommandWithMillArguments(Seq("--ticker", "true", "--color", colour))("core.test"))
@@ -205,7 +214,7 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
     }
 
     Scenario("A task named before the test command keeps its output on the console, outside the human-readable output") {
-      val result = withSuites("AddSuite") { build =>
+      val result = withSuitesInSharedSandbox("AddSuite") { build =>
         Given("AddSuite, and the build's task banner, which writes building banner to stdout")
         When("one mill command runs banner and then the test command, with Mill's ticker on")
         build.runTestCommandWithMillArguments(Seq("--ticker", "true", "banner", "+"))("core.test")
@@ -228,7 +237,7 @@ final class CapturedOutputSpec extends AnyFeatureSpec with GivenWhenThen with sh
     }
 
     Scenario("After a failing test is fixed, a second test command shows the fixed run alone and succeeds") {
-      val second = withSuites("CalculatorSuite") { build =>
+      val second = withSuitesInSharedSandbox("CalculatorSuite") { build =>
         Given("CalculatorSuite, whose test adds two numbers has been changed to fail, and the test command has run core.test")
         val source = build.samples / "CalculatorSuite.scala"
         val succeeding = os.read(source)

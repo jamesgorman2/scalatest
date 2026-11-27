@@ -4,7 +4,18 @@ import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
 
-final class ModulesOwnScalaTestArgumentsSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with SingleModuleFixture {
+final class ModulesOwnScalaTestArgumentsSpec
+    extends AnyFeatureSpec
+    with GivenWhenThen
+    with should.Matchers
+    with SingleModuleFixture
+    with SharedSandboxes {
+
+  private val calculatorAndOtherSuiteBuild: SharedSandbox =
+    sharedSandbox(FixtureName.arguments, SandboxReset.fixtureFiles(os.sub / "build.mill"))(_.addSuites("CalculatorSuite", "OtherSuite"))
+
+  // Scenarios that compare against the run with no module arguments share that run.
+  private lazy val runWithoutModuleArguments: TestCommandResult = calculatorAndOtherSuiteBuild.use(_.runTestCommand("core.test"))
 
   Feature("The module's own ScalaTest arguments") {
 
@@ -26,11 +37,11 @@ final class ModulesOwnScalaTestArgumentsSpec extends AnyFeatureSpec with GivenWh
       Scenario(s"The module's own ${moduleArguments.mkString(" ")} leaves the human-readable output unchanged") {
         Given(s"CalculatorSuite and OtherSuite, in a module whose own ScalaTest arguments are ${moduleArguments.mkString(" ")}")
         And("the module's testParallelism is false")
-        When("the test command runs core.test, and runs it again with the module's own arguments removed")
-        val (result, withoutArguments) = withSuites(moduleArguments*)("CalculatorSuite", "OtherSuite") { build =>
-          val result = build.runTestCommand("core.test")
-          build.removeModuleArguments()
-          (result, build.runTestCommand("core.test"))
+        When("the test command runs core.test, and also runs it with the module's own arguments removed")
+        val withoutArguments = runWithoutModuleArguments
+        val result = calculatorAndOtherSuiteBuild.use { build =>
+          build.setModuleArguments(moduleArguments)
+          build.runTestCommand("core.test")
         }
 
         Then("the human-readable output is the one the test command writes with no module arguments")

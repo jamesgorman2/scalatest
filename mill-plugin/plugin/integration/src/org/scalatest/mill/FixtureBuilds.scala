@@ -6,17 +6,20 @@ import org.scalatest.matchers.should
 trait FixtureBuilds { this: should.Matchers =>
 
   protected def withFixtureBuild[A](fixture: FixtureName, daemonMode: Boolean = false)(test: FixtureBuild => A): A = {
-    val tester = IntegrationTester(
-      daemonMode = daemonMode,
-      workspaceSourcePath = IntegrationEnvironment.fixture(fixture),
-      millExecutable = IntegrationEnvironment.millExecutable
-    )
+    val tester = integrationTester(fixture, daemonMode)
     try {
       test(new FixtureBuild(tester))
     } finally {
       tester.close()
     }
   }
+
+  protected def integrationTester(fixture: FixtureName, daemonMode: Boolean): IntegrationTester =
+    IntegrationTester(
+      daemonMode = daemonMode,
+      workspaceSourcePath = IntegrationEnvironment.fixture(fixture),
+      millExecutable = IntegrationEnvironment.millExecutable
+    )
 
   protected def shouldSucceed(result: TestCommandResult): Unit =
     withClue(result.debugString) {
