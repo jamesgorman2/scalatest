@@ -204,7 +204,7 @@ It leaves nothing at the `-fJ` path when:
 - the dependencies Mill resolves for a selected test module hold no `com.edc:scalatest-core_3` at the plugin's release, as for a module testing with MUnit, uTest, upstream `org.scalatest:scalatest` or another release of this fork;
 - a selected module's own ScalaTest arguments hold an argument ScalaTest's runner does not recognise.
 
-The failure names each selected test module the test command cannot run, and each unrecognised argument. A selected module whose dependencies fail to resolve does not cause this failure: only its own tests do not start (below). Where the test command fails this way for another module, the failure also names, under `The tests of these selected test modules cannot start:`, each module whose tests cannot start, such as one whose dependencies fail to resolve, with the failure its module node would hold.
+The failure names each selected test module the test command cannot run, and each unrecognised argument. A selected module whose dependencies fail to resolve does not cause this failure: only its own tests do not start (below). Where the test command fails this way for another module, the failure also names, under `The tests of these selected test modules cannot start:`, each other selected test module whose tests are known not to start before any test starts, such as one whose dependencies fail to resolve, with the failure its module node would hold.
 
 Where a goal before the test command on the same `mill` command line fails and Mill's `--keep-going` is not given, the test command does not run: it writes no consolidated output and leaves the file at the `-fJ` path as it was.
 
@@ -228,7 +228,7 @@ It also fails when one of the cases below happens to a selected module. The cons
 - two of the module's fork groups would share a `processFolder`, as where each runs only the same test class or, on a case-insensitive filesystem, only classes whose names differ only in case. No test of the module runs;
 - two or more of the module's fork groups hold a test class to run, and the test command cannot tell whether the filesystem is case-insensitive. No test of the module runs.
 
-Where the test command fails for any reason in these two lists other than the JSON output not being written, its failure names only the selected modules that failed, such as `The tests of alpha.test and broken.test failed`.
+Unless the JSON output cannot be written, where the test command fails once its tests have run, its failure names only the selected modules that failed, such as `The tests of alpha.test and broken.test failed`.
 
 Under the test command, ScalaTest prints no end-of-run summary of its own. Instead, the human-readable output ends with one summary line that counts the suites and tests of every run. Mill's own test tasks still print ScalaTest's summary.
 
