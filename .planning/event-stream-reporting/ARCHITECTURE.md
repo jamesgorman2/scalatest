@@ -236,7 +236,7 @@ The Mill plugin is the library's only caller (`decisions/event-log-contract.md` 
 - **Attach output or a failure to a module**: given a module and output or a failure, attaches it to the module, adding the module's node where the module has none yet (R-072b, R-097b, R-098e). Output is in the form **Add a run** takes it.
   - The caller attaches each failure it can attribute to one selected module this way. Such failures include a fork group failing to lay out, a worker failing to start, and the failure of a runner that is not a run.
   - The caller attaches the output of a runner that is not a run, such as Mill's discovery runner, to the module the runner ran for. Such a runner adds no node (R-072a).
-- **Attach output or a failure to the root**: given output or a failure that the caller cannot attribute to one selected module, such as a failure of the test command itself, attaches it to the root (R-072b, R-098f). Output is in the form **Add a run** takes it.
+- **Attach output or a failure to the root**: given output or a failure that the caller cannot attribute to one selected module, attaches it to the root (R-072b, R-098f). Output is in the form **Add a run** takes it. The test command attaches none.
 - **End**, which the caller calls once every run's event stream has ended. Where the caller gives it, **End** takes the root's end time: the time, by the caller's clock, at which every run has ended. The library writes the human-readable and JSON output. The consolidation state is ended once **End** returns, after that output is written.
 - **Read the consolidation state**: returns, at once and at any time from **Start**, one of *open*, *open, failed*, *ended* and *ended, failed* (`decisions/architecture-library-and-modules.md` "The consolidation library, not the Mill plugin, decides whether the test command has failed." and "The library gives the consolidation state as a synchronous read of four states…").
   - The state becomes failed, and stays failed, when (`SPECIFICATION.md` R-046a, R-046b, R-046c, R-137):
@@ -332,7 +332,7 @@ flowchart LR
   DEC -- "event stream, live" --> LIB
   CAP -- "output captured against the run" --> LIB
   CMD -- "each run's module, selectors, test classes each process was assigned, modules not started, test classes left in a queue, processes with no run, output and failures for each module and for the root, Mill version, start and end times of the root and each module" --> LIB
-  LIB -- "runner argument; consolidation state; whether a module has a test result" --> CMD
+  LIB -- "ScalaTest arguments grouped by flag; runner argument; consolidation state; whether a module has a test result; whether a module has failed; the modules that failed the test command; the version the library was built at" --> CMD
   LIB -- "on stdout: progress summary, redrawn as events arrive; human-readable, once every stream has ended" --> LOG --> CON[Console]
   LIB -- "each output a -f names: progress as events arrive; human-readable and JSON once every stream has ended" --> OUT["Files the test command's arguments name"]
 ```

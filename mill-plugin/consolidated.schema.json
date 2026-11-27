@@ -30,7 +30,7 @@
           "const": "aborted"
         },
         "failures": {
-          "description": "The failures attached to the root: those that belong to no single module, such as a failure of the test command itself. Absent where none is attached.",
+          "description": "The failures that the consolidation library's caller attaches to the root, which belong to no module. The test command attaches none. Absent where none is attached.",
           "type": "array",
           "minItems": 1,
           "items": { "$ref": "#/$defs/failure" }

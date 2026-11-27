@@ -4,7 +4,7 @@ Scale: feature.
 
 ## Summary
 
-The test command takes exactly one module selector, which must name one JVM test module, so a build with several test modules needs one test command per module and gets a separate consolidated output from each. This feature has the test command take several module selectors and run the tests of every test module they select in one test command, with one consolidated output. Each selected module's tests wait for every selected module's dependencies to resolve, but not for any other selected module to compile. Each selected module's tests run whatever happens to the other selected modules.
+This feature has the test command take several module selectors and run the tests of every test module they select in one test command, with one consolidated output. Each selected module's tests wait for every selected module's dependencies to resolve, but not for any other selected module to compile. Each selected module's tests run whatever happens to the other selected modules.
 
 ## Plan
 
