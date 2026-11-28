@@ -207,7 +207,7 @@ A task's *task folder* is the folder Mill gives that task to write its files in.
 - R-106e Human-readable output prints each nodes output
 - R-106f Human-readable output prints in colour, unless the `w` formatting character is given
 - R-106g Human-readable output prints durations only when the `d` formatting character is given
-- R-127a Human-readable output omits tests with the following filtering characters: `c` succeeded tests, `x` ignored tests, `e` pending tests, `o` info, `m` markup and `r` pending scopes.
+- R-127a For each filtering character given, human-readable output omits what that character names: `c` succeeded tests, `x` ignored tests, `e` pending tests, `o` info, `m` markup and `r` pending scopes.
 - R-127b Human-readable output omits a scope when all its children have been omitted by filtering characters. This is recursive.
 - R-143 Human-readable output shows the root only where the root failed or has output attached.
 - R-144 Human-readable output shows a run only where the run has output attached, the run aborted or stopped, or the run was assigned test classes and ran none of them.
@@ -218,7 +218,7 @@ A task's *task folder* is the folder Mill gives that task to write its files in.
 
 - R-028 JSON output encodes the node tree, per the JSON schema `../../mill-plugin/consolidated.schema.json`.
 - R-084 The JSON output records the release of this fork that wrote it.
-- R-127c JSON output omits tests with the following filtering characters: `c` succeeded tests, `x` ignored tests, `e` pending tests, `o` info, `m` markup and `r` pending scopes. 
+- R-127c For each filtering character given, JSON output omits what that character names: `c` succeeded tests, `x` ignored tests, `e` pending tests, `o` info, `m` markup and `r` pending scopes.
 - R-127d JSON output omits a scope when all its children have been omitted by filtering characters. This is recursive.
 
 ### Progress output

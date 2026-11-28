@@ -108,7 +108,7 @@ Decisions behind `../SPECIFICATION.md` on which outputs the consolidation produc
 
 ---
 
-## Each `-o` and `-f` argument takes the formatting characters `w` and `d` for human-readable output, and the filtering characters `c`, `x`, `e`, `o`, `m` and `r` for human-readable and JSON output (`../SPECIFICATION.md` R-106f, R-106g, R-127a, R-127b, R-127c, R-127d, R-138, R-139).
+## Each `-o` and `-f` argument takes the formatting character `w` for human-readable and progress output, the formatting character `d` for human-readable output, and the filtering characters `c`, `x`, `e`, `o`, `m` and `r` for human-readable and JSON output (`../SPECIFICATION.md` R-090e, R-106f, R-106g, R-127a, R-127b, R-127c, R-127d, R-138, R-139).
 
 **Alternatives**
 
