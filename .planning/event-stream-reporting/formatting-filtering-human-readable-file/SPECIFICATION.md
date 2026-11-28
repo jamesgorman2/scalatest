@@ -43,13 +43,15 @@ Terms are defined in `.docs/ubiquitous-language.md`, among them **Output argumen
     - a run whose closing run event (`RunCompleted`, `RunStopped` or `RunAborted`) carries a duration. A run's duration is printed only where the run's line is shown.
     - a suite or test whose closing event carries a duration;
     - a scope whose opening and closing ScalaTest both reported.
-- The filtering characters on an `-oH` or `-fH`: `c` omits succeeded tests, `x` ignored tests, `e` pending tests, `o` info messages, `m` markup messages and `r` pending scopes.
+- The filtering characters on an `-oH` or `-fH`, each of which names one kind of node or message: `c` names succeeded tests, `x` ignored tests, `e` pending tests, `o` info messages, `m` markup messages and `r` pending scopes. A filtering character omits each message it names.
   - A scope's children are its child scopes and tests. A message is not a child.
+  - A node that a filtering character names is omitted where no node beneath it is kept.
+  - A node that a filtering character names keeps its line as a header where a node beneath it is kept, so that the kept node keeps its place in the tree. A failed test in a pending scope under `r`, and a suite run inside a succeeded test under `c`, are such kept nodes.
   - A scope all of whose children the filtering characters omit is omitted too, at any depth, whatever the scope's own outcome.
   - A scope that has no children is kept unless a filtering character names it, as `r` names a pending scope.
   - Filtering characters never omit a module, a run or a suite.
-  - The messages attached to an omitted node, and any output captured against it, are omitted with it.
-  - Where a test was executed more than once, `c` omits each execution that succeeded.
+  - The messages attached to an omitted node or to a node kept as a header, and any output captured against either node, are omitted.
+  - Where a test was executed more than once, `c` names each execution that succeeded.
   - Filtering characters omit lines only. The summary line counts every suite and test, whatever the filtering characters omit.
 - Formatting and filtering characters on an `-oH` or `-fH`, such as `-oHwc`, each applying only to the output that argument names.
 - Accepting formatting and filtering characters on an `-fJ`, such as `-fJc <path>`. `w` and `d` on an `-fJ` leave the JSON output unchanged.
@@ -324,7 +326,7 @@ Feature: Filtering characters
       Then the human-readable output on stdout should hold the line `- retries *** FAILED ***`
       But the human-readable output on stdout should hold no line `- retries`
 
-  Rule: The messages attached to an omitted node are omitted with it
+  Rule: The messages attached to an omitted node, or to a node kept as a header, are omitted
 
     Scenario: AC-034 Under `c`, the note `pushed` attached to the omitted test `pushes` is omitted
       When `mill scalatest/test core.test -oHc` is invoked
@@ -338,6 +340,31 @@ Feature: Filtering characters
     Scenario: AC-041 Under `c`, the info `checked` attached to the kept test `pops` is kept
       When `mill scalatest/test core.test -oHc` is invoked
       Then the human-readable output on stdout should hold the line `[info] checked`
+
+    Scenario: AC-045 Under `r`, the info attached to a pending scope kept as a header is omitted
+      Given `StackSpec` also holds the scope `A heap`, which is pending and holds only the test `shrinks`, which fails
+      And `StackSpec`'s scope `A heap` sends the info `heaped` outside its test
+      When `mill scalatest/test core.test -oHr` is invoked
+      Then the human-readable output on stdout should hold no line `[info] heaped`
+
+  Rule: A node that a filtering character names keeps its line as a header where a node beneath it is kept
+
+    Scenario: AC-046 Under `r`, a pending scope holding a failed test keeps its line above that test
+      Given `StackSpec` also holds the scope `A heap`, which is pending and holds only the test `shrinks`, which fails
+      When `mill scalatest/test core.test -oHr` is invoked
+      Then the human-readable output on stdout should hold the line `A heap (pending)`
+      And the line `- shrinks *** FAILED ***` should appear under the line `A heap (pending)`, indented one level deeper
+
+    Scenario: AC-047 Under `c`, a succeeded test that runs a suite keeps its line above that suite
+      Given `core.test` also holds the suite `OuterSpec`, an `AnyFunSpec` whose test `delegates` runs the suite `InnerSuite`, then succeeds
+      When `mill scalatest/test core.test -oHc` is invoked
+      Then the human-readable output on stdout should hold the line `- delegates`
+      And the line `InnerSuite:` should appear under the line `- delegates`, indented one level deeper
+
+    Scenario: AC-048 Under `rx`, a pending scope whose only test is ignored is omitted
+      Given `StackSpec` also holds the scope `A heap`, which is pending and holds only the test `skips`, which is ignored
+      When `mill scalatest/test core.test -oHrx` is invoked
+      Then the human-readable output on stdout should hold no line `A heap (pending)`
 
   Rule: A scope is omitted, at any depth, where filtering characters omit all of its child scopes and tests, whatever its own outcome
 
@@ -483,18 +510,18 @@ Feature: Output arguments
 
 Each epic requirement this feature addresses, with the criteria that address it:
 
-| Epic requirement             | Criteria                                                                                       |
-|------------------------------|------------------------------------------------------------------------------------------------|
-| `../SPECIFICATION.md` R-138  | AC-010, AC-011, AC-012, AC-013, AC-016, AC-019, AC-024, AC-025, AC-026, AC-028, AC-039         |
-| `../SPECIFICATION.md` R-139  | AC-015, AC-023                                                                                 |
-| `../SPECIFICATION.md` R-127a | AC-016, AC-017, AC-018, AC-019, AC-022, AC-034, AC-037, AC-038, AC-039, AC-040, AC-041         |
-| `../SPECIFICATION.md` R-127b | AC-020, AC-021, AC-035, AC-036, AC-042                                                         |
-| `../SPECIFICATION.md` R-106c | AC-016, AC-017, AC-020, AC-021, AC-037, AC-038, AC-039                                         |
-| `../SPECIFICATION.md` R-106f | AC-011, AC-012, AC-015                                                                         |
-| `../SPECIFICATION.md` R-106g | AC-013, AC-014, AC-031, AC-032, AC-033                                                         |
-| `../SPECIFICATION.md` R-049a | AC-001, AC-002, AC-003, AC-007, AC-024, AC-025, AC-043, AC-044                                 |
-| `../SPECIFICATION.md` R-049b | AC-004, AC-005, AC-006, AC-027                                                                 |
-| `../SPECIFICATION.md` R-055  | AC-001, AC-003, AC-004, AC-011, AC-012, AC-016, AC-023, AC-026, AC-028, AC-043                 |
-| `../SPECIFICATION.md` R-020  | AC-001, AC-003, AC-005, AC-030                                                                 |
-| `../SPECIFICATION.md` R-077  | AC-008, AC-029                                                                                 |
-| `../SPECIFICATION.md` R-059  | AC-009                                                                                         |
+| Epic requirement             | Criteria                                                                                                               |
+|------------------------------|------------------------------------------------------------------------------------------------------------------------|
+| `../SPECIFICATION.md` R-138  | AC-010, AC-011, AC-012, AC-013, AC-016, AC-019, AC-024, AC-025, AC-026, AC-028, AC-039                                 |
+| `../SPECIFICATION.md` R-139  | AC-015, AC-023                                                                                                         |
+| `../SPECIFICATION.md` R-127a | AC-016, AC-017, AC-018, AC-019, AC-022, AC-034, AC-037, AC-038, AC-039, AC-040, AC-041, AC-045, AC-046, AC-047, AC-048 |
+| `../SPECIFICATION.md` R-127b | AC-020, AC-021, AC-035, AC-036, AC-042, AC-046                                                                         |
+| `../SPECIFICATION.md` R-106c | AC-016, AC-017, AC-020, AC-021, AC-037, AC-038, AC-039, AC-046, AC-047, AC-048                                         |
+| `../SPECIFICATION.md` R-106f | AC-011, AC-012, AC-015                                                                                                 |
+| `../SPECIFICATION.md` R-106g | AC-013, AC-014, AC-031, AC-032, AC-033                                                                                 |
+| `../SPECIFICATION.md` R-049a | AC-001, AC-002, AC-003, AC-007, AC-024, AC-025, AC-043, AC-044                                                         |
+| `../SPECIFICATION.md` R-049b | AC-004, AC-005, AC-006, AC-027                                                                                         |
+| `../SPECIFICATION.md` R-055  | AC-001, AC-003, AC-004, AC-011, AC-012, AC-016, AC-023, AC-026, AC-028, AC-043                                         |
+| `../SPECIFICATION.md` R-020  | AC-001, AC-003, AC-005, AC-030                                                                                         |
+| `../SPECIFICATION.md` R-077  | AC-008, AC-029                                                                                                         |
+| `../SPECIFICATION.md` R-059  | AC-009                                                                                                                 |
