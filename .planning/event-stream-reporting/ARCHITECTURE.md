@@ -57,8 +57,7 @@ Every artifact the fork's sbt build publishes, scalactic and the style artifacts
 - its argument splitter;
 - its definition of the runner argument;
 - its JSON encoder;
-- its test class name type;
-- the version of this fork it was built at.
+- its test class name type.
 
 The operation that adds a run's assigned test classes (§ APIs § The Mill plugin and the consolidation library, **Add a run**) takes that type, so it is also `private[scalatest]`.
 
@@ -294,7 +293,7 @@ Before it starts any of a module's test processes, the test command knows the mo
   - for a module that sets `testBatchFrameworkTasks`, as the class list it gives each fork group's worker;
 - on Scala.js and Native, as the classes the class globs keep among the test classes it learns itself before it evaluates the test task, because Mill's test task discovers them only inside its own body (`research/mill-worker-channels.md` § 4).
 
-Before any test starts, the test command checks every selected module in a first nested evaluation of its own, with fail-fast off, over one anonymous check task for each selected JVM test module (`many-modules-in-one-test-command/TECHNICAL-DESIGN.md` § The check before any test starts):
+Before any test starts, the test command checks each selected JVM test module in a first nested evaluation of its own, with fail-fast off, over one anonymous check task for each such module (`many-modules-in-one-test-command/TECHNICAL-DESIGN.md` § The check before any test starts):
 
 - A module's check task reads the module's `testArgsDefault` and resolves the module's runtime dependencies. It evaluates no compile, so each module's tests wait on every selected module's dependency resolution, but on no other module's compile (`SPECIFICATION.md` R-056b; `many-modules-in-one-test-command/SPECIFICATION.md` AC-007).
 - Where a selected module is one the test command cannot run, the test command fails before **Start**, and so writes no consolidated output.

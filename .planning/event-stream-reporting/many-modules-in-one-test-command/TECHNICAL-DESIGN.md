@@ -31,7 +31,7 @@ This design checks every selected JVM test module before any test starts, then r
   - the module's `testArgsDefault`;
   - the Coursier resolution of the module's runtime dependencies, which covers the dependencies of every module the module depends on:
     - The check task names the runtime configuration on a copy of the module's `coursierDependencyTask`, and calls the module's `millResolver`'s `resolution` on that copy. `resolution` fetches metadata only.
-    - `resolvedRunMvnDeps` uses the same resolver and root dependency but calls `classpath`, whose parameters set the runtime configuration as the default configuration and add the Gradle runtime variant attributes. `resolution` takes the module's `resolutionParams` unchanged, so the check's resolution has neither.
+    - `resolvedRunMvnDeps` uses the same resolver on the unchanged `coursierDependencyTask`, but calls `classpath`, whose parameters set the runtime configuration as the default configuration and add the Gradle runtime variant attributes. `resolution` takes the module's `resolutionParams` unchanged, so the check's resolution has neither.
 - Once that `execute` returns, the test command holds each module's check result: the module's `testArgsDefault`, and the library and version of each dependency the resolution keeps.
 - A check task evaluates no compile. A module's tests therefore wait on every selected module's dependency resolution and `testArgsDefault`, but on no other module's compile (AC-007).
 - A check task is anonymous, so Mill caches none of it: every test command resolves every selected module's dependencies again before any test starts. Coursier's cache keeps the metadata, so a warm check downloads nothing.
