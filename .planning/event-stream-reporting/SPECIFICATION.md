@@ -201,7 +201,7 @@ A task's *task folder* is the folder Mill gives that task to write its files in.
 - R-106a Human-readable output prints each node's label as either the ScalaTest formatted name, or the name of the node.
 - R-106b Human-readable output prints the node tree as with each child indented from its parent
 - R-106c Human-readable output prints every module, suite, scope and test of the node tree, except:
-  - where a filter character removes nodes
+  - where a filtering character removes nodes
   - where a subtree contains identical aborted messages, only the root is printed
 - R-106d Human-readable output prints each nodes outcome and outcome message
 - R-106e Human-readable output prints each nodes output
