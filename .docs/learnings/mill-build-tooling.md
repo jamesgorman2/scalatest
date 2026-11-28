@@ -257,7 +257,7 @@ date: 2026-11-27
 ---
 In Mill 1.3.1, `mill.javalib.CoursierModule.Resolver` resolves dependencies in two ways that take different resolution parameters:
 
-- `classpath(deps, sources, artifactTypes, resolutionParamsMapOpt, ...)` downloads every artifact. `JavaModule.resolvedRunMvnDeps` calls it with a map that sets `withDefaultConfiguration(runtime)` and the Gradle `org.gradle.usage` runtime variant attribute.
+- `classpath(deps, sources, artifactTypes, resolutionParamsMapOpt, ...)` downloads every artifact. `JavaModule.resolvedRunMvnDeps` calls it on `coursierDependencyTask().withConfiguration(runtime)`, with a map that sets `withDefaultConfiguration(runtime)` and the Gradle `org.gradle.usage` runtime variant attribute.
 - `resolution(deps)` fetches metadata only and returns the `coursier.core.Resolution`, but takes no parameter map: it resolves with the module's `resolutionParams` unchanged.
 
 For a metadata-only resolution in the runtime configuration, either:
