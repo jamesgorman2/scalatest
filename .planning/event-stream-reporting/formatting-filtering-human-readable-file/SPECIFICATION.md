@@ -8,7 +8,7 @@ The test command writes human-readable output only to its stdout. It prints ever
 
 ## Plan
 
-The plan is not yet created.
+[Plan: Formatting, filtering and human-readable output to a file](https://github.com/jamesgorman2/scalatest/issues/270)
 
 ## Spec documents
 
