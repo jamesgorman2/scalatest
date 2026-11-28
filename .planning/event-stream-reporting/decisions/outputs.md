@@ -1,6 +1,6 @@
 # Decisions: outputs
 
-Decisions behind `../SPECIFICATION.md` on which outputs the consolidation produces, how its human-readable output is coloured, formatted, filtered and collapsed, how it shows a node that ran more than once, and what its JSON output records, newest first. The JSON output's layout has its own decisions, in `../JSON-LAYOUT-DECISIONS.md`.
+Decisions behind `../SPECIFICATION.md` on which outputs the consolidation produces, how its human-readable and progress output are coloured, how its human-readable output is formatted, filtered and collapsed, how its JSON output is filtered, how it shows a node that ran more than once, and what its JSON output records, newest first. The JSON output's layout has its own decisions, in `../JSON-LAYOUT-DECISIONS.md`.
 
 ## The test command writes no JUnit XML report: neither one consolidated report nor Mill's report for each module (`../SPECIFICATION.md` R-047).
 

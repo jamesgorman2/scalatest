@@ -21,7 +21,6 @@ Settles:
 - Where the output captured against an omitted test or scope goes (R-127c and R-127d are silent; R-097b attaches output to the most specific identifiable node).
 - Whether a scope is omitted when its tests and scopes are all omitted but a message remains in its `contents`, or output is captured against it (R-127d speaks of its children).
 - Whether a suite, run node or module is omitted when everything beneath it is omitted (R-127d names scopes only).
-- What a formatting character, `w` or `d`, does on a `-fJ` (R-138 allows formatting characters on each `-f`; R-106f and R-106g name the human-readable output only).
 
 Risks:
 
@@ -136,7 +135,6 @@ Settles:
   - colours: each part, a word and its count, has the colour of a line of its kind whatever the count, 0 included: `<aborted> aborted` and `failed <failed>` red, `succeeded <succeeded>` green, `canceled <canceled>`, `ignored <ignored>` and `pending <pending>` yellow. Every other character is cyan.
 - How progress output counts before a run's event stream ends, where attribution and the suites its end aborts are not yet decided. One function produces the summary line's counts, text and colours by counting over the assembled tree, so it needs every run's event stream to have ended. So that its last output equals the summary line (R-141), progress output keeps the counts that arriving events give apart from the changes a run's end makes (attributed suites and tests leave the counts; a suite still open at the run's end is aborted), and shows that its counts equal that function's once every stream has ended.
 - What a progress file contains, where nothing can be redrawn in place (R-089).
-- Which formatting and filtering characters other than `w` apply to progress output (R-090e names `w`; R-106g, R-127a and R-127b name only the human-readable output).
 
 Risks:
 

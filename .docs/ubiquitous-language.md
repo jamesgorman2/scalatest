@@ -95,6 +95,14 @@ _Avoid_: JSON lines reporter
 The reporter configuration characters `N C X E H L O P Q R M`, each of which drops one kind of event from what the reporter writes.
 _Avoid_: Filter flags, suppression characters
 
+**Output argument**:
+An `-o` or `-f` argument of the test command: an `-o` names the test command's stdout, and an `-f` names the file at the path that follows it.
+_Avoid_: Output flag, output option, reporter argument
+
+**Output letter**:
+One of the upper-case characters `H`, `P` and `J` on an output argument, which select the human-readable, progress and JSON output that the argument writes. They are not ScalaTest reporter configuration characters.
+_Avoid_: Output format, format letter
+
 **Formatting characters**:
 The characters `w` and `d` on a test command's `-o` or `-f` argument, each of which changes how that argument's output is written, such as without colour or with durations. They are not ScalaTest reporter configuration characters.
 _Avoid_: Format flags, formatting options
