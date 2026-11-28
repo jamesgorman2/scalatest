@@ -2,25 +2,6 @@
 
 No feature is released before the epic is complete. Behaviour a feature leaves to a later one is undefined until that later feature, and a feature specifies it only where its own acceptance criteria need it.
 
-## 16. Formatting, filtering and human-readable output to a file
-
-The test command takes the formatting and filtering characters on `-o` and `-f` and applies them to human-readable output (R-138, R-139, R-106f, R-106g, R-127a, R-127b), and `-fH <path>` writes human-readable output to the file at that path. Feature 18 applies the filtering characters to JSON output. Builds on features 1 and 2.
-
-Enables:
-
-- `SPECIFICATION.md` R-138 and R-139 (parsing on every `-o` and `-f`; effect on human-readable output), R-127a, R-127b, R-106c (nodes a filtering character removes), R-106f (`w`), R-106g (`d`), R-049a (`-fH`), R-049b (more than one `-f`), R-055 (human-readable files; formatting and filtering), R-020 (human-readable on stdout and in a file), R-077 and R-059 (a human-readable file), § Scope (the test command's output arguments)
-- `ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library (Start: a sink for each output in a file; each human-readable output's characters), § Data flow (each output a `-f` names: human-readable)
-
-Settles:
-
-- Whether one `-f` may name output letters in a combination other than those R-049a lists, such as `J` with `H`.
-- What the test command does with a lowercase character outside the set R-106f, R-106g and R-127a name.
-- What the test command does with an `-o` output letter other than `H` and `P`, such as `J` (R-048 names only those two).
-
-Risks:
-
-- `decisions/outputs.md` "Each `-o` and `-f` argument takes the formatting characters `w` and `d` for human-readable output, and the filtering characters…"
-
 ## 18. Filtering characters on JSON output
 
 The filtering characters on a `-fJ` argument omit nodes and messages from the JSON output that argument names. Builds on features 2 and 16.
