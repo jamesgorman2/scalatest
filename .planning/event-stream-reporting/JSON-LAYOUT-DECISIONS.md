@@ -2,6 +2,27 @@
 
 Decisions behind the layout of the JSON output that [../../mill-plugin/consolidated.schema.json](../../mill-plugin/consolidated.schema.json) states, newest first.
 
+## The root's and a module's failures are a `failures` array of `{ "message" }` objects beside an `outcome` of `aborted`.
+
+**Alternatives**
+
+- One `message` key, as a run node has, holds one failure, but the root and a module can each be given several.
+- An array of plain strings cannot gain a key, such as a throwable, without changing each item's type.
+- Putting failures in `output` mixes a failure with what runners wrote, and a reader must search `output` to learn why the node aborted.
+- A new outcome value, such as `error`, is one more value every reader must handle, and pre-empts the outcome reason a later feature may add beside `outcome`.
+- `failures` with no `outcome`, which `SPECIFICATION.md` R-098e permits, leaves a node that holds an error without an outcome, so a reader cannot find every aborted node by its `outcome` alone.
+
+**Reasoning** A failure attached to the root or to a module is why that node aborted, as a run node's `message` is why the run aborted, so it sits beside `outcome`. An object per failure keeps the order the failures were attached in and lets an item gain keys later. One shape on both nodes gives a reader one way to read failures on either node.
+
+**Costs** A reader that wants one reason for a node's abort must join the messages itself. A module's `outcome` does not say whether its tests started; a reader learns that from its `contents` and its failures' messages.
+
+**Settled by**
+
+- [Library JSON output: encoding, root, module and run node](https://github.com/jamesgorman2/scalatest/issues/142).
+- [Many modules in one test command - How a module's error is shown](https://github.com/jamesgorman2/scalatest/issues/241).
+
+---
+
 ## A module's runs are numbered by their fork group's position in the module's `testForkGrouping`, then by their worker's index within the fork group.
 
 **Alternatives**
@@ -75,22 +96,6 @@ Top-level suites that share a name follow their start order, as R-105 gives for 
 **Costs** The order matches neither source order nor run order. Numbered names sort as text (`Suite10` before `Suite2`), and among ASCII names every uppercase name sorts before every lowercase one.
 
 **Settled by** [Consolidated JSON output - Suites, scopes and tests in the JSON output](https://github.com/jamesgorman2/scalatest/issues/143).
-
----
-
-## The root's failures are a `failures` array of `{ "message" }` objects, beside `outcome`.
-
-**Alternatives**
-
-- One `message` key, as a run node has, holds one failure, but the root can be given several.
-- An array of plain strings cannot gain a key, such as a throwable, without changing each item's type.
-- Putting failures in `output` mixes a failure of the test command with what its runners wrote, and a reader must search `output` to learn why the root aborted.
-
-**Reasoning** A failure attached to the root is why the root aborted, as a run node's `message` is why the run aborted, so it sits beside `outcome`. An object per failure keeps the order they were attached in and lets an item gain keys later.
-
-**Costs** A reader that wants one reason for the root's abort must join the messages itself.
-
-**Settled by** [Library JSON output: encoding, root, module and run node](https://github.com/jamesgorman2/scalatest/issues/142).
 
 ---
 

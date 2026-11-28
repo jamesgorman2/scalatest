@@ -2,6 +2,9 @@ package org.scalatest.mill
 
 import java.io.IOException
 import java.nio.file.Paths
+import org.scalatest.consolidation.Consolidation
+import org.scalatest.consolidation.ModuleName
+import org.scalatest.consolidation.ScalaTestArgument
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -40,42 +43,100 @@ final class TestCommandFailureSpec extends AnyWordSpec with should.Matchers {
     }
 
     "no module selector is given" should {
-      "say the command takes one" in {
-        TestCommandFailure.NoModuleSelector.message shouldBe "The test command takes one module selector, but was given none"
+      "say the command takes one or more" in {
+        TestCommandFailure.NoModuleSelector.message shouldBe "The test command takes one or more module selectors, but was given none"
       }
     }
 
-    "several module selectors are given" should {
-      "say the command takes one, naming each separated by a space" in {
-        TestCommandFailure.SeveralModuleSelectors(Seq(ModuleSelectorArgument("core.test"), ModuleSelectorArgument("util.test"))).message shouldBe
-          "The test command takes one module selector, but was given: core.test util.test"
-      }
-    }
-
-    "a module selector resolves to other than one JVM test module" should {
-      "name the selector and what it resolved to" in {
-        TestCommandFailure.NotOneJvmTestModule(ModuleSelectorArgument("core"), "nothing").message shouldBe
-          "Module selector core must resolve to one JVM test module, but resolved to: nothing"
+    "a module selector resolves to no test module" should {
+      "name the selector" in {
+        TestCommandFailure.ModuleSelectorsWithNoTestModule(Seq(ModuleSelectorFailure.NoTestModule(ModuleSelectorArgument("core")))).message shouldBe
+          "Module selector core resolves to no test module"
       }
     }
 
     "a module selector resolves to no module" should {
       "name the selector and Mill's error" in {
-        TestCommandFailure.UnresolvedModuleSelector(ModuleSelectorArgument("missing"), "Cannot resolve missing").message shouldBe
-          "Module selector missing resolves to no module: Cannot resolve missing"
+        TestCommandFailure
+          .ModuleSelectorsWithNoTestModule(Seq(ModuleSelectorFailure.Unresolved(ModuleSelectorArgument("missing"), "Cannot resolve missing")))
+          .message shouldBe "Module selector missing resolves to no module: Cannot resolve missing"
       }
     }
 
-    "the module's inputs are not evaluated" should {
-      "be Mill's error" in {
-        TestCommandFailure.ModuleInputsNotEvaluated("compile failed").message shouldBe "compile failed"
+    "several module selectors resolve to no test module" should {
+      "name each selector, on its own line, in the order given" in {
+        TestCommandFailure
+          .ModuleSelectorsWithNoTestModule(
+            Seq(
+              ModuleSelectorFailure.NoTestModule(ModuleSelectorArgument("util")),
+              ModuleSelectorFailure.Unresolved(ModuleSelectorArgument("missing"), "Cannot resolve missing"),
+              ModuleSelectorFailure.NoTestModule(ModuleSelectorArgument("core"))
+            )
+          )
+          .message shouldBe
+          Seq(
+            "Module selector util resolves to no test module",
+            "Module selector missing resolves to no module: Cannot resolve missing",
+            "Module selector core resolves to no test module"
+          ).mkString("\n")
       }
     }
 
-    "the module's ScalaTest arguments hold an unrecognised argument" should {
-      "name the argument" in {
-        TestCommandFailure.UnrecognisedModuleArgument("-x").message shouldBe
-          "The module's ScalaTest arguments hold -x, which ScalaTest does not recognise"
+    "the test command cannot run selected test modules" should {
+      "name each module, on its own line, with why the test command cannot run it" in {
+        TestCommandFailure
+          .CannotRunModules(
+            Seq(
+              CannotRunReason.NotJvm(ModuleName("js.test")),
+              CannotRunReason.WithoutThisRelease(ModuleName("munit.test")),
+              CannotRunReason.UnrecognisedArguments(
+                ModuleName("args.test"),
+                Seq(ScalaTestArgument.Unrecognised("-x"), ScalaTestArgument.Unrecognised("--not-a-scalatest-argument"))
+              )
+            ),
+            Seq.empty
+          )
+          .message shouldBe
+          Seq(
+            "The test command cannot run these selected test modules:",
+            "  js.test is a Scala.js or Native test module",
+            s"  munit.test does not depend on com.edc:scalatest-core_3 at ${Consolidation.scalaTestVersion}, " +
+              "the release of this fork that the Mill plugin belongs to",
+            "  args.test's testArgsDefault holds -x and --not-a-scalatest-argument, which ScalaTest does not recognise"
+          ).mkString("\n")
+      }
+
+      "also name, after them, each module whose tests cannot start, with each line of its failure beneath it" in {
+        TestCommandFailure
+          .CannotRunModules(
+            Seq(CannotRunReason.NotJvm(ModuleName("js.test"))),
+            Seq(
+              FailedModuleCheck(ModuleName("broken.test"), "Resolution failed for 1 modules:\n  com.example:absent_3:0.0.1 not found"),
+              FailedModuleCheck(ModuleName("unread.test"), "unread.test.testArgsDefault testArgsDefault fails")
+            )
+          )
+          .message shouldBe
+          Seq(
+            "The test command cannot run these selected test modules:",
+            "  js.test is a Scala.js or Native test module",
+            "The tests of these selected test modules cannot start:",
+            "  broken.test:",
+            "    Resolution failed for 1 modules:",
+            "      com.example:absent_3:0.0.1 not found",
+            "  unread.test:",
+            "    unread.test.testArgsDefault testArgsDefault fails"
+          ).mkString("\n")
+      }
+    }
+
+    "the tests of selected modules failed" should {
+      "name the one module that failed" in {
+        TestCommandFailure.ModulesFailed(Seq(ModuleName("broken.test"))).message shouldBe "The tests of broken.test failed"
+      }
+
+      "name each module that failed" in {
+        TestCommandFailure.ModulesFailed(Seq(ModuleName("alpha.test"), ModuleName("broken.test"), ModuleName("core.test"))).message shouldBe
+          "The tests of alpha.test, broken.test and core.test failed"
       }
     }
 

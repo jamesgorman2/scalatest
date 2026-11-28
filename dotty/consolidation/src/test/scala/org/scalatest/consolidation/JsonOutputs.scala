@@ -33,7 +33,19 @@ private[consolidation] trait JsonOutputs { this: Assertions & ConsolidatedRuns =
 
     def root: JsonValue = JsonReader.read(text)
 
+    /** The root, failing where the JSON output does not validate against the Mill plugin's JSON schema. */
+    def schemaValidRoot: JsonValue = {
+      val violations = MillPluginDocuments.schemaViolationsOf(text)
+      if (violations.nonEmpty) {
+        fail(s"the JSON output does not validate against consolidated.schema.json: ${violations.mkString("; ")}\n$text")
+      }
+      root
+    }
+
     def module: JsonValue = root("contents").only
+
+    def schemaValidModule(name: ModuleName): JsonValue =
+      schemaValidRoot("contents").items.find(_("name") == JsonValue.Text(name.value)).getOrElse(fail(s"expected the module ${name.value}"))
 
     def runNode: JsonValue = module("contents").only
 

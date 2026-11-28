@@ -11,13 +11,14 @@ import mill.util.TokenReaders.millEvaluatorTokenReader
 object TestCommandModule extends ExternalModule {
 
   /**
-   * Runs one JVM test module's tests and writes their human-readable output to stdout and, where `-fJ` is given, their
-   * JSON output to a file.
+   * Runs the tests of every JVM test module the module selectors resolve to, each once, and writes their human-readable
+   * output to stdout and, where `-fJ` is given, their JSON output to a file.
    *
-   * @param arguments the module selector and, in any order, optionally `-oH` or, to write nothing to stdout, a bare
-   *   `-o`, and optionally `-fJ` and the JSON output file's path; a relative path resolves against the workspace root.
-   *   Optionally `--` follows, then the arguments `mill <module>.testOnly` takes: class globs and, after a second `--`,
-   *   framework arguments, as in `core.test -fJ report.json -- samples.Alpha* -- -n samples.Fast`. A framework
+   * @param arguments one or more module selectors and, in any order among them, optionally `-oH` or, to write nothing
+   *   to stdout, a bare `-o`, and optionally `-fJ` and the JSON output file's path; a relative path resolves against
+   *   the workspace root. Optionally `--` follows, then the arguments `mill <module>.testOnly` takes: class globs and,
+   *   after a second `--`, framework arguments, as in `core.test util.test -fJ report.json -- samples.Alpha* -- -n
+   *   samples.Fast`. The class globs and framework arguments apply alike to every selected module. A framework
    *   argument is ScalaTest's `-D`, `-n`, `-l`, `-P`, `-m`, `-w`, `-F`, `-T`, `-t`, `-z`, `-S` or `-W` with its
    *   values. The command fails on any other framework argument, and on any of these flags given before the first `--`,
    *   or anywhere if no `--` is given.

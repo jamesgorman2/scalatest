@@ -2,7 +2,6 @@ package org.scalatest.consolidation
 
 import java.time.Instant
 import org.scalactic.source.Position
-import org.scalatest.ScalaTestVersions
 import org.scalatest.events.CapturedStream
 import org.scalatest.events.DecodedEvent
 import org.scalatest.events.DecodedStackDepth
@@ -93,7 +92,7 @@ final class JsonOutputWriterSpec extends AnyWordSpec with should.Matchers with C
         consolidation.end(Some(Instant.ofEpochMilli(1600L)))
         json.root shouldBe objectOf(
           "kind" -> text("root"),
-          "scalaTestVersion" -> text(ScalaTestVersions.ScalaTestVersion),
+          "scalaTestVersion" -> text(Consolidation.scalaTestVersion),
           "buildTool" -> objectOf("name" -> text("Mill"), "version" -> text("1.3.1")),
           "moduleSelectors" -> arrayOf(
             objectOf("selector" -> text("__.test"), "modules" -> arrayOf(text("app.test"), text("core.test"))),
@@ -130,6 +129,16 @@ final class JsonOutputWriterSpec extends AnyWordSpec with should.Matchers with C
     "given no failure and no output" should {
       "have no outcome, failures or output" in {
         jsonOutputOfRun(completedRun).root.keys should contain noneOf ("outcome", "failures", "output")
+      }
+    }
+
+    "given no failure or output, though a module was given both" should {
+      "have no outcome, failures or output" in {
+        val json = jsonOutputAfter { consolidation =>
+          consolidation.addModuleFailure(module, "the module's tests did not start")
+          consolidation.addModuleOutput(module, CapturedLine.Stdout("loading samples.Noisy\n"))
+        }
+        json.schemaValidRoot.keys should contain noneOf ("outcome", "failures", "output")
       }
     }
 
@@ -199,6 +208,72 @@ final class JsonOutputWriterSpec extends AnyWordSpec with should.Matchers with C
         }
         json.module("contents").items.map(_("number")) shouldBe Vector(integer(1L), integer(2L))
       }
+    }
+
+    "given failures and output, interleaved, with its times and a run" should {
+      "hold its outcome, failures, times, run node and output in that order, with failures and lines in the order attached" in {
+        val json = jsonOutputAfter { consolidation =>
+          consolidation.timeModule(module, Some(Instant.ofEpochMilli(2000L)), Some(Instant.ofEpochMilli(2750L)))
+          consolidation.addModuleFailure(module, "first failure")
+          consolidation.addModuleOutput(module, CapturedLine.Stdout("loading samples.Noisy\n"))
+          consolidation.addModuleOutput(module, CapturedLine.Stderr("warn: slow discovery\r\n"))
+          consolidation.addModuleFailure(module, "Test selector does not match any test: samples.*\nRun discoveredTestClasses to see available tests")
+          consolidation.addRunOf(TestRunPart.Events(completedRunOf()))
+        }
+        json.schemaValidModule(module) shouldBe objectOf(
+          "kind" -> text("module"),
+          "name" -> text("core.test"),
+          "outcome" -> text("aborted"),
+          "failures" -> arrayOf(
+            objectOf("message" -> text("first failure")),
+            objectOf("message" -> text("Test selector does not match any test: samples.*\nRun discoveredTestClasses to see available tests"))
+          ),
+          "startedAt" -> integer(2000L),
+          "endedAt" -> integer(2750L),
+          "duration" -> integer(750L),
+          "contents" -> arrayOf(objectOf("kind" -> text("run"), "number" -> integer(1L), "contents" -> arrayOf())),
+          "output" -> arrayOf(
+            objectOf("kind" -> text("stdio"), "stream" -> text("stdout"), "text" -> text("loading samples.Noisy\n")),
+            objectOf("kind" -> text("stdio"), "stream" -> text("stderr"), "text" -> text("warn: slow discovery\r\n"))
+          )
+        )
+      }
+    }
+
+    "given only output" should {
+      "hold its output, with no outcome and no failures" in {
+        val json = jsonOutputAfter(_.addModuleOutput(module, CapturedLine.Stdout("loading samples.Noisy\n")))
+        json.schemaValidModule(module).keys shouldBe Vector("kind", "name", "contents", "output")
+      }
+    }
+
+    "given a failure but no run" should {
+      "be written with no run node, among the modules in ascending order by name, though it was given its failure last" in {
+        val json = jsonOutputAfter { consolidation =>
+          Vector("d.test", "b.test").foreach(name => consolidation.addRun(ModuleName(name))(_.addAll(completedRun)))
+          consolidation.addModuleFailure(ModuleName("c.test"), "c.test.compile failed")
+        }
+        json.schemaValidRoot("contents").items.map(_("name")) shouldBe Vector(text("b.test"), text("c.test"), text("d.test"))
+        val broken = json.schemaValidModule(ModuleName("c.test"))
+        (broken("contents"), broken("outcome"), broken("failures")) shouldBe
+          ((arrayOf(), text("aborted"), arrayOf(objectOf("message" -> text("c.test.compile failed")))))
+      }
+    }
+
+    "given a failure but no run, and another module given no failure" should {
+      "give the other module no outcome, failures or output" in {
+        val json = jsonOutputAfter { consolidation =>
+          consolidation.addRunOf(completedRun)
+          consolidation.addModuleFailure(ModuleName("broken.test"), "broken.test.compile failed")
+        }
+        json.schemaValidModule(module).keys should contain noneOf ("outcome", "failures", "output")
+      }
+    }
+  }
+
+  "The ScalaTest version the library gives" should {
+    "be the one the JSON output's root writes as its scalaTestVersion" in {
+      jsonOutputOfRun(completedRun).schemaValidRoot("scalaTestVersion") shouldBe text(Consolidation.scalaTestVersion)
     }
   }
 

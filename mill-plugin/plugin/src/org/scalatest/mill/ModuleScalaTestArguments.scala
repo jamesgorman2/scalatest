@@ -4,12 +4,12 @@ import org.scalatest.consolidation.ScalaTestArgument
 
 private[mill] object ModuleScalaTestArguments {
 
-  def kept(moduleArguments: Seq[String]): Either[TestCommandFailure, Seq[ScalaTestArgument.Flagged]] = {
+  def kept(moduleArguments: Seq[String]): Either[Seq[ScalaTestArgument.Unrecognised], Seq[ScalaTestArgument.Flagged]] = {
     val split = ScalaTestArgument.split(moduleArguments)
-    split.collectFirst { case ScalaTestArgument.Unrecognised(argument) => argument } match {
-      case Some(argument) => Left(TestCommandFailure.UnrecognisedModuleArgument(argument))
-      case None =>
-        Right(split.collect { case flagged: ScalaTestArgument.Flagged if AllowedFlag.from(flagged).isDefined => flagged })
-    }
+    val unrecognised = split.collect { case argument: ScalaTestArgument.Unrecognised => argument }
+    if (unrecognised.nonEmpty)
+      Left(unrecognised)
+    else
+      Right(split.collect { case flagged: ScalaTestArgument.Flagged if AllowedFlag.from(flagged).isDefined => flagged })
   }
 }

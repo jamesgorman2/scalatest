@@ -1,7 +1,9 @@
 package org.scalatest.mill
 
 import java.io.IOException
+import java.nio.charset.StandardCharsets
 import java.nio.file.Files
+import java.util.concurrent.CountDownLatch
 import org.scalatest.consolidation.Consolidation
 import org.scalatest.consolidation.ConsolidationState
 import org.scalatest.consolidation.ForkGroup
@@ -38,16 +40,15 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
     consolidationUnderTest
   }
 
-  private def outputOf(consolidate: Consolidation => Unit): Seq[String] =
-    consolidationEndedAfter(consolidate).output
-
   "Handling the outcome of laying out a module's workers" when {
     "two fork groups would share a processFolder" should {
       val sharing = ForkGroupsShareProcessFolders(Seq(SharedProcessFolder(Seq(ForkGroup.at(0), ForkGroup.at(1)), PathUnderModule("samples.A1"))))
 
-      "attach the groups and the folder to the root, naming the module" in {
-        outputOf(consolidation => JvmTestModuleRun.launcherOrReportFailure(consolidation, module, Left(sharing))) should contain(
-          "    Laying out the workers of core.test failed: fork groups 0 and 1 share the processFolder samples.A1"
+      "attach the groups and the folder to the module, without naming the module" in {
+        consolidationEndedAfter(consolidation => JvmTestModuleRun.launcherOrReportFailure(consolidation, module, Left(sharing))).outputWithoutSummaryLine shouldBe Seq(
+          "[core.test]",
+          "  *** MODULE ABORTED ***",
+          "    Laying out the workers failed: fork groups 0 and 1 share the processFolder samples.A1"
         )
       }
 
@@ -58,10 +59,12 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
     }
 
     "checking whether the filesystem ignores case fails" should {
-      "attach why the check failed to the root, naming the module" in {
+      "attach why the check failed to the module, without naming the module" in {
         val notChecked = FilesystemCaseNotChecked(new IOException("disk full"))
-        outputOf(consolidation => JvmTestModuleRun.launcherOrReportFailure(consolidation, module, Left(notChecked))) should contain(
-          "    Laying out the workers of core.test failed: checking whether the filesystem ignores case failed: java.io.IOException: disk full"
+        consolidationEndedAfter(consolidation => JvmTestModuleRun.launcherOrReportFailure(consolidation, module, Left(notChecked))).outputWithoutSummaryLine shouldBe Seq(
+          "[core.test]",
+          "  *** MODULE ABORTED ***",
+          "    Laying out the workers failed: checking whether the filesystem ignores case failed: java.io.IOException: disk full"
         )
       }
     }
@@ -69,15 +72,14 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
     "the class globs keep no class" should {
       val noClassKept = ClassGlobsKeepNoTestClass(Seq(ClassGlob("samples.Gamma*"), ClassGlob("samples.Fast")))
 
-      "attach to the root the failure Mill's testOnly fails with, unprefixed, and show the module with no run" in {
+      "attach to the module the failure Mill's testOnly fails with, unprefixed, and show the module with no run" in {
         val consolidationUnderTest = new ConsolidationUnderTest
         val consolidation = consolidationUnderTest.consolidation
         JvmTestModuleRun.launcherOrReportFailure(consolidation, module, Left(noClassKept))
         consolidation.end()
         consolidationUnderTest.outputWithoutSummaryLine shouldBe Seq(
-          "Consolidated tests:",
-          "  [core.test]",
-          "  *** CONSOLIDATED TESTS ABORTED ***",
+          "[core.test]",
+          "  *** MODULE ABORTED ***",
           "    Test selector does not match any test: samples.Gamma* samples.Fast",
           "    Run discoveredTestClasses to see available tests"
         )
@@ -86,7 +88,7 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
     }
 
     "the workers are laid out" should {
-      "give the launcher, attaching nothing to the root" in {
+      "give the launcher, attaching nothing to the module" in {
         val consolidation = Consolidation.start(_ => (), coloured = false)
         JvmTestModuleRun.launcherOrReportFailure(consolidation, module, Right("launcher")) shouldBe Some("launcher")
         consolidation.end()
@@ -136,12 +138,11 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
       "the JVM of a worker of it ended without writing its result after its run completed" -> Seq(EndedWithResult, EndedWithoutResult)
     ).foreach { case (howTheWorkersEnded, workerEndings) =>
       s"class globs are given, every fork group of the module was laid out, $howTheWorkersEnded, and no run of the module reported a test result" should {
-        "attach to the root the failure Mill's testOnly fails with, unprefixed, and fail the consolidation" in {
+        "attach to the module the failure Mill's testOnly fails with, unprefixed, and fail the consolidation" in {
           val consolidationUnderTest = consolidationEndedAfterReportingNoTestResult(addCompletedRunWithNoSuite, everyForkGroupLaidOut = true, workerEndings)
           consolidationUnderTest.outputWithoutSummaryLine shouldBe Seq(
-            "Consolidated tests:",
-            "  [core.test]",
-            "  *** CONSOLIDATED TESTS ABORTED ***",
+            "[core.test]",
+            "  *** MODULE ABORTED ***",
             "    Test selector does not match any test: samples.Alpha1 samples.Beta*",
             "    Run discoveredTestClasses to see available tests"
           )
@@ -151,7 +152,7 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
     }
 
     "class globs are given, every fork group of the module was laid out, every worker of it wrote its result, a run of the module did not finish, and no run of the module reported a test result" should {
-      "attach to the root the failure Mill's testOnly fails with" in {
+      "attach to the module the failure Mill's testOnly fails with" in {
         val consolidationUnderTest =
           consolidationEndedAfterReportingNoTestResult(addUnfinishedRunWithNoSuite, everyForkGroupLaidOut = true, Seq(EndedWithResult, EndedWithResult))
         consolidationUnderTest.output should contain("    Test selector does not match any test: samples.Alpha1 samples.Beta*")
@@ -159,41 +160,133 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
     }
 
     "class globs are given, a fork group of the module failed to lay out and no run of the module reported a test result" should {
-      "attach nothing to the root" in {
+      "attach nothing to the module" in {
         val consolidationUnderTest = consolidationEndedAfterReportingNoTestResult(addCompletedRunWithNoSuite, everyForkGroupLaidOut = false, Seq(EndedWithResult))
         consolidationUnderTest.outputWithoutSummaryLine shouldBe Seq("[core.test]")
       }
     }
 
     "class globs are given, a worker of the module failed to start or run and no run of the module reported a test result" should {
-      "attach nothing to the root" in {
+      "attach nothing to the module" in {
         val consolidationUnderTest = consolidationEndedAfterReportingNoTestResult(addCompletedRunWithNoSuite, everyForkGroupLaidOut = true, Seq(EndedWithResult, Failed))
         consolidationUnderTest.outputWithoutSummaryLine shouldBe Seq("[core.test]")
       }
     }
 
     "class globs are given, the JVM of a worker of the module ended without writing its result before its run finished, and no run of the module reported a test result" should {
-      "attach nothing to the root" in {
+      "not attach the failure Mill's testOnly fails with" in {
         val consolidationUnderTest =
           consolidationEndedAfterReportingNoTestResult(addUnfinishedRunWithNoSuite, everyForkGroupLaidOut = true, Seq(EndedWithResult, EndedWithoutResult))
         consolidationUnderTest.output.filter(_.contains("Test selector does not match any test")) shouldBe empty
       }
     }
 
+    "class globs are given, the JVM of a worker of the module ended without writing its result before any run existed in it, and no run of the module reported a test result" should {
+      "not attach the failure Mill's testOnly fails with" in {
+        val consolidationUnderTest =
+          consolidationEndedAfterReportingNoTestResult(_.addProcessEndedBeforeAnyRun(module), everyForkGroupLaidOut = true, Seq(EndedWithoutResult))
+        consolidationUnderTest.output.filter(_.contains("Test selector does not match any test")) shouldBe empty
+      }
+    }
+
+    "class globs are given, only another module has ended abnormally, the JVM of a worker of the module ended without writing its result after its run completed, and no run of the module reported a test result" should {
+      "attach to the module the failure Mill's testOnly fails with" in {
+        val consolidationUnderTest = consolidationEndedAfterReportingNoTestResult(
+          consolidation => {
+            consolidation.addModuleFailure(ModuleName("other.test"), "other.test.compile failed")
+            addCompletedRunWithNoSuite(consolidation)
+          },
+          everyForkGroupLaidOut = true,
+          Seq(EndedWithResult, EndedWithoutResult)
+        )
+        consolidationUnderTest.outputWithoutSummaryLine shouldBe Seq(
+          "[core.test]",
+          "  *** MODULE ABORTED ***",
+          "    Test selector does not match any test: samples.Alpha1 samples.Beta*",
+          "    Run discoveredTestClasses to see available tests",
+          "[other.test]",
+          "  *** MODULE ABORTED ***",
+          "    other.test.compile failed"
+        )
+      }
+    }
+
     "class globs are given and a run of the module reported a suite as aborted" should {
-      "attach nothing to the root" in {
+      "not attach the failure Mill's testOnly fails with" in {
         val consolidationUnderTest = consolidationEndedAfterReportingNoTestResult(addRunWithAbortedSuite, everyForkGroupLaidOut = true, Seq(EndedWithResult))
         consolidationUnderTest.output.filter(_.contains("Test selector does not match any test")) shouldBe empty
       }
     }
 
     "no class glob is given and no run of the module reported a test result" should {
-      "attach nothing to the root, leaving the consolidation unfailed" in {
+      "attach nothing to the module, leaving the consolidation unfailed" in {
         val consolidation = Consolidation.start(_ => (), coloured = false)
         addCompletedRunWithNoSuite(consolidation)
         JvmTestModuleRun.reportNoTestResultForClassGlobs(consolidation, module, Nil, everyForkGroupLaidOut = true, Seq(EndedWithResult))
         consolidation.end()
         consolidation.state shouldBe ConsolidationState.Ended
+      }
+    }
+  }
+
+  "Capturing what a module's test discovery writes" when {
+    "discovery writes lines to Console and to the streams it is given" should {
+      "attach each line to the module, tagged with its stream, in the order written" in {
+        consolidationEndedAfter { consolidation =>
+          JvmTestModuleRun.attachingDiscoveryOutput(consolidation, module, StandardCharsets.UTF_8) { (stdout, stderr) =>
+            Console.out.println("loading samples.Noisy")
+            stderr.println("warn: slow discovery")
+            stdout.print("last line")
+          }
+        }.outputWithoutSummaryLine shouldBe Seq(
+          "[core.test]",
+          "  [stdout] loading samples.Noisy",
+          "  [stderr] warn: slow discovery",
+          "  [stdout] last line"
+        )
+      }
+
+      "give what discovery returns" in {
+        val consolidation = Consolidation.start(_ => (), coloured = false)
+        JvmTestModuleRun.attachingDiscoveryOutput(consolidation, module, StandardCharsets.UTF_8)((_, _) => Set("samples.Noisy")) shouldBe Set("samples.Noisy")
+      }
+    }
+
+    "discovery throws after writing a line" should {
+      "attach that line to the module and rethrow what discovery threw" in {
+        val consolidationUnderTest = new ConsolidationUnderTest
+        val consolidation = consolidationUnderTest.consolidation
+        val thrown = the[ExceptionInInitializerError] thrownBy {
+          JvmTestModuleRun.attachingDiscoveryOutput(consolidation, module, StandardCharsets.UTF_8) { (_, _) =>
+            Console.out.println("loading samples.Noisy")
+            throw new ExceptionInInitializerError("samples.Noisy failed to initialize")
+          }
+        }
+        consolidation.end()
+        (thrown.getMessage, consolidationUnderTest.outputWithoutSummaryLine) shouldBe
+          (("samples.Noisy failed to initialize", Seq("[core.test]", "  [stdout] loading samples.Noisy")))
+      }
+    }
+
+    "a thread that discovery started writes after discovery returns" should {
+      "attach nothing that thread writes to the module" in {
+        val consolidationUnderTest = new ConsolidationUnderTest
+        val consolidation = consolidationUnderTest.consolidation
+        val discoveryReturned = new CountDownLatch(1)
+        val lateWriter = JvmTestModuleRun.attachingDiscoveryOutput(consolidation, module, StandardCharsets.UTF_8) { (_, _) =>
+          Console.out.println("during discovery")
+          val writer = new Thread(() => {
+            discoveryReturned.await()
+            Console.out.println("after discovery")
+            Console.err.println("after discovery")
+          })
+          writer.start()
+          writer
+        }
+        discoveryReturned.countDown()
+        lateWriter.join()
+        consolidation.end()
+        consolidationUnderTest.outputWithoutSummaryLine shouldBe Seq("[core.test]", "  [stdout] during discovery")
       }
     }
   }
@@ -225,15 +318,15 @@ final class JvmTestModuleRunSpec extends AnyWordSpec with should.Matchers {
 
   "Laying out a module's fork groups" when {
     "laying out the first of two fork groups throws" should {
-      "attach what it threw to the root, naming the first fork group, and fail the consolidation" in {
+      "attach what it threw to the module, naming the first fork group, and fail the consolidation" in {
         val consolidationUnderTest = new ConsolidationUnderTest
         val consolidation = consolidationUnderTest.consolidation
         JvmTestModuleRun.layOutForkGroups(consolidation, module, Seq(forkGroupAt(0), forkGroupAt(1)))(layOutAllButTheFirst)
         consolidation.end()
         consolidationUnderTest.outputWithoutSummaryLine shouldBe Seq(
-          "Consolidated tests:",
-          "  *** CONSOLIDATED TESTS ABORTED ***",
-          "    Laying out fork group 0 of core.test failed: java.lang.IllegalStateException: disk full"
+          "[core.test]",
+          "  *** MODULE ABORTED ***",
+          "    Laying out fork group 0 failed: java.lang.IllegalStateException: disk full"
         )
         consolidation.state shouldBe ConsolidationState.EndedFailed
       }

@@ -3,7 +3,9 @@ package org.scalatest.mill
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
+import org.scalatest.mill.tags.MillCoexistence
 
+@MillCoexistence
 final class MillBspServerSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with FixtureBuilds {
 
   private val answeredRequests: Seq[(String, String)] = Seq(

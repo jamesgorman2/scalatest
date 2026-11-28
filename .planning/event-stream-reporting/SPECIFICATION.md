@@ -105,7 +105,8 @@ A throwable is compared on its class, its message and its chain of causes, and, 
 - R-097b All output is attached to the most specific identifiable node.
 - R-043 All captured output keeps its order within a node, whatever its source.
 - R-076 Output captured from a forked execution, before any Runner is constructed, is associated with the most specific node that can be identified.
-- R-072 The execution of a runner that is not intended to produce test output, such as Mill's discovery runner, does not create nodes. Its failure state and output is attached to the root node.
+- R-072a A runner that is not a run, such as Mill's discovery runner, creates no node.
+- R-072b An error that no run, suite, scope or test records is attached to the node of the one selected test module it can be attributed to, such as the module whose discovery runner failed. Such an error that cannot be attributed to one selected test module is attached to the root.
 - R-136 The node tree is constructed from the consolidated test command's execution, each process's assigned test classes, and the events emitted by all Runners
 
 ### Outcomes and durations
@@ -114,8 +115,8 @@ A throwable is compared on its class, its message and its chain of causes, and, 
 - R-098b A scope has an outcome only when that execution is pending or aborted.
 - R-098c An execution of a suite has an outcome only when that execution is aborted. 
 - R-098d A run has an outcome only when the run is aborted or stopped. 
-- R-098e A module has an outcome only when the module has an error. 
-- R-098f A root has an outcome only when the consolidated test command has an error. 
+- R-098e A module has an outcome only when an error is attached to it.
+- R-098f The root has an outcome only when an error is attached to it.
 - R-095a Any suite scheduled to be run, or any suite, scope or test that is recorded in a structure event, and has no subsequent test events is reported as aborted with reason *not run*.
 - R-095b Any node recorded with a start event but no end event is reported as aborted.
 - R-103 A node's duration is measured from that node's own start and end, and a node whose start or end was not measured has no duration.

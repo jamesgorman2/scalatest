@@ -1,11 +1,14 @@
 package org.scalatest.mill
 
 import java.io.IOException
+import java.io.PrintStream
 import java.nio.charset.Charset
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
+import mill.api.Logger
 import mill.api.Result
+import mill.api.SystemStreams
 import mill.api.TaskCtx
 import mill.javalib.TestModuleUtil
 import mill.javalib.api.internal.ZincOp
@@ -30,7 +33,8 @@ private[mill] final class JvmTestModuleRun(
     runArguments: RunArguments,
     classGlobs: Seq[ClassGlob],
     moduleFolder: os.Path,
-    commandCtx: TaskCtx,
+    taskCtx: TaskCtx,
+    workerLog: Logger,
     now: () => Instant,
     workerCharset: Charset,
     eventLogFileAt: Path => EventLogFile,
@@ -39,17 +43,16 @@ private[mill] final class JvmTestModuleRun(
     filesystemIgnoresCase: Path => Either[FilesystemCaseNotChecked, Boolean]
 ) {
 
-  // The test command places every worker path in the module folder itself. `dest` points there too, so anything Mill
-  // derives from `Task.dest` also lands there. In Mill 1.3.1 only test discovery reads `dest`, and it writes nothing
-  // there, so no test can show whether `dest` is the module folder or the command's own.
-  private val ctx: TaskCtx = new ModuleFolderTaskCtx(commandCtx, moduleFolder)
+  // An anonymous task's context has no `dest`, and in Mill 1.3.1 test discovery reads `dest`. This context gives
+  // discovery the module folder, where the test command places every worker path, as its `dest`.
+  private val ctx: TaskCtx = new ModuleFolderTaskCtx(taskCtx, moduleFolder)
 
   private val forkGroups: Seq[Seq[TestClassName]] = inputs.forkGroups.map(_.map(TestClassName(_)))
 
   def execute(consolidation: Consolidation): Unit =
-    JvmTestModuleRun.launcherOrReportFailure(consolidation, module, layOutWorkers()).foreach(launcher => runWorkers(consolidation, launcher))
+    JvmTestModuleRun.launcherOrReportFailure(consolidation, module, layOutWorkers(consolidation)).foreach(launcher => runWorkers(consolidation, launcher))
 
-  private def layOutWorkers(): Either[WorkerLayoutFailure, WorkerLauncher] = {
+  private def layOutWorkers(consolidation: Consolidation): Either[WorkerLayoutFailure, WorkerLauncher] = {
     val moduleFolderIgnoresCase = () => filesystemIgnoresCase(moduleFolder.toNIO)
     // As Mill 1.3.1 does, batch workers run, without discovery, the classes in each fork group's `testForkGrouping` list
     // that the class globs match.
@@ -57,7 +60,7 @@ private[mill] final class JvmTestModuleRun(
       WorkerLayout.ofBatches(forkGroups, classGlobs, moduleFolderIgnoresCase).map(new BatchLauncher(_))
     else
       WorkerLayout
-        .ofQueue(forkGroups, discoveredTestClasses(), classGlobs, inputs.testParallelism, ctx.jobs, moduleFolderIgnoresCase)
+        .ofQueue(forkGroups, discoveredTestClasses(consolidation), classGlobs, inputs.testParallelism, ctx.jobs, moduleFolderIgnoresCase)
         .map(new QueueLauncher(_))
   }
 
@@ -79,21 +82,30 @@ private[mill] final class JvmTestModuleRun(
     )
   }
 
-  private def discoveredTestClasses(): Set[TestClassName] =
-    inputs.jvmWorker
-      .apply(
-        ZincOp.GetTestTasks(
-          (inputs.runClasspath ++ inputs.testrunnerEntrypointClasspath).map(_.path),
-          inputs.testClasspath.map(_.path),
-          inputs.testFramework,
-          classGlobs.map(_.text),
-          runArguments.commandLine,
-          inputs.discoveredClasses
-        ),
-        javaHome = inputs.javaHome
-      )(using ctx)
-      .map(TestClassName(_))
-      .toSet
+  private def discoveredTestClasses(consolidation: Consolidation): Set[TestClassName] =
+    // Without `javaHome`, discovery runs on this thread, and its writes reach `SystemStreams.current` through Mill's
+    // process-wide `System.out` and `System.err`. `SystemStreamsUtils.withStreams` would also bind `os.Inherit`, and so
+    // send the stderr of a JVM worker subprocess that discovery starts into the capture for the rest of the
+    // subprocess's life. With or without `javaHome`, Mill's JVM encodes each of discovery's writes with its default
+    // charset, so the capture decodes with it too.
+    JvmTestModuleRun.attachingDiscoveryOutput(consolidation, module, Charset.defaultCharset()) { (stdout, stderr) =>
+      SystemStreams.current.withValue(new SystemStreams(stdout, stderr, SystemStreams.current.value.in)) {
+        inputs.jvmWorker
+          .apply(
+            ZincOp.GetTestTasks(
+              (inputs.runClasspath ++ inputs.testrunnerEntrypointClasspath).map(_.path),
+              inputs.testClasspath.map(_.path),
+              inputs.testFramework,
+              classGlobs.map(_.text),
+              runArguments.commandLine,
+              inputs.discoveredClasses
+            ),
+            javaHome = inputs.javaHome
+          )(using ctx)
+          .map(TestClassName(_))
+          .toSet
+      }
+    }
 
   private def resultLog(groupFolder: os.Path): os.Path = groupFolder / "result.log"
 
@@ -111,7 +123,7 @@ private[mill] final class JvmTestModuleRun(
       runWorker: (WorkerTaskCtx, TestModuleUtil) => Future[WorkerProcess]
   ): WorkerRun = {
     val eventLogFile = inModuleFolder(plannedWorker.processFolder) / JvmTestModuleRun.eventLogFileName
-    val capture = new WorkerOutputCapture(workerCharset)
+    val capture = new OutputCapture(workerCharset)
     val reader = new EventLogReader(
       eventLogFileAt(eventLogFile.toNIO),
       readRun =>
@@ -119,13 +131,13 @@ private[mill] final class JvmTestModuleRun(
           capture.addTo(feed.add)
           readRun(feed)
         },
-      () => consolidation.addProcessEndedBeforeAnyRun(),
+      () => consolidation.addProcessEndedBeforeAnyRun(module),
       processHasExited,
       eventLogPollInterval
     )
-    val workerRun = new WorkerRun(consolidation, plannedWorker.describedIn(module), reader, capture)
+    val workerRun = new WorkerRun(consolidation, module, plannedWorker.description, reader, capture)
     workerRun.start { workerStarting =>
-      val workerCtx = new WorkerTaskCtx(ctx, capture, workerStarting)
+      val workerCtx = new WorkerTaskCtx(ctx, workerLog, capture, workerStarting)
       runWorker(workerCtx, inputs.testModuleUtil(runArguments.commandLine ++ RunnerArgument.forEventLogFile(eventLogFile.toNIO), workerCtx))
     }
     workerRun
@@ -249,6 +261,25 @@ private[mill] object JvmTestModuleRun {
       case failure: IOException => Left(new FilesystemCaseNotChecked(failure))
     }
 
+  def attachingDiscoveryOutput[T](consolidation: Consolidation, module: ModuleName, charset: Charset)(
+      discover: (PrintStream, PrintStream) => T
+  ): T = {
+    val capture = new OutputCapture(charset)
+    val stdout = capture.stdoutPrintStream()
+    val stderr = capture.stderrPrintStream()
+    try {
+      // With `javaHome`, discovery runs in a JVM worker subprocess, which forwards its writes to this thread's `Console`.
+      Console.withOut(stdout) {
+        Console.withErr(stderr) {
+          discover(stdout, stderr)
+        }
+      }
+    } finally {
+      // A thread that discovery started inherits these streams, and may write after discovery has returned or thrown.
+      capture.stopAndTakeLines().foreach(line => consolidation.addModuleOutput(module, line))
+    }
+  }
+
   def launcherOrReportFailure[Launcher](
       consolidation: Consolidation,
       module: ModuleName,
@@ -256,7 +287,7 @@ private[mill] object JvmTestModuleRun {
   ): Option[Launcher] =
     outcomeOfLayingOut.fold(
       failure => {
-        consolidation.addRootFailure(failure.rootMessage(module))
+        consolidation.addModuleFailure(module, failure.moduleMessage)
         consolidation.timeModule(module, None, None)
         None
       },
@@ -270,18 +301,18 @@ private[mill] object JvmTestModuleRun {
       everyForkGroupLaidOut: Boolean,
       workerEndings: Seq[WorkerRun.Ending]
   ): Unit = {
-    // Fails the test command as Mill 1.3.1's `testOnly` fails the module where its class globs gave no test result once
-    // the workers ended. The consolidation, not the result Mill gives for each worker, tells whether a test result
-    // reached it. Mill skips this check where a fork group failed to lay out, a worker failed to start or run, or a
-    // worker's JVM ended without writing its result. Unlike Mill, the test command skips it for such a JVM only where
-    // the test command already fails. A JVM that dies after its run ended leaves no aborted run or class, so the test
-    // command could otherwise pass where Mill's fails.
+    // Fails the module as Mill 1.3.1's `testOnly` does where its class globs gave no test result once the workers
+    // ended. The consolidation, not the result Mill gives for each worker, tells whether a test result reached it.
+    // Mill skips this check where a fork group failed to lay out, a worker failed to start or run, or a worker's JVM
+    // ended without writing its result. Unlike Mill, the test command skips it for such a JVM only where the module
+    // has already ended abnormally. A JVM that dies after its run ended leaves no aborted run or class, so the module
+    // could otherwise pass where Mill's fails.
     val missingTestResultExplained =
       !everyForkGroupLaidOut ||
         workerEndings.contains(WorkerRun.Ending.Failed) ||
-        (workerEndings.contains(WorkerRun.Ending.EndedWithoutResult) && consolidation.state.failed)
+        (workerEndings.contains(WorkerRun.Ending.EndedWithoutResult) && consolidation.hasEndedAbnormally(module))
     if (classGlobs.nonEmpty && !missingTestResultExplained && !consolidation.hasTestResult(module)) {
-      consolidation.addRootFailure(ClassGlob.noTestMatchedMessage(classGlobs))
+      consolidation.addModuleFailure(module, ClassGlob.noTestMatchedMessage(classGlobs))
     }
   }
 
@@ -290,7 +321,7 @@ private[mill] object JvmTestModuleRun {
   ): Seq[(PlannedForkGroup, LaidOut)] = {
     val attempts = forkGroups.map(forkGroup => forkGroup -> Try(layOut(forkGroup)))
     attempts.foreach {
-      case (forkGroup, Failure(throwable)) => consolidation.addRootFailure(s"Laying out ${forkGroup.describedIn(module)} failed: $throwable")
+      case (forkGroup, Failure(throwable)) => consolidation.addModuleFailure(module, s"Laying out ${forkGroup.description} failed: $throwable")
       case (_, Success(_)) => ()
     }
     attempts.collect { case (forkGroup, Success(laidOut)) => forkGroup -> laidOut }

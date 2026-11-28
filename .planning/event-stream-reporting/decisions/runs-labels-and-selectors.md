@@ -1,6 +1,36 @@
 # Decisions: the root, runs and modules in the output
 
-Decisions behind `../SPECIFICATION.md` on how the root, runs and modules appear in the consolidated output, and when the human-readable output shows the root or a run, newest first.
+Decisions behind `../SPECIFICATION.md` on how the root, runs and modules appear in the consolidated output, which node an error or a discovery runner's output is attached to, and when the human-readable output shows the root or a run, newest first.
+
+---
+
+## The output of a runner that is not a run, such as Mill's discovery runner, is attached to the module the runner ran for (`../SPECIFICATION.md` R-097b).
+
+**Alternatives**
+
+- Attaching that output to the root mixes several modules' discovery output, unlabelled, on one node, and makes the human-readable output show the root (`../SPECIFICATION.md` R-143).
+- Leaving a module's output to a later feature keeps discovery output on the root, and no feature in `../ROADMAP.md` is planned to move it.
+
+**Reasoning** A discovery runner runs for one module, so that module is the most specific node its output can be attributed to. A module's output then sits beside the module's failures, where a reader looks for why that module's tests behaved as they did.
+
+**Costs** A module gains an `output` key in the JSON output and output lines in the human-readable output. The test command must capture what Mill's discovery runner writes for each module.
+
+**Settled by** [Many modules in one test command - How a module's error is shown](https://github.com/jamesgorman2/scalatest/issues/241).
+
+---
+
+## An error that no run, suite, scope or test records, and that the test command can attribute to one selected test module, is attached to that module's node, not to the root (`../SPECIFICATION.md` R-072b).
+
+**Alternatives**
+
+- Keeping such errors on the root, each naming its module in its message, leaves a tool parsing messages to learn which module failed.
+- Moving only the failures of a module's tests not starting or of its class globs matching no test leaves the module's other failures, such as a worker failing to start, on the root.
+
+**Reasoning** This fork exists so that tools read test output without parsing its text. The tree already names each module, so a module's node is where a reader looks for that module's failures.
+
+**Costs** A reader collecting every failure must walk the modules as well as the root.
+
+**Settled by** [Many modules in one test command - How a module's error is shown](https://github.com/jamesgorman2/scalatest/issues/241).
 
 ---
 
@@ -44,7 +74,7 @@ Decisions behind `../SPECIFICATION.md` on how the root, runs and modules appear 
 
 ---
 
-## A module has an outcome only when the module has an error (`../SPECIFICATION.md` R-098e).
+## A module has an outcome only when an error is attached to it (`../SPECIFICATION.md` R-098e).
 
 **Alternatives**
 

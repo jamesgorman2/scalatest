@@ -1,6 +1,7 @@
 package org.scalatest.mill
 
 import java.nio.file.Path
+import org.scalatest.consolidation.ModuleName
 import scala.util.control.NoStackTrace
 
 private[mill] enum TestCommandFailure extends Exception with NoStackTrace {
@@ -9,14 +10,12 @@ private[mill] enum TestCommandFailure extends Exception with NoStackTrace {
   case FrameworkArgumentAmongOwnArguments(argument: String)
   case FrameworkArgumentNotPassedOn(argument: String)
   case NoModuleSelector
-  case SeveralModuleSelectors(selectors: Seq[ModuleSelectorArgument])
-  case NotOneJvmTestModule(selector: ModuleSelectorArgument, resolved: String)
-  case UnresolvedModuleSelector(selector: ModuleSelectorArgument, error: String)
-  case ModuleInputsNotEvaluated(error: String)
-  case UnrecognisedModuleArgument(argument: String)
+  case ModuleSelectorsWithNoTestModule(failures: Seq[ModuleSelectorFailure])
+  case CannotRunModules(reasons: Seq[CannotRunReason], failedChecks: Seq[FailedModuleCheck])
   case JsonOutputPathIsFolder(path: Path)
   case JsonOutputNotDeleted(path: Path, cause: Throwable)
   case JsonOutputNotWritten(path: Path, cause: Throwable, partlyWrittenFileDeleteFailure: Option[Throwable])
+  case ModulesFailed(modules: Seq[ModuleName])
 
   override def getMessage: String = message
 
@@ -34,17 +33,15 @@ private[mill] enum TestCommandFailure extends Exception with NoStackTrace {
       case FrameworkArgumentNotPassedOn(argument) =>
         s"The test command takes only ScalaTest's $frameworkFlags as framework arguments, each with the values ScalaTest's runner takes with it, but was given: $argument"
       case NoModuleSelector =>
-        "The test command takes one module selector, but was given none"
-      case SeveralModuleSelectors(selectors) =>
-        s"The test command takes one module selector, but was given: ${selectors.map(_.text).mkString(" ")}"
-      case NotOneJvmTestModule(selector, resolved) =>
-        s"Module selector ${selector.text} must resolve to one JVM test module, but resolved to: $resolved"
-      case UnresolvedModuleSelector(selector, error) =>
-        s"Module selector ${selector.text} resolves to no module: $error"
-      case ModuleInputsNotEvaluated(error) =>
-        error
-      case UnrecognisedModuleArgument(argument) =>
-        s"The module's ScalaTest arguments hold $argument, which ScalaTest does not recognise"
+        "The test command takes one or more module selectors, but was given none"
+      case ModuleSelectorsWithNoTestModule(failures) =>
+        failures.map(_.line).mkString("\n")
+      case CannotRunModules(reasons, failedChecks) =>
+        val cannotRunLines = "The test command cannot run these selected test modules:" +: reasons.map(reason => s"  ${reason.line}")
+        val failedCheckLines =
+          if (failedChecks.isEmpty) Seq.empty
+          else "The tests of these selected test modules cannot start:" +: failedChecks.flatMap(_.lines).map("  " + _)
+        (cannotRunLines ++ failedCheckLines).mkString("\n")
       case JsonOutputPathIsFolder(path) =>
         s"The test command cannot delete $path, the file $jsonOutputArgument names: it is a folder"
       case JsonOutputNotDeleted(path, cause) =>
@@ -52,6 +49,8 @@ private[mill] enum TestCommandFailure extends Exception with NoStackTrace {
       case JsonOutputNotWritten(path, cause, partlyWrittenFileDeleteFailure) =>
         s"The test command cannot write its JSON output to $path, the file $jsonOutputArgument names: $cause" +
           partlyWrittenFileDeleteFailure.fold("")(deleteFailure => s"; it cannot delete the partly written file either: $deleteFailure")
+      case ModulesFailed(modules) =>
+        s"The tests of ${EnglishList.of(modules.map(_.value))} failed"
     }
   }
 }

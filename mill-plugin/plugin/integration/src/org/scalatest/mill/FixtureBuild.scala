@@ -12,6 +12,14 @@ final class FixtureBuild(tester: IntegrationTester) {
 
   def workspace: os.Path = tester.workspacePath
 
+  def fixtureSource: os.Path = tester.workspaceSourcePath
+
+  def filesDifferingFromTheFixture(path: os.SubPath): Seq[os.SubPath] = {
+    val inWorkspace = FixtureBuild.contents(workspace / path)
+    val inFixture = FixtureBuild.contents(fixtureSource / path)
+    (inWorkspace.keySet ++ inFixture.keySet).filter(file => inWorkspace.get(file) != inFixture.get(file)).toSeq.map(path / _).sortBy(_.toString)
+  }
+
   def testSources: os.Path = workspace / "core" / "test" / "src"
 
   def samples: os.Path = testSources / "samples"
@@ -19,6 +27,8 @@ final class FixtureBuild(tester: IntegrationTester) {
   def jsonOutputFile: os.Path = workspace / "report.json"
 
   def markersFolder: os.Path = workspace / "markers"
+
+  def markers: Seq[String] = os.list(markersFolder).map(_.last).sorted
 
   def modulesFolder: os.Path = workspace / "out" / "org.scalatest.mill.TestCommandModule" / "modules"
 
@@ -31,6 +41,8 @@ final class FixtureBuild(tester: IntegrationTester) {
   def replaceInBuild(from: String, to: String): Unit = replaceIn(buildFile, "the build file")(from, to)
 
   def replaceInSample(fileName: String, from: String, to: String): Unit = replaceIn(samples / fileName, fileName)(from, to)
+
+  def replaceInSource(source: os.Path, from: String, to: String): Unit = replaceIn(source, source.last)(from, to)
 
   private def replaceIn(file: os.Path, description: String)(from: String, to: String): Unit = {
     val text = os.read(file)
@@ -56,10 +68,10 @@ final class FixtureBuild(tester: IntegrationTester) {
   def addToTestModule(members: String*): Unit =
     replaceInBuild(testModuleDependencies, (testModuleDependencies +: members.map("    " + _)).mkString("\n"))
 
+  def turnOnTestParallelism(): Unit = replaceInBuild("def testParallelism = false", "def testParallelism = true")
+
   def setModuleArguments(moduleArguments: Seq[String]): Unit =
     addToTestModule(moduleArguments.map(argument => s"\"$argument\"").mkString("def testArgsDefault = Seq(", ", ", ")"))
-
-  def removeModuleArguments(): Unit = removeBuildLines("line holding testArgsDefault")(_.contains("testArgsDefault"))
 
   private def removeBuildLines(description: String)(matches: String => Boolean): Unit =
     editBuild { build =>
@@ -146,11 +158,16 @@ final class FixtureBuild(tester: IntegrationTester) {
     json
   }
 
-  def anyTestWorkerStarted: Boolean =
-    // Mill writes a `testargs` file for each worker it starts.
-    os.exists(workspace / "out") && os.walk(workspace / "out").exists(_.last == "testargs")
+  def anyTestWorkerStarted: Boolean = anyTestWorkerStartedIn(workspace / "out")
 
-  def eventLogFiles: Seq[os.Path] = os.walk(workspace / "out").filter(_.last == JvmTestModuleRun.eventLogFileName)
+  def anyTestWorkerStartedIn(folder: os.Path): Boolean =
+    // Mill writes a `testargs` file for each worker it starts.
+    os.exists(folder) && os.walk(folder).exists(_.last == "testargs")
+
+  def eventLogFiles: Seq[os.Path] = {
+    val out = workspace / "out"
+    if (os.exists(out)) os.walk(out).filter(_.last == JvmTestModuleRun.eventLogFileName) else Nil
+  }
 
   // `resolve _` compiles the build, so a later command's output holds no compile messages.
   def compile(): Unit = requireCompiled(tester.eval(compilingArguments))
@@ -173,6 +190,14 @@ final class FixtureBuild(tester: IntegrationTester) {
 object FixtureBuild {
 
   def jobsArguments(jobs: Int): Seq[String] = Seq("-j", jobs.toString)
+
+  private def contents(path: os.Path): Map[os.SubPath, Seq[Byte]] =
+    if (os.isFile(path))
+      Map(os.sub -> os.read.bytes(path).toSeq)
+    else if (os.isDir(path))
+      os.walk(path).filter(os.isFile).map(file => file.subRelativeTo(path) -> os.read.bytes(file).toSeq).toMap
+    else
+      Map.empty
 
   // The `-jvm` suffix has `mill.bat` run a `.bat` file rather than a native executable.
   private val millBatVersion: String = "1.3.1-jvm"

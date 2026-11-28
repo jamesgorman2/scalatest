@@ -3,7 +3,6 @@ package org.scalatest.mill
 import java.io.IOException
 import java.util.Locale
 import org.scalatest.consolidation.ForkGroup
-import org.scalatest.consolidation.ModuleName
 import org.scalatest.consolidation.Worker
 import org.scalatest.consolidation.WorkerIndex
 import org.scalatest.events.TestClassName
@@ -27,17 +26,17 @@ private[mill] final case class PlannedForkGroup(
 
   def workerIndexDigits: Int = PaddedIndex.digits(workers.size)
 
-  def describedIn(module: ModuleName): String = id.describedIn(module)
+  def description: String = id.description
 }
 
 extension (forkGroup: ForkGroup) {
 
-  private[mill] def describedIn(module: ModuleName): String = s"fork group ${forkGroup.position} of ${module.value}"
+  private[mill] def description: String = s"fork group ${forkGroup.position}"
 }
 
 private[mill] final case class PlannedWorker(id: Worker, processFolder: PathUnderModule) {
 
-  def describedIn(module: ModuleName): String = s"worker ${id.index.value} of ${id.forkGroup.describedIn(module)}"
+  def description: String = s"worker ${id.index.value} of ${id.forkGroup.description}"
 }
 
 private[mill] enum WorkerLayoutFailure extends Exception with NoStackTrace {
@@ -54,11 +53,11 @@ private[mill] enum WorkerLayoutFailure extends Exception with NoStackTrace {
       case FilesystemCaseNotChecked(cause) => s"checking whether the filesystem ignores case failed: $cause"
     }
 
-  def rootMessage(module: ModuleName): String =
+  def moduleMessage: String =
     this match {
       // Unprefixed, as Mill's `testOnly` words it.
       case ClassGlobsKeepNoTestClass(_) => message
-      case _ => s"Laying out the workers of ${module.value} failed: $message"
+      case _ => s"Laying out the workers failed: $message"
     }
 }
 

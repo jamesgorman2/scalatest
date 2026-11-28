@@ -12,6 +12,8 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
 
   val module: ModuleName = ModuleName("core.test")
 
+  val otherModule: ModuleName = ModuleName("api.test")
+
   extension (literal: String) {
 
     def stripExpectedMargin: String =
@@ -95,6 +97,14 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
   def runOfCalculatorSuiteHolding(nodes: String, testEvents: String*): TestRunPart =
     TestRunPart.Events(completedRunOf(eventLogOfSuite("CalculatorSuite", nodes, testEvents*)))
 
+  val runWithSucceededTest: TestRunPart = runOfCalculatorSuite("""test "adds": TestStarting""", """test "adds": TestSucceeded""")
+
+  def startedWithOtherModuleCompleted(): Consolidation = {
+    val consolidation = startedWithColour()
+    consolidation.addRun(otherModule)(_.addAll(runWithSucceededTest))
+    consolidation
+  }
+
   def structureOf(suite: String, nodes: String): String =
     (Vector("structure", s"""  suite "$suite", class "samples.$suite"""") ++ ConsolidatedRuns.nested(nodes, depth = 2)).mkString("\n")
 
@@ -131,6 +141,22 @@ private[consolidation] trait ConsolidatedRuns { this: Assertions =>
   def colourMarkedOutputFrom(eventLog: String): ColourMarkedOutput = colourMarkedOutputFrom(TestRunPart.Events(eventLog))
 
   def colourMarkedOutputFrom(parts: TestRunPart*): ColourMarkedOutput = colourMarkedOutputAfter(_.addRunOf(parts*))
+
+  val sqrtPropSpecEventLog: String =
+    """
+    run started
+    structure
+      suite "SqrtPropSpec", class "samples.SqrtPropSpec"
+        test "sqrt of a square is the root", label "- sqrt of a square is the root"
+    suite "SqrtPropSpec": SuiteStarting
+    test "sqrt of a square is the root": TestStarting
+    test "sqrt of a square is the root": TestSucceeded
+    suite "SqrtPropSpec": SuiteCompleted
+    run ended completed
+    """
+
+  def addSqrtPropSpecRun(consolidation: Consolidation): Unit =
+    consolidation.addRunOf(TestRunPart.Events(sqrtPropSpecEventLog))
 }
 
 private[consolidation] object ConsolidatedRuns {

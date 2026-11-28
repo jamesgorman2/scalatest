@@ -7,6 +7,7 @@ object FixtureName {
   val arguments: FixtureName = "arguments"
   val brokenConstructor: FixtureName = "broken-constructor"
   val capturedOutput: FixtureName = "captured-output"
+  val classGlobsAcrossModules: FixtureName = "class-globs-across-modules"
   val classGlobsAndFrameworkArguments: FixtureName = "class-globs-and-framework-arguments"
   val compatibilityFixture: FixtureName = "compatibility-fixture"
   val everyWorker: FixtureName = "every-worker"
@@ -14,11 +15,9 @@ object FixtureName {
   val libraryWithoutMill: FixtureName = "library-without-mill"
   val millOwnTasks: FixtureName = "mill-own-tasks"
   val moduleSelectors: FixtureName = "module-selectors"
-  val munit: FixtureName = "munit"
+  val modulesTheTestCommandCannotRun: FixtureName = "modules-the-test-command-cannot-run"
   val result: FixtureName = "result"
-  val styles: FixtureName = "styles"
-  val upstreamScalaTest: FixtureName = "upstream-scalatest"
-  val utest: FixtureName = "utest"
+  val severalModules: FixtureName = "several-modules"
 
   def onScala(scalaVersion: String): FixtureName = s"scala-$scalaVersion"
 

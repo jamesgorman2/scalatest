@@ -3,13 +3,16 @@ package org.scalatest.mill
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
+import org.scalatest.mill.tags.CoreTag
+import org.scalatest.mill.tags.MillCoexistence
 
+@MillCoexistence
 final class AddingThePluginSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with FixtureBuilds {
 
   Feature("The test command runs a module whose definition names nothing from the plugin") {
 
     for (scala <- Seq("3.3", "3.9")) {
-      Scenario(s"Adding the plugin's header line alone lets the test command run a module built with Scala $scala") {
+      Scenario(s"Adding the plugin's header line alone lets the test command run a module built with Scala $scala", CoreTag.when(scala == "3.3")*) {
         withFixtureBuild(FixtureName.withoutPluginOnScala(scala)) { build =>
           Given(s"the build does not add the plugin, its build.mill header has no mvnDeps, and the module is built with Scala $scala")
           And("the module is at Mill's default testLogLevel")

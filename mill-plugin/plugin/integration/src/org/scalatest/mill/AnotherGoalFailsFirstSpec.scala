@@ -1,0 +1,78 @@
+package org.scalatest.mill
+
+import org.scalatest.GivenWhenThen
+import org.scalatest.featurespec.AnyFeatureSpec
+import org.scalatest.matchers.should
+import org.scalatest.mill.tags.Modules
+
+@Modules
+final class AnotherGoalFailsFirstSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with SeveralModulesFixture {
+
+  protected def givenTheBackground(): Unit = {
+    givenABuildThatAddsTheMillPlugin()
+    And("the build's JVM test module alpha.test tests with com.edc::scalatest at that release and holds the suite Alpha1, an AnyFunSuite whose test fast creates a file in <markers> when it runs")
+    And("the build's module broken does not compile")
+    And("<markers> is an absolute path at which an empty folder exists")
+    andAnEarlierTestCommandWroteTheReport()
+    andEachArgumentReachesMillAsWritten()
+  }
+
+  private val sharedBuildWithBrokenModuleAndEarlierReport: SharedFixtureBuild =
+    sharedFixtureBuildWithEarlierReport(FixtureName.severalModules, addBrokenModuleThatDoesNotCompile) { build =>
+      runTestCommandWithTwoJobsWritingJsonOutput(build)("alpha.test", "beta.test")
+    }
+
+  private def addBrokenModuleThatDoesNotCompile(build: FixtureBuild): Unit = {
+    build.appendToBuild("object broken extends SampleModule")
+    os.write(build.workspace / "broken" / "src" / "Broken.scala", "object Broken {\n  val value: Int = notDefinedAnywhere\n}\n", createFolders = true)
+  }
+
+  private def runMillCommandLine(build: FixtureBuild, millArguments: String*): TestCommandResult =
+    TestCommandResult(build.eval(FixtureBuild.jobsArguments(2) ++ millArguments))
+
+  Feature("Another goal fails first") {
+
+    Scenario("broken.compile before the test command") {
+      inSharedBuild(sharedBuildWithBrokenModuleAndEarlierReport) { build =>
+        val reportBefore = os.read(build.jsonOutputFile)
+        val reportModifiedBefore = os.mtime(build.jsonOutputFile)
+        When("mill -j 2 broken.compile + scalatest/test alpha.test -fJ <report> is invoked")
+        val result = runMillCommandLine(build, "broken.compile", "+", "scalatest/test", "alpha.test", "-fJ", build.jsonOutputFile.toString)
+
+        Then("Mill reports that broken.compile failed")
+        shouldFail(result)
+        shouldWriteToTheConsole(result, "broken.compile Compilation failed")
+
+        withClue(result.debugString) {
+          andNoFileShouldExistInTheMarkers(build)
+
+          And("the file at <report> has the content and modification time it had before mill was invoked")
+          os.read(build.jsonOutputFile) shouldBe reportBefore
+          os.mtime(build.jsonOutputFile) shouldBe reportModifiedBefore
+
+          andTheConsoleShouldShowNoConsolidatedOutput(result)
+        }
+      }
+    }
+
+    Scenario("broken.compile before the test command, with --keep-going") {
+      inSharedBuild(sharedBuildWithBrokenModuleAndEarlierReport) { build =>
+        When("mill -j 2 --keep-going broken.compile + scalatest/test alpha.test -fJ <report> is invoked")
+        val result =
+          runMillCommandLine(build, "--keep-going", "broken.compile", "+", "scalatest/test", "alpha.test", "-fJ", build.jsonOutputFile.toString)
+
+        Then("Mill reports that broken.compile failed")
+        shouldFail(result)
+        shouldWriteToTheConsole(result, "broken.compile Compilation failed")
+
+        withClue(result.debugString) {
+          And("a file exists in <markers>")
+          build.markers should not be empty
+
+          And("the file at <report> holds JSON output whose root holds exactly the module node alpha.test")
+          moduleNodeNames(build.jsonOutput) shouldBe Seq("alpha.test")
+        }
+      }
+    }
+  }
+}

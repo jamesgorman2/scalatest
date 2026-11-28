@@ -63,7 +63,7 @@ Settles:
 
 - Whether a suite that has no events, and that a run was to execute, is written inside that run's node or as a child of its module (R-101, R-136; a module's `contents` holds only its run nodes, `../../mill-plugin/consolidated.schema.json` `$defs/module`).
 - Whether the `name` of a suite scheduled to run that has no events is its simple or its fully qualified class name (R-095a).
-- How a module records a process that ended before any run existed in it, and the output captured from that process's stdout and stderr; the JSON output writes no `output` on a module (R-076).
+- How a module records a process that ended before any run existed in it, and the output captured from that process's stdout and stderr (R-076).
 - The reason, if any, that an unfinished run's open suites, scopes and tests carry (R-095b aborts them and states no reason; R-102 gives the run *process failed*, and R-095a gives registered suites, scopes and tests that have no events *not run*).
 
 Risks:

@@ -228,5 +228,5 @@ The compatibility policy covers `mill.api`, `mill.util`, `mill.eval`, `mill.reso
 - Compiling a plugin against `mill-core-eval` and `mill-core-exec` artifacts instead of using reflection, and whether that loads a second copy of those classes.
 - Setting `failFast` on the command's own `Execution` by reflection instead of copying it.
 - Concurrent `execute` calls each on its own copy of the `Execution` with its own executor.
-- Whether `Execution`'s constructor or fields changed between Mill versions; only `1.1.10` was read.
+- Mill versions other than `1.1.10`. `.planning/event-stream-reporting/research/mill-nested-module-run.md` § 2 reads `Execution` and `EvaluatorImpl` at `1.3.1` and runs the § 3.1 route there.
 - The `--watch` and BSP paths, `--halt-on-failure`-style use of a fail-fast-on copy, and several Mill commands sharing one daemon.

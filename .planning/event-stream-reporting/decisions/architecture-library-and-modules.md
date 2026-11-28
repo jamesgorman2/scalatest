@@ -6,7 +6,7 @@ Decisions behind `../ARCHITECTURE.md` on what the consolidation library takes, b
 
 **Alternatives** Reading the results that Mill's test-runner subprocess call returns for each worker, from the worker's `out.json`, makes the check Mill's `testOnly` makes (`results.isEmpty && selectors.nonEmpty` in `mill.javalib.TestModuleUtil.runTests`, `com.lihaoyi:mill-libs-javalib_3:1.3.1`), but keeps a second source of test facts beside the consolidation for one check.
 
-**Reasoning** The library already knows from each run's event stream which tests and suites the run reported, so it answers whether any of them reached a module without a second reading of the module's runs. The plugin attaches the failure `testOnly` fails with to the root from that answer, so the consolidation state still decides the test command's result (`../SPECIFICATION.md` R-053a, R-137).
+**Reasoning** The library already knows from each run's event stream which tests and suites the run reported, so it answers whether any of them reached a module without a second reading of the module's runs. The plugin attaches the failure `testOnly` fails with to the module from that answer, so the consolidation state still decides the test command's result (`../SPECIFICATION.md` R-053a, R-137).
 
 **Costs** The answer can differ from `testOnly`'s: where ScalaTest's `SuiteSortingReporter` drops a helper suite's events before they reach Mill, the library can count a test result where `testOnly` sees none, so the test command passes where `testOnly` fails.
 

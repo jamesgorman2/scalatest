@@ -1,11 +1,6 @@
 package org.scalatest.consolidation
 
-import java.nio.charset.StandardCharsets
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.Paths
 import java.time.Instant
-import java.util.Properties
 import org.scalatest.GivenWhenThen
 import org.scalatest.events.DecodedEvent
 import org.scalatest.events.DecodedStackFrame
@@ -16,15 +11,6 @@ import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
 
 final class MillPluginDocumentationSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with ConsolidatedRuns with JsonOutputs {
-
-  private val millPluginDirectory: Path = {
-    val properties = new Properties
-    val resource = getClass.getResourceAsStream("/repository.properties")
-    try properties.load(resource) finally resource.close()
-    Paths.get(properties.getProperty("millPlugin"))
-  }
-
-  private def millPluginDocument(name: String): String = Files.readString(millPluginDirectory.resolve(name), StandardCharsets.UTF_8)
 
   private def keysDefinedIn(document: String): Set[String] = {
     val bulletLeads = """(?m)^\s*- ((?:`\w+`(?:, | or | and )?)+)(?: — |\.$)""".r
@@ -113,9 +99,18 @@ final class MillPluginDocumentationSpec extends AnyFeatureSpec with GivenWhenThe
 
   Feature("The Mill plugin's documents describe the JSON output") {
 
+    Scenario("The JSON schema refuses a module's outcome without its failures") {
+      Given("a JSON output whose module holds an outcome but no failures")
+      val moduleNode = """{"kind":"module","name":"core.test","outcome":"aborted","contents":[]}"""
+      val root = s"""{"kind":"root","scalaTestVersion":"${Consolidation.scalaTestVersion}","moduleSelectors":[],"contents":[$moduleNode]}"""
+
+      Then("it does not validate against consolidated.schema.json")
+      MillPluginDocuments.schemaViolationsOf(root) should not be empty
+    }
+
     Scenario("The README links JSON.md") {
       Given("the Mill plugin's README")
-      val readme = millPluginDocument("README.md")
+      val readme = MillPluginDocuments.read("README.md")
 
       Then("it links JSON.md")
       readme should include("](JSON.md)")
@@ -126,7 +121,7 @@ final class MillPluginDocumentationSpec extends AnyFeatureSpec with GivenWhenThe
       val keys = keysOf(jsonOutputWithEveryKey)
 
       When("the keys JSON.md defines are read")
-      val defined = keysDefinedIn(millPluginDocument("JSON.md"))
+      val defined = keysDefinedIn(MillPluginDocuments.read("JSON.md"))
 
       Then("JSON.md defines each of them")
       keys.diff(defined) shouldBe empty

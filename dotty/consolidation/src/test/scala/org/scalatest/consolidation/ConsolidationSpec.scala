@@ -10,6 +10,8 @@ import org.scalatest.wordspec.AnyWordSpec
 
 final class ConsolidationSpec extends AnyWordSpec with should.Matchers with ConsolidatedRuns with JsonOutputs {
 
+  private final case class LateAddition(description: String, add: Consolidation => Unit)
+
   private def stateAfterRunOf(testEvents: String*): ConsolidationState = {
     val consolidation = startedWithColour()
     consolidation.addRunOf(runOfCalculatorSuite(testEvents*))
@@ -108,8 +110,48 @@ final class ConsolidationSpec extends AnyWordSpec with should.Matchers with Cons
     "given a process that ended before any run existed in it" should {
       "be open and failed" in {
         val consolidation = startedWithColour()
-        consolidation.addProcessEndedBeforeAnyRun()
+        consolidation.addProcessEndedBeforeAnyRun(module)
         consolidation.state shouldBe ConsolidationState.OpenFailed
+      }
+    }
+
+    "given a failure attached to a module" should {
+      "be open and failed" in {
+        val consolidation = startedWithColour()
+        consolidation.addModuleFailure(module, "the module's tests did not start")
+        consolidation.state shouldBe ConsolidationState.OpenFailed
+      }
+    }
+
+    "given output attached to a module" should {
+      "stay open" in {
+        val consolidation = startedWithColour()
+        consolidation.addModuleOutput(module, CapturedLine.Stderr("warn: slow discovery\n"))
+        consolidation.state shouldBe ConsolidationState.Open
+      }
+    }
+
+    "ended after a failure attached to a module" should {
+      "be ended and failed" in {
+        val consolidation = startedWithColour()
+        consolidation.addModuleFailure(module, "the module's tests did not start")
+        consolidation.end() shouldBe ConsolidationState.EndedFailed
+      }
+    }
+
+    for (
+      lateAddition <- Vector(
+        LateAddition("a failure attached to a module", _.addModuleFailure(module, "too late")),
+        LateAddition("output attached to a module", _.addModuleOutput(module, CapturedLine.Stdout("too late\n"))),
+        LateAddition("a process that ended before any run existed in it", _.addProcessEndedBeforeAnyRun(module))
+      )
+    ) {
+      s"ended, then given ${lateAddition.description}" should {
+        "be refused" in {
+          val consolidation = startedWithColour()
+          consolidation.end()
+          an[IllegalStateException] should be thrownBy lateAddition.add(consolidation)
+        }
       }
     }
 
@@ -125,13 +167,13 @@ final class ConsolidationSpec extends AnyWordSpec with should.Matchers with Cons
     "ended after a failure" should {
       "be ended and failed" in {
         val consolidation = startedWithColour()
-        consolidation.addProcessEndedBeforeAnyRun()
+        consolidation.addProcessEndedBeforeAnyRun(module)
         consolidation.end()
         consolidation.state shouldBe ConsolidationState.EndedFailed
       }
       "give that state as it ends" in {
         val consolidation = startedWithColour()
-        consolidation.addProcessEndedBeforeAnyRun()
+        consolidation.addProcessEndedBeforeAnyRun(module)
         consolidation.end() shouldBe ConsolidationState.EndedFailed
       }
     }

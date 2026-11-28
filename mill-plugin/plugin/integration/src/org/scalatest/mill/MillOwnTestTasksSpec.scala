@@ -3,7 +3,9 @@ package org.scalatest.mill
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
+import org.scalatest.mill.tags.MillCoexistence
 
+@MillCoexistence
 final class MillOwnTestTasksSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with FixtureBuilds {
 
   private val tasks: Seq[Seq[String]] = Seq(
@@ -17,14 +19,18 @@ final class MillOwnTestTasksSpec extends AnyFeatureSpec with GivenWhenThen with 
 
   private lazy val runs: Map[Seq[String], BuildComparison[MillConsole]] =
     withFixtureBuild(FixtureName.millOwnTasks) { build =>
-      val withoutPlugin = tasks.map(task => task -> runAlone(build, task)).toMap
+      val withoutPlugin = runEachAlone(build)
       build.addPlugin()
-      val withPlugin = tasks.map(task => task -> runAlone(build, task)).toMap
+      val withPlugin = runEachAlone(build)
       tasks.map(task => task -> BuildComparison(withoutPlugin(task), withPlugin(task))).toMap
     }
 
-  private def runAlone(build: FixtureBuild, task: Seq[String]): MillConsole = {
+  private def runEachAlone(build: FixtureBuild): Map[Seq[String], MillConsole] = {
     build.compile()
+    tasks.map(task => task -> runAlone(build, task)).toMap
+  }
+
+  private def runAlone(build: FixtureBuild, task: Seq[String]): MillConsole = {
     build.removeModuleOutput()
     MillConsole(build.eval(task))
   }

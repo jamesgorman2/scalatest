@@ -1,5 +1,7 @@
 package org.scalatest.consolidation
 
+import scala.concurrent.Promise
+import scala.util.Success
 import org.scalatest.GivenWhenThen
 import org.scalatest.concurrent.Eventually
 import org.scalatest.events.TestRunPart
@@ -10,13 +12,9 @@ import org.scalatest.time.Span
 
 final class ModuleTestResultSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with Eventually with ConsolidatedRuns with JsonOutputs {
 
-  private val otherModule = ModuleName("api.test")
-
   private val calculatorSuiteStructure = structureOf("CalculatorSuite", addsTest)
 
   private def runPartOf(events: String*): TestRunPart = TestRunPart.Events(events.mkString("\n"))
-
-  private val runWithSucceededTest: TestRunPart = runOfCalculatorSuite("""test "adds": TestStarting""", """test "adds": TestSucceeded""")
 
   private val runWithNoSuite: TestRunPart = TestRunPart.Events(completedRunOf())
 
@@ -24,8 +22,7 @@ final class ModuleTestResultSpec extends AnyFeatureSpec with GivenWhenThen with 
 
     Scenario("A module that has no run has no test result, though another module has one") {
       Given("a consolidation whose only run belongs to another module and reports a test as succeeded")
-      val consolidation = startedWithColour()
-      consolidation.addRun(otherModule)(_.addAll(runWithSucceededTest))
+      val consolidation = startedWithOtherModuleCompleted()
 
       Then("the other module has a test result")
       consolidation.hasTestResult(otherModule) shouldBe true
@@ -185,9 +182,9 @@ final class ModuleTestResultSpec extends AnyFeatureSpec with GivenWhenThen with 
       var whileWritingJsonOutput: () => Unit = () => ()
       val consolidation = Consolidation.start(new OutputSink, coloured = false, jsonOutput = Some(_ => whileWritingJsonOutput()))
       consolidation.addRunOf(runWithSucceededTest)
-      var read = Option.empty[Boolean]
-      val reader = new Thread(() => read = Some(consolidation.hasTestResult(module)))
-      whileWritingJsonOutput = () => {
+      val read = Promise[Boolean]()
+      val reader = new Thread(() => { read.success(consolidation.hasTestResult(module)); () })
+      whileWritingJsonOutput = { () =>
         When("another thread reads whether the module has a test result while the consolidation writes its JSON output")
         reader.start()
 
@@ -195,14 +192,14 @@ final class ModuleTestResultSpec extends AnyFeatureSpec with GivenWhenThen with 
         eventually(timeout(Span(10, Seconds))) {
           reader.getState shouldBe Thread.State.BLOCKED
         }
-        read shouldBe None
+        read.isCompleted shouldBe false
       }
 
       consolidation.end()
       reader.join()
 
       Then("once the consolidation has ended, the read answers that the module has a test result")
-      read shouldBe Some(true)
+      read.future.value shouldBe Some(Success(true))
       consolidation.hasTestResult(module) shouldBe true
     }
   }

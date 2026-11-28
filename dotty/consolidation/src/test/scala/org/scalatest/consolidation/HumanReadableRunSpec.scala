@@ -356,9 +356,6 @@ final class HumanReadableRunSpec extends AnyFeatureSpec with GivenWhenThen with 
 
   Feature("The root") {
 
-    def addSqrtPropSpecRun(consolidation: Consolidation): Unit =
-      consolidation.addRunOf(TestRunPart.Events(sqrtPropSpecEventLog))
-
     def consolidationOfSqrtPropSpec(output: OutputSink): Consolidation = {
       val consolidation = startedWithColour(output)
       addSqrtPropSpecRun(consolidation)
@@ -688,19 +685,6 @@ private object HumanReadableRunSpec {
     test "helps": TestSucceeded
     test "uses a helper": TestSucceeded
     suite "OuterSuite": SuiteCompleted
-    run ended completed
-    """
-
-  val sqrtPropSpecEventLog: String =
-    """
-    run started
-    structure
-      suite "SqrtPropSpec", class "samples.SqrtPropSpec"
-        test "sqrt of a square is the root", label "- sqrt of a square is the root"
-    suite "SqrtPropSpec": SuiteStarting
-    test "sqrt of a square is the root": TestStarting
-    test "sqrt of a square is the root": TestSucceeded
-    suite "SqrtPropSpec": SuiteCompleted
     run ended completed
     """
 

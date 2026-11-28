@@ -1,47 +1,14 @@
 package org.scalatest.mill
 
-import mill.api.Evaluator
-import mill.api.Result
-import mill.api.SelectMode
+import mill.javalib.JavaModule
 import mill.javalib.TestModule
 import mill.scalajslib.ScalaJSModule
 import mill.scalanativelib.ScalaNativeModule
 import org.scalatest.consolidation.ModuleName
 
-private[mill] final case class SelectedTestModule(module: TestModule) {
+private[mill] final case class SelectedTestModule(testModule: TestModule & JavaModule) {
 
-  def name: ModuleName = ModuleName(module.moduleSegments.render)
-}
+  def name: ModuleName = ModuleName(testModule.moduleSegments.render)
 
-private[mill] object SelectedTestModule {
-
-  def resolve(evaluator: Evaluator, moduleSelectors: Seq[ModuleSelectorArgument]): Either[TestCommandFailure, SelectedTestModule] =
-    moduleSelectors match {
-      case Seq(selector) =>
-        resolveSelector(evaluator, selector)
-      case Seq() =>
-        Left(TestCommandFailure.NoModuleSelector)
-      case _ =>
-        Left(TestCommandFailure.SeveralModuleSelectors(moduleSelectors))
-    }
-
-  private def resolveSelector(evaluator: Evaluator, selector: ModuleSelectorArgument): Either[TestCommandFailure, SelectedTestModule] =
-    evaluator.resolveModulesOrTasks(Seq(selector.text), SelectMode.Multi) match {
-      case Result.Success(List(Left(module: TestModule))) if isJvm(module) =>
-        Right(SelectedTestModule(module))
-      case Result.Success(resolved) =>
-        Left(TestCommandFailure.NotOneJvmTestModule(selector, describe(resolved)))
-      case failure: Result.Failure =>
-        Left(TestCommandFailure.UnresolvedModuleSelector(selector, failure.error))
-    }
-
-  private def isJvm(module: TestModule): Boolean =
-    !module.isInstanceOf[ScalaJSModule] && !module.isInstanceOf[ScalaNativeModule]
-
-  private def describe(resolved: List[Either[mill.api.Module, mill.api.Task.Named[?]]]): String =
-    if (resolved.isEmpty) {
-      "nothing"
-    } else {
-      resolved.map(_.fold(_.moduleSegments.render, _.toString)).mkString(", ")
-    }
+  def isJvm: Boolean = !testModule.isInstanceOf[ScalaJSModule] && !testModule.isInstanceOf[ScalaNativeModule]
 }

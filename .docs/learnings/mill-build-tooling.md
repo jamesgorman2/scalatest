@@ -1,6 +1,6 @@
 ---
 kind: mill-build-tooling
-description: How Mill 1.x, its bootstrap scripts, testkit, BSP server and plugin API misbehave, and how to read a meta-build's classpath. Read before running Mill from GitBash on Windows, writing a Mill plugin or its integration tests, driving Mill's BSP server, or inspecting a meta-build's classpath.
+description: How Mill 1.x, its bootstrap scripts, testkit, test runners, BSP server and plugin API misbehave or constrain a build. Read before running Mill from GitBash on Windows, writing a Mill plugin or its integration tests, tuning a parallel test run, driving Mill's BSP server, or inspecting a meta-build's classpath.
 ---
 
 <learning>
@@ -53,11 +53,13 @@ Read the process's own output, `evalResult.result.out.text()` and `evalResult.re
 </learning>
 
 <learning>
-date: 2026-11-14
+date: 2026-11-27
 ---
 A Mill module's `compileMvnDeps` reach neither its runtime classpath nor its `ScalaTests` test module's classpath. A Mill plugin that depends on Mill through `compileMvnDeps` therefore has no Mill or os-lib classes in its unit tests: a test naming `os.*` fails with `Not found: os`.
 
-Keep classes under unit test free of Mill and os-lib types, and do the Mill wiring, such as setting `os.Inherit.out`, in the class that calls Mill. Test that wiring under testkit.
+Where a case class's companion object holds a method that builds a `Task.Anon`, a unit test calling the case class's `apply` compiles but fails at run time with `java.lang.NoClassDefFoundError: mill/api/Task`, and the suite aborts.
+
+Keep classes under unit test free of Mill and os-lib types. Do the Mill wiring, such as setting `os.Inherit.out`, in the class that calls Mill. Build a task in an object that no unit test loads, not in the companion of a class under unit test. Test that wiring under testkit.
 </learning>
 
 <learning>
@@ -174,11 +176,14 @@ A path taken from the test build's processes, such as `user.dir`, can therefore 
 </learning>
 
 <learning>
-date: 2026-11-19
+date: 2026-11-27
 ---
-Under `testParallelism`, Mill 1.3.1's test queue varies between invocations on every platform. It may run a fork group's classes in one worker or split them across several, so which worker runs which class varies. On Windows it also sometimes runs one test class in two workers; both write a `CLAIM` for it in their `claim.log`. This race rarely shows when a scenario runs alone.
+Under `testParallelism`, Mill 1.3.1's test queue varies between invocations on every platform. It may run a fork group's classes in one worker or split them across several, so which worker runs which class varies. On Windows it also sometimes runs one test class in several workers; each writes a `CLAIM` for it in its `claim.log`.
 
-An integration test that compares output across invocations, or expects a fixed number of runs, must not depend on the queue. Mill's default is `testParallelism = true`, so set `def testParallelism = false` in the fixture unless parallel workers are what the test is about.
+This race rarely shows when a scenario runs alone. It shows readily in a tag-filtered run (`testForked -n <tag>`), where most test classes have nothing to run and their workers finish at once: the first slow class can then run in many workers. In one such run with 16 workers, one class ran in 5, giving 14 report entries and a summed ScalaTest summary of 14 for 10 distinct tests. The duplicate runs inflate the summed summaries and the report's entries, and the extra copies compete for CPU.
+
+- An integration test that compares output across invocations, or expects a fixed number of runs, must not depend on the queue. Mill's default is `testParallelism = true`, so set `def testParallelism = false` in the fixture unless parallel workers are what the test is about.
+- Count tests as the distinct `<testcase>` names in the run's `test-report.xml`. In a tag-filtered run, expect duplicate runs of the first slow class.
 </learning>
 
 <learning>
@@ -225,4 +230,97 @@ It skips the second check whenever laying out a fork group fails or any worker d
 - a worker whose JVM exits without writing `out.json`, as where it dies, gives `Result.Failure("Test reporting Failed: … does not exist")`, and `processTestResults` returns the joined failure.
 
 A plugin that matches `testOnly`'s failures must decide, for each of these cases, whether to add the no-match failure. `testOnly` adds it after none of them: only where every worker ended with a result and none held a test.
+</learning>
+
+<learning>
+date: 2026-11-26
+---
+In Mill 1.3.1 with the ticker on (`--ticker true`) and output that is not a terminal, such as a testkit `IntegrationTester` run, Mill's prompt logger dumps its prompt lines to the console at intervals while tasks run. Each line shows a running task's prompt key, its name, its time and the detail `logger.ticker` last set, such as `1-144] Task.Anon@6342ff7f(<enclosing method>) 3s samples.QueueFlatSpec`.
+
+- Every non-exclusive task gets a prompt line, anonymous tasks included, and so does each `Task.fork.async` body. A `ticker` call on that task's or body's logger therefore reaches the console.
+- An exclusive command gets no prompt line. A `ticker` call on its logger prints nothing, even inside a nested `Evaluator.execute`.
+- `TestModuleUtil.runTestFuture`, where it runs a worker on the calling thread, calls `ticker` with each test class the worker claims, on the logger of the `TaskCtx` it was built with.
+
+To keep test class names off the console, a plugin that runs Mill's test workers inside an anonymous task of its exclusive command must build `TestModuleUtil` with a `TaskCtx` whose logger is the exclusive command's, not the anonymous task's.
+</learning>
+
+<learning>
+date: 2026-11-27
+---
+A Mill module trait that declares `object test extends ScalaTests, ...` gives every module that extends it the same test module definition. Scala cannot override an `object`, so no module can change one of its test module's tasks, such as `testForkGrouping`, without copying the whole trait.
+
+Where modules share test settings but one may need its own, declare the settings as an inner trait of the module trait (`trait SharedTests extends ScalaTests, TestModule.ScalaTest { ... }`) and have each module declare `object test extends SharedTests`. A module can then override a task of its own test module: `object test extends SharedTests { def testForkGrouping = ... }`. This applies equally to a test fixture build that a scenario edits.
+</learning>
+
+<learning>
+date: 2026-11-27
+---
+In Mill 1.3.1, `mill.javalib.CoursierModule.Resolver` resolves dependencies in two ways that take different resolution parameters:
+
+- `classpath(deps, sources, artifactTypes, resolutionParamsMapOpt, ...)` downloads every artifact. `JavaModule.resolvedRunMvnDeps` calls it on `coursierDependencyTask().withConfiguration(runtime)`, with a map that sets `withDefaultConfiguration(runtime)` and the Gradle `org.gradle.usage` runtime variant attribute.
+- `resolution(deps)` fetches metadata only and returns the `coursier.core.Resolution`, but takes no parameter map: it resolves with the module's `resolutionParams` unchanged.
+
+For a metadata-only resolution in the runtime configuration, either:
+
+1. Bypass `millResolver`. `mill.javalib.Lib.resolveDependenciesMetadataSafe` is public, fetches metadata only and takes `resolutionParams`. `CoursierModule.Resolver`'s constructor is public, and so is every module task `millResolver` builds it from: `allRepositories`, `bindDependency`, `mapDependencies`, `resolutionCustomizer`, `coursierCacheCustomizer`, `resolutionParams`, `checkGradleModules` and `coursierConfigModule().coursierConfig()`. Pass those tasks' values to `resolveDependenciesMetadataSafe`, or to a new `Resolver` and call its `resolution`, with `resolutionParams` mapped as `resolvedRunMvnDeps` maps it. This keeps `resolvedRunMvnDeps`'s parameters but ignores a module's override of `millResolver`.
+2. Call `millResolver().resolution`, which keeps a module's override but not `resolvedRunMvnDeps`'s parameters. Name the configuration on the root dependency yourself: `coursierDependencyTask().copy(variantSelector = VariantSelector.ConfigurationBased(Configuration.runtime))`. Mill gives every dependency of a module's Coursier project a configuration. Only a dependency or BOM that names none, or a Gradle module variant under `checkGradleModules`, can then resolve differently from `resolvedRunMvnDeps`.
+</learning>
+
+<learning>
+date: 2026-11-28
+---
+In Mill 1.3.1, `CoursierModule.Resolver.resolution` calls `.get` on the `Result` that `Lib.resolveDependenciesMetadataSafe` returns. A failed resolution therefore throws a `RuntimeException` from inside the task's body, and the evaluation records the task as `ExecResult.Exception`, not `ExecResult.Failure`. The exception's message is Coursier's error, which begins and ends with a line break.
+
+An exception from test discovery can reach `ExecResult.Exception` as `mill.api.daemon.Result.SerializedException`:
+- With `javaHome` or discovery runtime options, discovery runs in a JVM worker subprocess, and `MillRpcClient` rebuilds every link of the returned cause chain as a `SerializedException` (`mill/rpc/MillRpcClient.scala`). `JvmWorkerImpl.apply` picks the subprocess when either is non-empty. Mill's own `discoveredTestClasses` passes `testDiscoverRuntimeOptions`, which `QuarkusModule` overrides with a non-empty value.
+- With neither, discovery runs in Mill's process inside `Jvm.withClassLoader`. `withClassLoader` calls `Result.SerializedException.partialFrom`, which replaces only an exception whose class the discovery class loader defined, or one whose cause it replaced (`mill/util/Jvm.scala`). A JDK exception with a JDK cause, such as a static initializer's `ExceptionInInitializerError`, arrives unchanged.
+
+A `SerializedException`'s `getMessage` is the original's message, but only its `info` (`Result.Failure.ExceptionInfo`'s `clsName`) holds the original's class name. Where the original had no message, such as `ExceptionInInitializerError`, `toString` is only `mill.api.daemon.Result$SerializedException`, so falling back to `toString` loses both what was thrown and its cause.
+
+Code that reads a task's failure from `executionResults.transitiveResults` must handle both `ExecResult.Failure` (read `msg`) and `ExecResult.Exception`.
+
+For an exception:
+- read the class name from `info.clsName` where the throwable is a `SerializedException`, otherwise from its class;
+- read the message with `getMessage`;
+- walk `getCause` for the causes.
+
+Trim the result before writing it on one line or after a task name.
+</learning>
+
+<learning>
+date: 2026-11-27
+---
+In Mill 1.3.1, a test module (`ScalaTests`, `JavaTests`) overrides `repositoriesTask` to return its outer module's `repositoriesTask` (`mill.javalib.JavaModule`, the `JavaTests` trait). A `repositories` override inside `object test` is therefore ignored: the test module's resolution never tries that repository, and Coursier's error lists only the outer module's repositories.
+
+Declare extra repositories, such as a fixture's local `file://` Maven repository, on the outer module. The test module then resolves with them.
+</learning>
+
+<learning>
+date: 2026-11-27
+---
+To read which version of a library a Mill module's dependencies resolve to, without downloading jars, read `retainedVersions` on the `coursier.core.Resolution` that `millResolver().resolution` returns for the module's `coursierDependencyTask()`. It is a `Map[coursier.core.Module, coursier.version.Version]` (Coursier 2.1.26). Compare `module.organization.value`, `module.name.value` (the artifact name with its Scala suffix, such as `_3`) and `version.repr`.
+
+The root dependency is the module's own Coursier project, so the result also holds the libraries the module gets through its `moduleDeps`, served from Mill's internal repositories. You need not walk `moduleDeps` yourself.
+</learning>
+
+<learning>
+date: 2026-11-27
+---
+Under Mill's `testForked` with `testParallelism`, when forked workers outnumber cores, splitting the longest test classes shortens the run far less than per-test times predict. More classes keep every worker busy for longer, so CPU contention rises and most other classes slow down. The critical path moves to another class rather than shrinking.
+
+For example, with 16 workers on 8 cores, splitting the two longest integration test classes into ten cut a 2388 s run by 170 s, not the predicted 550 s. The next-longest class slowed from 1628 s to 2188 s and became the critical path.
+
+Before splitting test classes to shorten a run, compare the worker count with the core count. Where workers outnumber cores, expect a small gain. Measure the run before and after; do not predict from per-test times taken on a less loaded run.
+</learning>
+
+<learning>
+date: 2026-11-28
+---
+In Mill 1.3.1, a task evaluates every task its body calls, in parallel, before the body runs. An override such as `def compile: T[CompilationResult] = Task { awaitMarker(); super.compile() }` therefore does not delay the compile: `super.compile` runs while `awaitMarker` is still waiting, and only the override's own body waits.
+
+To make a build's work start only after a condition, such as a marker file another process writes, put the wait upstream of that work. For a compile, wait in a task that feeds the compiler, as in `def allSourceFiles: T[Seq[PathRef]] = Task { awaitMarker(); super.allSourceFiles() }`.
+
+Declare the wait as a `Task.Input`. Mill evaluates an input on every run, so the wait still happens where the downstream task is cached, such as on a test fixture build that several scenarios reuse.
+
+A `Task.Input` with no upstream task starts as soon as the build starts evaluating tasks, not when the task that depends on it is reached. A timeout inside the wait therefore also covers every other module's dependency resolution and cold compile running at the same time. In a full parallel integration run (16 workers on 8 cores), these took about 140 s, and a 120 s wait timed out before the waited-for test had started. Size the timeout for a cold build under a full parallel run, or start the clock from a later condition.
 </learning>

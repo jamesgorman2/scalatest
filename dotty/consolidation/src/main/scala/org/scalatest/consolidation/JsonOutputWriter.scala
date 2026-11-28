@@ -3,7 +3,6 @@ package org.scalatest.consolidation
 import java.time.Duration
 import java.time.Instant
 import org.scalactic.source.Position
-import org.scalatest.ScalaTestVersions
 import org.scalatest.events.DecodedStackDepth
 import org.scalatest.events.DecodedStackFrame
 import org.scalatest.events.DecodedThrowable
@@ -56,14 +55,12 @@ private[consolidation] object JsonOutputWriter {
     objectOf(
       Vector[Field](
         "kind" -> Some(JsonValue.Text("root")),
-        "scalaTestVersion" -> Some(JsonValue.Text(ScalaTestVersions.ScalaTestVersion)),
+        "scalaTestVersion" -> Some(JsonValue.Text(Consolidation.scalaTestVersion)),
         "buildTool" -> root.buildTool.map(_.toJson),
-        "moduleSelectors" -> Some(JsonValue.Array(root.moduleSelectors.toVector.map(_.toJson))),
-        "outcome" -> Option.when(root.failures.nonEmpty)(JsonValue.Text("aborted")),
-        "failures" -> nonEmptyArray(root.failures.map(failure => objectOf(Vector[Field]("message" -> Some(JsonValue.Text(failure))))))
-      ) ++ measuredTimeFields(root.times) ++ Vector[Field](
+        "moduleSelectors" -> Some(JsonValue.Array(root.moduleSelectors.toVector.map(_.toJson)))
+      ) ++ failureFields(root.attachments) ++ measuredTimeFields(root.times) ++ Vector[Field](
         "contents" -> Some(JsonValue.Array(root.modules.map(moduleNode))),
-        "output" -> nonEmptyArray(root.output.map(capturedOutputItem))
+        "output" -> capturedOutputField(root.attachments)
       )
     )
 
@@ -72,9 +69,21 @@ private[consolidation] object JsonOutputWriter {
       Vector[Field](
         "kind" -> Some(JsonValue.Text("module")),
         "name" -> Some(JsonValue.Text(module.name.value))
-      ) ++ measuredTimeFields(module.times) :+
-        ("contents" -> Some(JsonValue.Array(module.runs.map(runNode))))
+      ) ++ failureFields(module.attachments) ++ measuredTimeFields(module.times) ++ Vector[Field](
+        "contents" -> Some(JsonValue.Array(module.runs.map(runNode))),
+        "output" -> capturedOutputField(module.attachments)
+      )
     )
+
+  private def failureFields(attachments: Attachments): Vector[Field] = {
+    val failures = attachments.failures
+    Vector(
+      "outcome" -> Option.when(failures.nonEmpty)(JsonValue.Text("aborted")),
+      "failures" -> nonEmptyArray(failures.map(failure => objectOf(Vector[Field]("message" -> Some(JsonValue.Text(failure))))))
+    )
+  }
+
+  private def capturedOutputField(attachments: Attachments): Option[JsonValue] = nonEmptyArray(attachments.output.map(capturedOutputItem))
 
   private def measuredTimeFields(times: MeasuredTimes): Vector[Field] =
     Vector(

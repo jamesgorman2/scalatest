@@ -1,0 +1,60 @@
+package org.scalatest.mill
+
+import org.scalatest.consolidation.Consolidation
+import org.scalatest.consolidation.ModuleName
+import org.scalatest.consolidation.ScalaTestArgument
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
+
+final class ModuleCheckSpec extends AnyWordSpec with should.Matchers {
+
+  private val module = ModuleName("core.test")
+
+  private val forkCore = ResolvedDependency(Organization("com.edc"), ArtifactName("scalatest-core_3"), LibraryVersion(Consolidation.scalaTestVersion))
+
+  private val scalaLibrary = ResolvedDependency(Organization("org.scala-lang"), ArtifactName("scala3-library_3"), LibraryVersion("3.3.8"))
+
+  private val frameworkArguments: Seq[ScalaTestArgument.Flagged] =
+    ScalaTestArgument.split(Seq("-z", "adds")).collect { case flagged: ScalaTestArgument.Flagged => flagged }
+
+  private def unrecognised(arguments: String*): Seq[ScalaTestArgument.Unrecognised] = arguments.map(ScalaTestArgument.Unrecognised(_))
+
+  private def runArguments(testArgsDefault: Seq[String], runtimeDependencies: ResolvedDependency*): Either[Seq[CannotRunReason], Seq[String]] =
+    ModuleCheck(testArgsDefault, runtimeDependencies.toSet).runArguments(module, frameworkArguments).map(_.commandLine)
+
+  "A module's check" when {
+    "its runtime dependencies hold this fork's core at the version the consolidation library was built at" should {
+      "give the module's kept arguments, then the framework arguments" in {
+        runArguments(Seq("-l", "samples.Slow", "-oD"), scalaLibrary, forkCore) shouldBe Right(Seq("-l", "samples.Slow", "-z", "adds"))
+      }
+    }
+
+    "its runtime dependencies hold this fork's core at another version" should {
+      "say the module does not test with this release" in {
+        runArguments(Nil, scalaLibrary, forkCore.copy(version = LibraryVersion(s"${Consolidation.scalaTestVersion}-other"))) shouldBe
+          Left(Seq(CannotRunReason.WithoutThisRelease(module)))
+      }
+    }
+
+    "its runtime dependencies hold upstream ScalaTest's core at the version the consolidation library was built at" should {
+      "say the module does not test with this release" in {
+        runArguments(Nil, scalaLibrary, forkCore.copy(organization = Organization("org.scalatest"))) shouldBe
+          Left(Seq(CannotRunReason.WithoutThisRelease(module)))
+      }
+    }
+
+    "its testArgsDefault holds arguments ScalaTest does not recognise" should {
+      "name each such argument" in {
+        runArguments(Seq("-x", "-l", "samples.Slow", "--not-a-scalatest-argument"), forkCore) shouldBe
+          Left(Seq(CannotRunReason.UnrecognisedArguments(module, unrecognised("-x", "--not-a-scalatest-argument"))))
+      }
+    }
+
+    "it does not test with this release and its testArgsDefault holds an argument ScalaTest does not recognise" should {
+      "give both reasons" in {
+        runArguments(Seq("-x"), scalaLibrary) shouldBe
+          Left(Seq(CannotRunReason.WithoutThisRelease(module), CannotRunReason.UnrecognisedArguments(module, unrecognised("-x"))))
+      }
+    }
+  }
+}

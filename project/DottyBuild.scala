@@ -423,6 +423,8 @@ trait DottyBuild { this: BuildCommons =>
       Test / unmanagedClasspath ++= (commonTestDotty / Compile / fullClasspath).value,
       // Core's Framework implements sbt's test interface, which core declares optional.
       libraryDependencies += "org.scala-sbt" % "test-interface" % "1.0" % Test,
+      // The tests validate the JSON output against the Mill plugin's JSON schema, of draft 2020-12.
+      libraryDependencies += "com.networknt" % "json-schema-validator" % "3.0.0" % Test,
       // The tests check the Mill plugin's documents against the JSON output, wherever sbt runs them from.
       Test / resourceGenerators += Def.task {
         val directories = new java.util.Properties

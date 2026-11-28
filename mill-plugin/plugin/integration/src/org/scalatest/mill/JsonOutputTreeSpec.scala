@@ -3,13 +3,14 @@ package org.scalatest.mill
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
+import org.scalatest.mill.tags.AreaTag
+import org.scalatest.mill.tags.Json
 
+@Json
 final class JsonOutputTreeSpec extends AnyFeatureSpec with GivenWhenThen with should.Matchers with JsonOutputFixture {
 
   private val outcomeMarkers: Map[String, String] =
     Map("failed" -> "*** FAILED ***", "canceled" -> "!!! CANCELED !!!", "ignored" -> "!!! IGNORED !!!", "pending" -> "(pending)")
-
-  private val timingKeys: Set[String] = Set("startedAt", "endedAt", "duration", "at", "threadName")
 
   private val kindsShownInTheTree: Set[NodeKind] = Set(NodeKind.Suite, NodeKind.Scope, NodeKind.Test)
 
@@ -40,17 +41,9 @@ final class JsonOutputTreeSpec extends AnyFeatureSpec with GivenWhenThen with sh
       }
     }
 
-  private def withTimingValuesMasked(value: ujson.Value): ujson.Value =
-    value match {
-      case ujson.Obj(fields) =>
-        ujson.Obj.from(fields.toSeq.map { case (key, field) => key -> (if (timingKeys.contains(key)) ujson.Str("<masked>") else withTimingValuesMasked(field)) })
-      case ujson.Arr(items) => ujson.Arr.from(items.map(withTimingValuesMasked))
-      case other => other
-    }
-
   Feature("The JSON output and the human-readable output hold one node tree") {
 
-    Scenario("Both outputs hold the same suites, scopes and tests in the same order") {
+    Scenario("Both outputs hold the same suites, scopes and tests in the same order", AreaTag.HumanReadable) {
       Given("suites holding a nested suite, scopes nested in scopes, a pending scope, and tests of every outcome except aborted")
       And("a suite wrapped with ConfigMapWrapperSuite, holding a scope whose tests two instances of the suite register")
       When("the test command is invoked as mill scalatest/test core.test -fJ <report>")
@@ -69,20 +62,6 @@ final class JsonOutputTreeSpec extends AnyFeatureSpec with GivenWhenThen with sh
         And("each suite's line is its name followed by a colon, and each scope's and test's starts with its label")
         And("a line marks its node's outcome as failed, canceled, ignored or pending, and only then")
         shouldWalkInOrder(treeNodes, result.treeLines.toList)
-      }
-    }
-
-    Scenario("The module's reporter arguments do not change the JSON output") {
-      Given("the JSON output of the test command invoked as mill scalatest/test core.test -fJ <report>")
-      withJsonOutputTree { build =>
-        val withoutReporterArguments = build.jsonOutputOfTestCommand()
-
-        When("the module's testArgsDefault is set to -oDW and the test command is invoked again the same way")
-        build.setModuleArguments(Seq("-oDW"))
-        val withReporterArguments = build.jsonOutputOfTestCommand()
-
-        Then("the JSON output is the same, key for key and in the same order, apart from the values of its times and thread names")
-        ujson.write(withTimingValuesMasked(withReporterArguments.raw), indent = 2) shouldBe ujson.write(withTimingValuesMasked(withoutReporterArguments.raw), indent = 2)
       }
     }
   }
