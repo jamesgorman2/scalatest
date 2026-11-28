@@ -6,9 +6,9 @@ import org.scalatest.ScalaTestVersions
 import org.scalatest.events.TestClassName
 
 /**
- * Consolidates the runs of one test command into human-readable output and, where `jsonOutput` is given, JSON output.
+ * Consolidates the runs of one test command into human-readable output and, when `jsonOutput` is given, JSON output.
  *
- * Every operation may be called from any thread. [[state]] takes no lock.
+ * Every method is thread-safe.
  */
 final class Consolidation private[consolidation] (
   humanReadableOutput: String => Unit,
@@ -29,13 +29,13 @@ final class Consolidation private[consolidation] (
   private val modulesEndedAbnormally = mutable.Set.empty[ModuleName]
   private val modulesFailingTestCommand = mutable.Set.empty[ModuleName]
 
-  /** A read made after an operation returns sees any failure that operation added. */
   def state: ConsolidationState = currentState
 
   /**
-   * Whether any of the module's runs has reported, in its event stream, a test as succeeded, failed, ignored, pending or
-   * canceled, or a suite as aborted. A suite or test that the consolidation reports as aborted only because it has no end
-   * event, such as one not run, does not count. Unlike [[state]], this takes the consolidation's lock.
+   * True when the event stream of one of the module's runs has reported a test as succeeded, failed, ignored, pending
+   * or canceled, or a suite as aborted.
+   *
+   * A suite or test that the consolidation marks as aborted because its end event never arrived is not a test result.
    */
   def hasTestResult(module: ModuleName): Boolean =
     synchronized {
@@ -43,12 +43,14 @@ final class Consolidation private[consolidation] (
     }
 
   /**
-   * Whether a failure is attached to the module, any of the module's runs has an outcome other than completed, or a
-   * process of the module ended before any run existed in it. A run whose event stream ended without recording how the
-   * run ended has an outcome other than completed. A failed or canceled test, an aborted suite, or a node aborted or
-   * not run inside a completed run does not count, though each fails the test command (see
-   * [[modulesFailingTheTestCommand]]). Unlike [[state]], this takes the consolidation's lock, and it answers before and
-   * after the consolidation ends.
+   * True when any of the following holds:
+   *   - a failure is attached to the module;
+   *   - a process of the module ended before any run existed in it;
+   *   - one of the module's runs has an outcome other than completed; or
+   *   - the event stream of one of the module's runs ended without recording the run's outcome.
+   *
+   * A failed or canceled test, an aborted suite, and a node aborted or not run inside a completed run do not end the
+   * module abnormally, although each fails the test command (see [[modulesFailingTheTestCommand]]).
    */
   def hasEndedAbnormally(module: ModuleName): Boolean =
     synchronized {
@@ -56,14 +58,10 @@ final class Consolidation private[consolidation] (
     }
 
   /**
-   * Each module, ordered by name, that holds a node failing the test command. Such a module is one where:
-   *   - a failure is attached to the module;
-   *   - a process of the module ended before any run existed in it; or
-   *   - a run of the module has an outcome other than completed, reports a test as failed or canceled or a suite as
-   *     aborted, or holds a node aborted or not run once its event stream ends.
-   *
-   * A failure attached to the root belongs to no module. Unlike [[state]], this takes the consolidation's lock, and it
-   * answers before and after the consolidation ends.
+   * The modules that fail the test command, ordered by name. A module fails the test command when:
+   *   - it has ended abnormally (see [[hasEndedAbnormally]]);
+   *   - one of its runs has reported a test as failed or canceled, or a suite as aborted; or
+   *   - one of its runs holds a node that is aborted or not run when the run's event stream ends.
    */
   def modulesFailingTheTestCommand: Vector[ModuleName] =
     synchronized {
@@ -72,16 +70,15 @@ final class Consolidation private[consolidation] (
 
   /**
    * Adds a run and passes its feed to `feedEventStream`. The run's event stream ends when `feedEventStream` returns or
-   * throws; anything it throws is rethrown.
+   * throws.
    *
-   * A module's runs are numbered from 1 by fork group, then by worker index. Runs given no worker come first, and runs
-   * that tie keep the order they were added in. Numbers are fixed when the consolidation ends, so a run added later can
-   * renumber earlier ones. A run's line in the human-readable output, and its run node in the JSON output, show its
-   * number.
+   * A module's runs are numbered from 1 by fork group, then by worker index. Runs without a worker come first, and
+   * runs that tie keep the order in which they were added. The numbers are assigned when the consolidation ends. Both
+   * the run's line in the human-readable output and its run node in the JSON output show its number.
    *
-   * @param module the run's module, under whose line the run appears in the human-readable output
+   * @param module the run's module. The run appears under this module's line in the human-readable output.
    * @param worker the worker the run ran in. The run node in the JSON output records the worker's fork group but not its index.
-   * @return the run, its event stream ended
+   * @return the run, whose event stream has ended
    * @throws java.lang.IllegalStateException if the consolidation has ended
    */
   def addRun(module: ModuleName, worker: Option[Worker] = None)(feedEventStream: RunFeed => Unit): EndedRun = {
@@ -100,7 +97,7 @@ final class Consolidation private[consolidation] (
   }
 
   /**
-   * Adds a process of the module that ended before any run existed in it. This fails the test command and ends the
+   * Records that a process of the module ended before any run existed in it. This fails the test command and ends the
    * module abnormally.
    *
    * @throws java.lang.IllegalStateException if the consolidation has ended
@@ -112,9 +109,9 @@ final class Consolidation private[consolidation] (
     }
 
   /**
-   * Attaches a line captured from a runner that is not a run, such as a build tool's discovery runner, to the module.
-   * A module given output but no run still appears in the human-readable and JSON outputs. The module's captured lines
-   * follow the lines for its runs, in the order they were attached.
+   * Attaches to the module a line captured from a runner that is not a run, such as a build tool's discovery runner.
+   * A module with output but no run still appears in the human-readable and JSON outputs. The module's captured lines
+   * follow the lines for its runs, in the order in which they were attached.
    *
    * @throws java.lang.IllegalStateException if the consolidation has ended
    */
@@ -126,8 +123,9 @@ final class Consolidation private[consolidation] (
 
   /**
    * Attaches to the module the message of a failure that belongs to none of its runs, such as its tests not starting.
-   * This fails the test command and ends the module abnormally. A module given a failure but no run still appears in
-   * the human-readable and JSON outputs. The module's failures follow its captured lines, in the order they were attached.
+   * This fails the test command and ends the module abnormally. A module with a failure but no run still appears in
+   * the human-readable and JSON outputs. The module's failures follow its captured lines, in the order in which they
+   * were attached.
    *
    * @throws java.lang.IllegalStateException if the consolidation has ended
    */
@@ -139,8 +137,8 @@ final class Consolidation private[consolidation] (
     }
 
   /**
-   * Attaches a line captured from a runner that is not a run, such as a build tool's discovery runner, to the root.
-   * The root's captured lines follow the lines for every module, in the order they were attached.
+   * Attaches to the root a line captured from a runner that is not a run, such as a build tool's discovery runner.
+   * The root's captured lines follow the lines for every module, in the order in which they were attached.
    *
    * @throws java.lang.IllegalStateException if the consolidation has ended
    */
@@ -151,8 +149,8 @@ final class Consolidation private[consolidation] (
     }
 
   /**
-   * Attaches the message of a failure of a runner that is not a run to the root. This fails the test command.
-   * The root's failures follow its captured lines, in the order they were attached.
+   * Attaches to the root the message of a failure of a runner that is not a run. This fails the test command.
+   * The root's failures follow its captured lines, in the order in which they were attached.
    *
    * @throws java.lang.IllegalStateException if the consolidation has ended
    */
@@ -164,8 +162,8 @@ final class Consolidation private[consolidation] (
     }
 
   /**
-   * Sets a module's start and end times by the caller's clock, replacing any an earlier call set. A module timed but
-   * given no run still appears in the human-readable and JSON outputs, with nothing under it.
+   * Sets a module's start and end times, measured by the caller's clock. These replace any times set by an earlier
+   * call. A module with times but no run still appears in the human-readable and JSON outputs.
    *
    * @param startedAt when the caller started the module's tests
    * @param endedAt when the last of the module's test processes ended
@@ -178,13 +176,13 @@ final class Consolidation private[consolidation] (
     }
 
   /**
-   * Ends the consolidation and writes the human-readable output, whose last line is the summary line, then the JSON
-   * output where a sink was given for it. Nothing is written before this.
+   * Ends the consolidation and writes the human-readable output, then the JSON output if a sink was given for it. The
+   * last line of the human-readable output is the summary line. No output is written before this call.
    *
-   * @param endedAt the root's end time by the caller's clock: when every run had ended
-   * @return the consolidation's state, now ended
-   * @throws java.lang.IllegalStateException if the consolidation has ended, or a run's event stream is still being fed, such as
-   *                               from within [[addRun]]'s `feedEventStream`
+   * @param endedAt the time at which every run had ended, measured by the caller's clock
+   * @return the consolidation's final state
+   * @throws java.lang.IllegalStateException if the consolidation has ended, or if a run's event stream has not ended, as
+   *                               happens when this is called from within [[addRun]]'s `feedEventStream`
    */
   def end(endedAt: Option[Instant] = None): ConsolidationState =
     synchronized {
@@ -247,17 +245,21 @@ final class Consolidation private[consolidation] (
 
 object Consolidation {
 
-  /** The version of `com.edc:scalatest-core_3` this library was built at, which the JSON output writes as `scalaTestVersion`. */
+  /** The version of `com.edc:scalatest-core_3` that this library was built with. The JSON output writes it as `scalaTestVersion`. */
   val scalaTestVersion: String = ScalaTestVersions.ScalaTestVersion
 
   /**
-   * @param humanReadableOutput the sink each line of human-readable output is written to, without its line end
-   * @param coloured whether that output is coloured with ANSI escape sequences
-   * @param jsonOutput the sink given the JSON output once, when the consolidation ends. Every operation but [[Consolidation#state]]
-   *                   waits until the sink returns. With none, no JSON output is made
-   * @param moduleSelectors each module selector, in the order given, with the test modules it resolved to
+   * Starts a consolidation.
+   *
+   * Both sinks are called only from [[Consolidation#end]]. Until they return, every other method except
+   * [[Consolidation#state]] waits.
+   *
+   * @param humanReadableOutput the sink that receives each line of human-readable output, without its line ending
+   * @param coloured true if the human-readable output is to be coloured with ANSI escape sequences
+   * @param jsonOutput the sink that receives the JSON output. If `None`, no JSON output is produced.
+   * @param moduleSelectors the module selectors, in the order given, each with the test modules it resolved to
    * @param buildTool the build tool that started the runs
-   * @param startedAt the root's start time by the caller's clock: when the consolidation started
+   * @param startedAt the time at which the consolidation started, measured by the caller's clock
    */
   def start(
     humanReadableOutput: String => Unit,
@@ -278,7 +280,7 @@ object Consolidation {
     )
 }
 
-/** Receives one run's event stream and captured lines, in the order they were read. */
+/** Receives one run's event stream and captured lines, in the order in which they were read. */
 final class RunFeed private[consolidation] (consolidation: Consolidation, newRun: RunAssembly) {
 
   private val run = new GuardedByConsolidation(consolidation, newRun)
@@ -297,8 +299,7 @@ final class RunFeed private[consolidation] (consolidation: Consolidation, newRun
       }
       val decoded = event.decoded
       run.set(run.get.added(decoded))
-      // A run that ends abnormally may have lost its module's test results, so it ends the module abnormally. A failed
-      // or canceled test or an aborted suite by itself fails only the test command.
+      // A run that ends abnormally may have lost some of its module's test results.
       if (RunAssembly.endsRunAbnormally(decoded)) {
         consolidation.endModuleAbnormally(module)
       } else if (RunAssembly.reportsFailure(decoded)) {
@@ -310,7 +311,8 @@ final class RunFeed private[consolidation] (consolidation: Consolidation, newRun
     }
 
   /**
-   * Adds the next line captured from the run's processes, before or after the run's event stream ends.
+   * Adds the next line captured from the run's processes. Lines can still be added after the run's event stream has
+   * ended.
    *
    * @throws java.lang.IllegalStateException if the consolidation has ended
    */
@@ -325,8 +327,7 @@ final class RunFeed private[consolidation] (consolidation: Consolidation, newRun
         val module = run.get.module
         val eventStream = run.get.assembledWholeEventStream
         endedEventStream.set(Some(eventStream))
-        // A stream that ends without recording a completed run may have lost its module's test results, so it ends the
-        // module abnormally. A node aborted or not run inside a completed run fails only the test command.
+        // An event stream that ends without recording a completed run may have lost some of its module's test results.
         if (eventStream.endsItsModuleAbnormally) {
           consolidation.endModuleAbnormally(module)
         } else if (eventStream.failsTestCommand) {
@@ -350,8 +351,8 @@ final class RunFeed private[consolidation] (consolidation: Consolidation, newRun
 final class EndedRun private[consolidation] (feed: RunFeed) {
 
   /**
-   * Adds the run's assigned test classes. A run that was assigned test classes and ran none of them shows its line in
-   * the human-readable output.
+   * Records the test classes that were assigned to the run. A run that was assigned test classes but ran none of them
+   * still has a line in the human-readable output.
    *
    * @throws java.lang.IllegalStateException if the consolidation has ended
    */
