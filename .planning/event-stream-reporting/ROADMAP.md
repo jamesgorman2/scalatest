@@ -1,8 +1,67 @@
 # Roadmap - Event-stream test reporting for Mill
 
-Features of the epic [Event-stream test reporting for Mill](SPECIFICATION.md), in intended implementation order: a walking skeleton on one JVM module, then JSON output, then every worker, argument and module Mill runs, then formatting, filtering and human-readable output to a file (feature 16), then filtering characters on JSON output (feature 18), then supported Mill releases, then `--halt-on-failure`, then a module that presets a test command's arguments (feature 17), then unfinished runs, progress output and capture against nodes on the JVM, then Scala.js and Scala Native. Spec document paths are relative to `.planning/event-stream-reporting/`. Requirements are cited by ID; architecture by section; decisions by title.
-
 No feature is released before the epic is complete. Behaviour a feature leaves to a later one is undefined until that later feature, and a feature specifies it only where its own acceptance criteria need it.
+
+## 16. Formatting, filtering and human-readable output to a file
+
+The test command takes the formatting and filtering characters on `-o` and `-f` and applies them to human-readable output (R-138, R-139, R-106f, R-106g, R-127a, R-127b), and `-fH <path>` writes human-readable output to the file at that path. Feature 18 applies the filtering characters to JSON output. Builds on features 1 and 2.
+
+Enables:
+
+- `SPECIFICATION.md` R-138 and R-139 (parsing on every `-o` and `-f`; effect on human-readable output), R-127a, R-127b, R-106c (nodes a filtering character removes), R-106f (`w`), R-106g (`d`), R-049a (`-fH`), R-049b (more than one `-f`), R-055 (human-readable files; formatting and filtering), R-020 (human-readable on stdout and in a file), R-077 and R-059 (a human-readable file), § Scope (the test command's output arguments)
+- `ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library (Start: a sink for each output in a file; each human-readable output's characters), § Data flow (each output a `-f` names: human-readable)
+
+Settles:
+
+- Whether one `-f` may name output letters in a combination other than those R-049a lists, such as `J` with `H`.
+- What the test command does with a lowercase character outside the set R-106f, R-106g and R-127a name.
+- What the test command does with an `-o` output letter other than `H` and `P`, such as `J` (R-048 names only those two).
+
+Risks:
+
+- `decisions/outputs.md` "Each `-o` and `-f` argument takes the formatting characters `w` and `d` for human-readable output, and the filtering characters…"
+
+## 18. Filtering characters on JSON output
+
+The filtering characters on a `-fJ` argument omit nodes and messages from the JSON output that argument names. Builds on features 2 and 16.
+
+- `c` omits succeeded tests, `x` ignored tests, `e` pending tests, `o` info, `m` markup and `r` pending scopes (R-127c).
+- A scope whose children have all been omitted is omitted, recursively (R-127d).
+- The characters apply only to the `-fJ` they are attached to: another `-f` or the `-o` of the same test command is unaffected, and a `-fJ` with no filtering character writes every node (R-139, R-028).
+
+Enables:
+
+- `SPECIFICATION.md` R-127c, R-127d, R-138 and R-139 (filtering characters on a `-fJ`), R-028 (the tree less what filtering characters omit), R-055 (filtering of JSON output)
+
+Settles:
+
+- How the JSON writer is given its `-f` argument's filtering characters (`ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library, Start, gives characters for each human-readable output only).
+- Whether the JSON output records which filtering characters were applied, or that a node's `contents` had nodes or messages omitted (`../../mill-plugin/consolidated.schema.json` `$defs/testNode` and `$defs/message` are silent).
+- Where the output captured against an omitted test or scope goes (R-127c and R-127d are silent; R-097b attaches output to the most specific identifiable node).
+- Whether a scope is omitted when its tests and scopes are all omitted but a message remains in its `contents`, or output is captured against it (R-127d speaks of its children).
+- Whether a suite, run node or module is omitted when everything beneath it is omitted (R-127d names scopes only).
+- What a formatting character, `w` or `d`, does on a `-fJ` (R-138 allows formatting characters on each `-f`; R-106f and R-106g name the human-readable output only).
+
+Risks:
+
+- `../../mill-plugin/consolidated.schema.json` `$defs/testNode` ("No node's outcome is rolled up from its children."): a reader rolling up a filtered tree counts only the nodes left.
+
+## 17. A module that presets a test command's arguments
+
+A build defines a module that presets a test command's arguments, such as module selectors and tags, so that a `mill` command naming only that module, such as `mill performanceTests` or `mill integrationTests`, runs that test command (R-126). The build, not the user, then knows which modules and tags make up a kind of test run. Builds on features 4 and 5.
+
+Enables:
+
+- `SPECIFICATION.md` R-126, R-055 (from a module that presets them), R-092 (modules a preset module selects), § Scope (a module that presets a test command's arguments)
+
+Settles:
+
+- How a build defines such a module (R-126 gives its effect only).
+- How arguments given on its `mill` command combine with its presets.
+
+Risks:
+
+- `decisions/test-command.md` "Only an explicit test command produces consolidated output, leaving Mill's test tasks unchanged." (Costs: built on evaluator commands that Mill documents as experimental), which a preset module's command must reach
 
 ## 6. Supported Mill releases
 
@@ -237,66 +296,6 @@ Risks:
 
 - `decisions/capture-and-console.md` "Test output and worker output are told apart by their source…" (Costs: a C `printf` lands on a broader node; `research/js-native-structure-and-capture.md` § 4.2)
 
-## 16. Formatting, filtering and human-readable output to a file
-
-The test command takes the formatting and filtering characters on `-o` and `-f` and applies them to human-readable output (R-138, R-139, R-106f, R-106g, R-127a, R-127b), and `-fH <path>` writes human-readable output to the file at that path. Feature 18 applies the filtering characters to JSON output. Builds on features 1 and 2.
-
-Enables:
-
-- `SPECIFICATION.md` R-138 and R-139 (parsing on every `-o` and `-f`; effect on human-readable output), R-127a, R-127b, R-106c (nodes a filtering character removes), R-106f (`w`), R-106g (`d`), R-049a (`-fH`), R-049b (more than one `-f`), R-055 (human-readable files; formatting and filtering), R-020 (human-readable on stdout and in a file), R-077 and R-059 (a human-readable file), § Scope (the test command's output arguments)
-- `ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library (Start: a sink for each output in a file; each human-readable output's characters), § Data flow (each output a `-f` names: human-readable)
-
-Settles:
-
-- Whether one `-f` may name output letters in a combination other than those R-049a lists, such as `J` with `H`.
-- What the test command does with a lowercase character outside the set R-106f, R-106g and R-127a name.
-- What the test command does with an `-o` output letter other than `H` and `P`, such as `J` (R-048 names only those two).
-
-Risks:
-
-- `decisions/outputs.md` "Each `-o` and `-f` argument takes the formatting characters `w` and `d` for human-readable output, and the filtering characters…"
-
-## 17. A module that presets a test command's arguments
-
-A build defines a module that presets a test command's arguments, such as module selectors and tags, so that a `mill` command naming only that module, such as `mill performanceTests` or `mill integrationTests`, runs that test command (R-126). The build, not the user, then knows which modules and tags make up a kind of test run. Builds on features 4 and 5.
-
-Enables:
-
-- `SPECIFICATION.md` R-126, R-055 (from a module that presets them), R-092 (modules a preset module selects), § Scope (a module that presets a test command's arguments)
-
-Settles:
-
-- How a build defines such a module (R-126 gives its effect only).
-- How arguments given on its `mill` command combine with its presets.
-
-Risks:
-
-- `decisions/test-command.md` "Only an explicit test command produces consolidated output, leaving Mill's test tasks unchanged." (Costs: built on evaluator commands that Mill documents as experimental), which a preset module's command must reach
-
-## 18. Filtering characters on JSON output
-
-The filtering characters on a `-fJ` argument omit nodes and messages from the JSON output that argument names. Builds on features 2 and 16.
-
-- `c` omits succeeded tests, `x` ignored tests, `e` pending tests, `o` info, `m` markup and `r` pending scopes (R-127c).
-- A scope whose children have all been omitted is omitted, recursively (R-127d).
-- The characters apply only to the `-fJ` they are attached to: another `-f` or the `-o` of the same test command is unaffected, and a `-fJ` with no filtering character writes every node (R-139, R-028).
-
-Enables:
-
-- `SPECIFICATION.md` R-127c, R-127d, R-138 and R-139 (filtering characters on a `-fJ`), R-028 (the tree less what filtering characters omit), R-055 (filtering of JSON output)
-
-Settles:
-
-- How the JSON writer is given its `-f` argument's filtering characters (`ARCHITECTURE.md` § APIs § The Mill plugin and the consolidation library, Start, gives characters for each human-readable output only).
-- Whether the JSON output records which filtering characters were applied, or that a node's `contents` had nodes or messages omitted (`../../mill-plugin/consolidated.schema.json` `$defs/testNode` and `$defs/message` are silent).
-- Where the output captured against an omitted test or scope goes (R-127c and R-127d are silent; R-097b attaches output to the most specific identifiable node).
-- Whether a scope is omitted when its tests and scopes are all omitted but a message remains in its `contents`, or output is captured against it (R-127d speaks of its children).
-- Whether a suite, run node or module is omitted when everything beneath it is omitted (R-127d names scopes only).
-- What a formatting character, `w` or `d`, does on a `-fJ` (R-138 allows formatting characters on each `-f`; R-106f and R-106g name the human-readable output only).
-
-Risks:
-
-- `../../mill-plugin/consolidated.schema.json` `$defs/testNode` ("No node's outcome is rolled up from its children."): a reader rolling up a filtered tree counts only the nodes left.
 
 ## Deferred
 
