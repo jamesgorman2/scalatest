@@ -4,7 +4,7 @@ Scale: feature.
 
 ## Summary
 
-The test command writes human-readable output only to its stdout. The test command prints every line of that output, always in colour and with no durations, and takes at most one `-f` argument. A reader who wants the output in a file, uncoloured, with durations, or without the lines of tests that succeeded cannot get it. This feature adds `-fH <path>` and several `-f` arguments on one test command, and the formatting and filtering characters on each output argument that writes human-readable output.
+The test command writes human-readable output only to its stdout. The test command prints every line of that output, always in colour and with no durations. The test command takes at most one `-f` argument. A reader who wants the output in a file, uncoloured, with durations, or without the lines of tests that succeeded cannot get it. This feature adds `-fH <path>` and several `-f` arguments on one test command, and the formatting and filtering characters on each output argument that writes human-readable output.
 
 ## Plan
 
@@ -12,7 +12,7 @@ The test command writes human-readable output only to its stdout. The test comma
 
 ## Spec documents
 
-- [../SPECIFICATION.md](../SPECIFICATION.md) — the epic's specification, whose requirements the epic coverage table cites.
+- [../SPECIFICATION.md](../SPECIFICATION.md) — the epic's specification, whose requirements the table at the end of § Acceptance criteria cites.
 - [../ROADMAP.md](../ROADMAP.md) — the epic's later features, which own what this feature leaves out.
 
 Terms are defined in `.docs/ubiquitous-language.md`, among them **Output argument**, **Output letter**, **Formatting characters** and **Filtering characters**.
@@ -20,10 +20,13 @@ Terms are defined in `.docs/ubiquitous-language.md`, among them **Output argumen
 ## Scope
 
 - Output arguments. An *output argument* is an `-o` or `-f` argument of the test command. An `-o` names stdout, and an `-f <path>` names the file at `<path>`.
-- The output letters each output argument takes. An output argument's *output letters* are its upper-case characters `H`, `P` and `J`, which select human-readable, progress and JSON output. An `-o` takes no output letter, `H`, `P`, or `H` with `P`. An `-f` takes `J`, `H`, `P`, or `H` with `P`. An `-oH` or an `-fH` is an `-o` or an `-f` whose output letters include `H`, such as `-oHP`.
+- The output letters each output argument takes. An output argument's *output letters* are its upper-case characters `H`, `P` and `J`, which select human-readable, progress and JSON output.
+  - An `-o` takes no output letter, `H`, `P`, or `H` with `P`.
+  - An `-f` takes `J`, `H`, `P`, or `H` with `P`.
+  - An `-oH` or an `-fH` is an `-o` or an `-f` whose output letters include `H`, such as `-oHP`.
 - Accepting `P` on an output argument, such as `-oHP` or `-fP <path>`. An `-oH` or `-fH` writes the human-readable output whether or not its output letters include `P`.
 - An unknown output argument: the test command fails before any test starts, naming the argument, as it fails on any other unknown argument. An output argument is unknown where it holds:
-  - a set of output letters that the item above does not list, such as `-oJ` or `-fJH <path>`;
+  - a set of output letters that its kind, `-o` or `-f`, does not take, such as `-oJ` or `-fJH <path>`;
   - no output letter, where it is an `-f`, such as `-fw <path>`;
   - any character, upper or lower case, that is not an output letter, a formatting character or a filtering character, such as `-oD` or `-oHC`.
 - The output letters, formatting characters and filtering characters on one output argument form a set: their order and repeats do not matter. `-oPH` is therefore `-oHP`, `-fPH <path>` is `-fHP <path>`, and `-fcwH <path>` is `-fHwc <path>`.
@@ -32,25 +35,25 @@ Terms are defined in `.docs/ubiquitous-language.md`, among them **Output argumen
 - An `-fH` with no path after it fails the test command before any test starts.
 - Any number of `-f` arguments on one test command, each `-fH` and each `-fJ` writing its own file. Two `-f` arguments name one file where their paths, each resolved against the build's workspace root, are the same once their `.` and `..` segments are removed. Two `-f` arguments that name one file fail the test command before any test starts, naming the file, as an unknown argument does.
 - Deleting each file an `-fH` names before any test starts, and leaving it deleted where the test command cannot run a selected test module.
-- An `-fH` file is deleted and written as an `-fJ` file is, by `mill-plugin/plugin/src/org/scalatest/mill/JsonOutputFile.scala` `JsonOutputFile`, and fails the test command where an `-fJ` file would:
+- `mill-plugin/plugin/src/org/scalatest/mill/JsonOutputFile.scala` `JsonOutputFile` deletes and writes the file an `-fH` names as it does the file an `-fJ` names. The test command fails on the file an `-fH` names where it would fail on the file an `-fJ` names:
   - Where a folder is at the path, or the file there cannot be deleted, the test command fails before any test starts, naming the path, and writes no consolidated output.
   - Where the file cannot be written once every run has ended, the test command fails, naming the path, and still writes every other output.
 - The formatting characters on an `-oH` or `-fH`:
   - `w` prints the human-readable output without colour.
   - `d` prints the duration of each node shown that has one, as ScalaTest's `-oD` prints a test's duration: the node's line, a space, then the duration in parentheses, such as `- pushes (12 milliseconds)`. The nodes with a duration are:
-    - the root, timed from when the test command starts to when every run has ended. The root's duration is printed only where the root's line is shown.
+    - the root, timed from when the test command starts to when every run has ended;
     - a module whose tests started, timed from when the test command starts the module's tests to when the last of the module's test processes ends;
-    - a run whose closing run event (`RunCompleted`, `RunStopped` or `RunAborted`) carries a duration. A run's duration is printed only where the run's line is shown.
+    - a run whose closing run event (`RunCompleted`, `RunStopped` or `RunAborted`) carries a duration;
     - a suite or test whose closing event carries a duration;
-    - a scope whose opening and closing ScalaTest both reported.
+    - a scope for which ScalaTest reported both its opening and its closing.
 - The filtering characters on an `-oH` or `-fH`, each of which names one kind of node or message: `c` names succeeded tests, `x` ignored tests, `e` pending tests, `o` info messages, `m` markup messages and `r` pending scopes. A filtering character omits each message it names.
   - A scope's children are its child scopes and tests. A message is not a child.
   - A node that a filtering character names is omitted where no node beneath it is kept.
   - A node that a filtering character names keeps its line as a header where a node beneath it is kept, so that the kept node keeps its place in the tree. A failed test in a pending scope under `r`, and a suite run inside a succeeded test under `c`, are such kept nodes.
-  - A scope all of whose children the filtering characters omit is omitted too, at any depth, whatever the scope's own outcome.
+  - A scope is omitted, at any depth and whatever its own outcome, where the filtering characters omit all of its children.
   - A scope that has no children is kept unless a filtering character names it, as `r` names a pending scope.
   - Filtering characters never omit a module, a run or a suite.
-  - The messages attached to an omitted node or to a node kept as a header, and any output captured against either node, are omitted.
+  - The messages attached to an omitted node or to a node kept as a header, and any output captured against such a node, are omitted.
   - Where a test was executed more than once, `c` names each execution that succeeded.
   - Filtering characters omit lines only. The summary line counts every suite and test, whatever the filtering characters omit.
 - Formatting and filtering characters on an `-oH` or `-fH`, such as `-oHwc`, each applying only to the output that argument names.
@@ -60,7 +63,7 @@ Terms are defined in `.docs/ubiquitous-language.md`, among them **Output argumen
 
 An item that names a section of `../ROADMAP.md` is left to the feature that section describes.
 
-- Progress output, what `P` on an `-o` or `-f` writes, and what stdout holds when no `-o` is given (§ 9).
+- Progress output, which `P` on an `-o` or `-f` writes, and what stdout holds when no `-o` is given (§ 9).
 - Capturing output against a suite, scope or test, so that output can be omitted with an omitted node (§ 10).
 - What filtering characters on an `-fJ` do to the JSON output (§ 18).
 - Formatting and filtering characters that a module presets (§ 17).
@@ -133,7 +136,7 @@ Feature: Output files
       When `mill scalatest/test core.test munit.test -fH tests.txt` is invoked
       Then no file should exist at `tests.txt`
 
-  Rule: An `-fH` path at which the test command cannot delete what is there fails the test command before any test starts
+  Rule: An `-fH` path holding something the test command cannot delete fails the test command before any test starts
 
     Scenario Outline: AC-029 <obstacle> at the `-fH` path fails the test command before any test starts
       Given <obstacle> exists at `tests.txt`

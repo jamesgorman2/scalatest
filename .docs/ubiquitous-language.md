@@ -104,11 +104,11 @@ One of the upper-case characters `H`, `P` and `J` on an output argument, which s
 _Avoid_: Output format, format letter
 
 **Formatting characters**:
-The characters `w` and `d` on a test command's `-o` or `-f` argument, each of which changes how that argument's output is written, such as without colour or with durations. They are not ScalaTest reporter configuration characters.
+The characters `w` and `d` on an output argument, each of which changes how that argument's output is written, such as without colour or with durations. They are not ScalaTest reporter configuration characters.
 _Avoid_: Format flags, formatting options
 
 **Filtering characters**:
-The characters `c`, `x`, `e`, `o`, `m` and `r` on a test command's `-o` or `-f` argument, each of which omits one kind of node or message from that argument's output. They are distinct from ScalaTest's event-filter characters, which drop events from what a reporter writes.
+The characters `c`, `x`, `e`, `o`, `m` and `r` on an output argument, each of which omits one kind of node or message from that argument's output. They are distinct from ScalaTest's event-filter characters, which drop events from what a reporter writes.
 _Avoid_: Event-filter characters, filter characters, filter flags
 
 **Test output**:

@@ -24,7 +24,12 @@ Terms are defined in `.docs/ubiquitous-language.md`.
 - An emitter in ScalaTest that sends one run's events, test structure and the output it captures in a single test event log.
 - A consolidation library that produces the consolidated output from many runs.
 - A Mill plugin that hosts the consolidation library, reads the test event log of each run it starts, and adds the consolidated test command, which runs the tests of every test module its module selectors name, with the emitter on.
-- The consolidated test command's output arguments: progress and human-readable output on its stdout or in files, JSON output in files, any number of files, the *formatting characters* that change how human-readable and progress output is written, and the *filtering characters* that omit nodes and messages from human-readable and JSON output.
+- The consolidated test command's output arguments:
+  - progress and human-readable output on its stdout or in files;
+  - JSON output in files;
+  - any number of files;
+  - the *formatting characters*, which change how human-readable and progress output is written;
+  - the *filtering characters*, which omit nodes and messages from human-readable and JSON output.
 - A module a build defines to preset a consolidated test command's arguments.
 
 The emitter, the consolidation library and the Mill plugin cover runs on the JVM, Scala.js and Native, in test modules on Scala 3.3 or later. The fork publishes no Scala 2 artifacts. On Scala.js, the fork meets § Constraints in every JS environment, but the emitter, the consolidated output and the consolidated test command cover only runs in the `NodeJs` and `JsDom` JS environments. The fork meets every requirement below on each runtime, and in each JS environment that the requirement covers.
@@ -204,7 +209,7 @@ A task's *task folder* is the folder Mill gives that task to write its files in.
   - where a filtering character removes nodes
   - where a subtree contains identical aborted messages, only the root is printed
 - R-106d Human-readable output prints each nodes outcome and outcome message
-- R-106e Human-readable output prints the output attached to each node, less what its filtering characters omit
+- R-106e Human-readable output prints the output attached to each node, less what the filtering characters given omit
 - R-106f Human-readable output prints in colour, unless the `w` formatting character is given
 - R-106g Human-readable output prints durations only when the `d` formatting character is given
 - R-127a For each filtering character given, human-readable output omits what that character names: `c` succeeded tests, `x` ignored tests, `e` pending tests, `o` info, `m` markup and `r` pending scopes.
